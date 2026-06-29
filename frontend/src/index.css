@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-deep: #0F1115;
+  --color-bg-panel: #1A1D24;
+  --color-text-primary: #E1E3E8;
+  --color-text-secondary: #A1A5B0;
+  --color-mint-green: #2EE59D;
+  --color-coral-red: #FF4B55;
+  --color-electric-blue: #4D88FF;
+  --color-warning-amber: #FFB300;
+}
+
+:root {
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: #E1E3E8;
+  background-color: #0F1115;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 0%, #1A1D24 0%, #0F1115 100%);
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 17, 21, 0.3);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(77, 136, 255, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 136, 255, 0.6);
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(10, 16, 30, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border-radius: 12px;
+}
+
+.glass-panel-glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), inset 0 0 12px rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.glass-panel-glow-green {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), inset 0 0 12px rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.glass-panel-glow-red {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15), inset 0 0 12px rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Custom code editor text area */
+.code-editor {
+  font-family: 'JetBrains Mono', monospace;
+  background: #070913;
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  resize: none;
+  outline: none;
+}
+.code-editor:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+/* News sentiment tag classes */
+.sentiment-bullish {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+.sentiment-bearish {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+.sentiment-neutral {
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px solid rgba(156, 163, 175, 0.3);
+  color: #9ca3af;
+}
+
+/* Glowing text colors */
+.glow-text-green {
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+.glow-text-red {
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+.glow-text-indigo {
+  text-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Animations */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+.pulse-badge {
+  animation: pulse-slow 2s infinite ease-in-out;
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.ticker-wrap {
+  overflow: hidden;
+  width: 100%;
+  background: rgba(10, 16, 30, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ticker-content {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ticker-scroll 30s linear infinite;
+}
+.ticker-content:hover {
+  animation-play-state: paused;
+}
+
+.ticker-item {
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* Sector Blocks */
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.sector-block {
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.sector-block:hover {
+  transform: translateY(-2px);
+}

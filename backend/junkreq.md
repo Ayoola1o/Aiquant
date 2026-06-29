@@ -1,0 +1,5 @@
+Successfully installed MarkupSafe-3.0.3 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.14.1 beautifulsoup4-4.15.0 certifi-2026.6.17 cffi-2.0.0 charset_normalizer-3.4.7 click-8.4.2 colorama-0.4.6 curl_cffi-0.15.0 einops-0.8.1 fastapi-0.138.1 filelock-3.29.4 fsspec-2026.6.0 
+h11-0.16.0 huggingface_hub-0.33.1 idna-3.18 jinja2-3.1.6 joblib-1.5.3 markdown-it-py-4.2.0 mdurl-0.1.2 mpmath-1.3.0 multitasking-0.0.13 narwhals-2.22.1 networkx-3.6.1 numpy-2.5.0 packaging-26.2 pandas-3.0.4 
+peewee-4.1.1 platformdirs-4.10.0 protobuf-7.35.1 pycparser-3.0 pydantic-2.13.4 pydantic-core-2.46.4 pygments-2.20.0 python-dateutil-2.9.0.post0 pytz-2026.2 pyyaml-6.0.3 requests-2.34.2 rich-15.0.0 safetensors-0.6.2 scikit-learn-1.9.0 scipy-1.18.0 setuptools-81.0.0 six-1.17.0 
+soupsieve-2.8.4 starlette-1.3.1 sympy-1.14.0 threadpoolctl-3.6.0 torch-2.12.1 tqdm-4.68.3 typing-extensions-4.15.0 typing-inspection-0.4.2 tzdata-2026.2 urllib3-2.7.0 uvicorn-0.49.0 websockets-16.0 yfinance-1.5.1
+(venv) PS C:\Users\ASUS\Documents\Aiquant\backend> 
