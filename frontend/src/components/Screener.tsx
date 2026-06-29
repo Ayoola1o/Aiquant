@@ -19,7 +19,12 @@ import {
   TrendingDown, 
   Layers, 
   Cpu, 
-  Newspaper 
+  Newspaper,
+  ChevronLeft,
+  Coins,
+  Scale,
+  Building2,
+  BookOpen
 } from 'lucide-react';
 
 interface ScreenerItem {
@@ -51,6 +56,11 @@ export default function Screener() {
   // Pagination states
   const [pageSize, setPageSize] = useState(30);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Deep-dive company view states
+  const [viewMode, setViewMode] = useState<'matrix' | 'company'>('matrix');
+  const [selectedCompanyData, setSelectedCompanyData] = useState<any | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const fetchScreener = async () => {
     setLoading(true);
@@ -186,6 +196,268 @@ export default function Screener() {
     }
     setHistoryData(pts);
   }, [selectedTicker, screenerList]);
+
+  const handleViewCompany = async (ticker: string) => {
+    setSelectedTicker(ticker);
+    setLoadingDetails(true);
+    try {
+      const res = await fetch(`/api/screener/company/${ticker}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedCompanyData(data);
+        setViewMode('company');
+      }
+    } catch (e) {
+      console.error("Failed to fetch company details:", e);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  if (viewMode === 'company' && selectedCompanyData) {
+    const data = selectedCompanyData;
+    const isUp = data.direction === 'Bullish';
+
+    // Parse cash vs debt weights
+    const parseToValue = (valStr: string) => {
+      if (!valStr) return 1;
+      const clean = valStr.replace(/[^0-9.]/g, '');
+      const num = parseFloat(clean);
+      if (isNaN(num)) return 1;
+      if (valStr.includes('T')) return num * 1000;
+      if (valStr.includes('B')) return num;
+      if (valStr.includes('M')) return num / 1000;
+      return num;
+    };
+    const cashVal = parseToValue(data.total_cash);
+    const debtVal = parseToValue(data.total_debt);
+    const totalSum = cashVal + debtVal || 1;
+    const cashWeight = Math.round((cashVal / totalSum) * 100);
+    const debtWeight = 100 - cashWeight;
+
+    return (
+      <div className="flex flex-col gap-6 text-[#E1E3E8] select-none min-h-[calc(100vh-140px)]">
+        {/* Navigation Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setViewMode('matrix')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back to Matrix
+            </button>
+            <div className="h-6 w-[1px] bg-white/10 hidden md:block" />
+            <div>
+              <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                {data.name} <span className="text-xs font-mono font-normal text-[#4D88FF] bg-[#4D88FF]/10 px-2 py-0.5 rounded-full">{data.ticker}</span>
+              </h2>
+              <span className="text-[10px] text-[#A1A5B0] font-light">Deep-Dive Quant & Qualitative AI Analysis</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Price Badge */}
+            <div className="bg-[#0F1115] border border-white/5 px-4 py-2 rounded-xl flex items-center gap-2">
+              <span className="text-xs text-[#A1A5B0]">Live Price:</span>
+              <span className={`text-sm font-mono font-bold ${isUp ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
+                {data.currency || '$'}{data.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* Quick Switch Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#A1A5B0] hidden sm:inline">Quick Switch:</span>
+              <select
+                value={selectedTicker}
+                onChange={(e) => handleViewCompany(e.target.value)}
+                className="px-3 py-2 bg-[#0F1115] border border-white/5 rounded-lg text-xs font-semibold outline-none focus:border-[#4D88FF]/50 text-white cursor-pointer"
+              >
+                {screenerList.map((x) => (
+                  <option key={x.ticker} value={x.ticker}>
+                    {x.ticker} ({x.currency || '$'}{x.price})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Dashboard 3-Column Grid */}
+        <div className="grid md:grid-cols-3 gap-6 items-start">
+          
+          {/* Card 1: Financial Foundation */}
+          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#4D88FF]" />
+                Financial Foundation
+              </h3>
+              <span className="text-[10px] text-[#A1A5B0] font-light">TTM Balance Sheet & Income Statements</span>
+            </div>
+
+            <div className="space-y-4">
+              {/* Total Revenue */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">Total Revenue (TTM)</span>
+                <span className="text-sm font-mono font-bold text-white">{data.revenue_ttm}</span>
+              </div>
+
+              {/* Gross Margin */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">Gross Profit Margin</span>
+                <span className="text-sm font-mono font-bold text-[#2EE59D]">{data.gross_margin}</span>
+              </div>
+
+              {/* Net Income */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">Net Income (TTM)</span>
+                <span className="text-sm font-mono font-bold text-white">{data.net_income_ttm}</span>
+              </div>
+
+              {/* Free Cash Flow */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">Free Cash Flow (FCF)</span>
+                <span className="text-sm font-mono font-bold text-[#4D88FF]">{data.fcf}</span>
+              </div>
+
+              {/* Cash vs Debt comparison widget */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between text-[9px] uppercase font-bold text-slate-400">
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#2EE59D]" /> Cash: {data.total_cash}</span>
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#FF4B55]" /> Debt: {data.total_debt}</span>
+                </div>
+                {/* Stacked progress bar */}
+                <div className="h-2.5 rounded-full bg-[#0F1115] overflow-hidden flex border border-white/5">
+                  <div className="bg-[#2EE59D] h-full transition-all" style={{ width: `${cashWeight}%` }} />
+                  <div className="bg-[#FF4B55] h-full transition-all" style={{ width: `${debtWeight}%` }} />
+                </div>
+                <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                  <span>Liquid Reserves ({cashWeight}%)</span>
+                  <span>Leverage ({debtWeight}%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Market Valuation & Chart */}
+          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Coins className="w-4 h-4 text-[#4D88FF]" />
+                Market Valuation Layers
+              </h3>
+              <span className="text-[10px] text-[#A1A5B0] font-light">Market capitalization & valuation ratios</span>
+            </div>
+
+            <div className="space-y-4">
+              {/* Market Cap */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">Market Capitalization</span>
+                <span className="text-sm font-mono font-bold text-white">{data.market_cap}</span>
+              </div>
+
+              {/* P/E Ratio */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">P/E Ratio</span>
+                <span className="text-sm font-mono font-bold text-white">{data.pe_ratio}</span>
+              </div>
+
+              {/* EV/EBITDA */}
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-slate-400">EV/EBITDA</span>
+                <span className="text-sm font-mono font-bold text-white">{data.ev_ebitda}</span>
+              </div>
+
+              {/* Model projection 24h Area Chart */}
+              <div className="flex flex-col gap-2 pt-2">
+                <span className="text-[10px] text-[#A1A5B0] font-semibold uppercase tracking-wider">Model Projection 24h</span>
+                <div className="h-24 w-full bg-[#0F1115] rounded-xl border border-white/5 p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={historyData}>
+                      <defs>
+                        <linearGradient id="companyGlow" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={isUp ? "#2EE59D" : "#FF4B55"} stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor={isUp ? "#2EE59D" : "#FF4B55"} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="time" hide />
+                      <YAxis domain={['auto', 'auto']} hide />
+                      <Tooltip 
+                        contentStyle={{ background: '#0a101e', borderColor: '#1e293b' }}
+                        labelStyle={{ color: '#94a3b8', fontSize: 9 }}
+                        itemStyle={{ fontSize: 10 }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke={isUp ? "#2EE59D" : "#FF4B55"} 
+                        strokeWidth={1.5}
+                        fill="url(#companyGlow)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: AI Contextual & Qualitative Insights */}
+          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-[#4D88FF]" />
+                AI Contextual superpower
+              </h3>
+              <span className="text-[10px] text-[#A1A5B0] font-light">NLP transcript audits & sentiment reports</span>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* Sector & Industry Classification */}
+              <div className="flex flex-col gap-2 p-3 bg-[#0F1115] border border-white/5 rounded-xl">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Sector & Classification</span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-[10px] font-semibold text-[#4D88FF] bg-[#4D88FF]/10 px-2.5 py-1 rounded-lg">
+                    {data.sector}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
+                    {data.industry}
+                  </span>
+                </div>
+              </div>
+
+              {/* Guidance Sentiment Badge */}
+              <div className="flex justify-between items-center p-3 bg-[#0F1115] border border-white/5 rounded-xl">
+                <span className="text-[10px] text-slate-500 uppercase font-bold">Forward Guidance Sentiment</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 ${
+                  data.forward_guidance === 'Positive' ? 'text-[#2EE59D] bg-[#2EE59D]/10' :
+                  data.forward_guidance === 'Neutral' ? 'text-[#FFD33D] bg-[#FFD33D]/10' :
+                  'text-[#FF4B55] bg-[#FF4B55]/10'
+                }`}>
+                  <BookOpen className="w-3 h-3" />
+                  {data.forward_guidance}
+                </span>
+              </div>
+
+              {/* Growth Driver Quote */}
+              <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl relative overflow-hidden">
+                <span className="absolute -right-2 -bottom-2 text-indigo-500/5 font-extrabold text-7xl select-none font-sans">
+                  AI
+                </span>
+                <h4 className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Cpu className="w-3.5 h-3.5" /> Core Growth Engine
+                </h4>
+                <p className="text-xs italic text-slate-300 leading-relaxed font-sans font-light">
+                  "{data.core_growth_driver}"
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid md:grid-cols-4 gap-6 min-h-[calc(100vh-140px)] select-none text-[#E1E3E8] items-start">
@@ -353,7 +625,17 @@ export default function Screener() {
                           isSelected ? 'bg-[#4D88FF]/10 text-white border-l-2 border-l-[#4D88FF]' : ''
                         }`}
                       >
-                        <td className="py-2.5 px-3 font-sans font-bold text-white">{item.ticker}</td>
+                        <td className="py-2.5 px-3 font-sans font-bold text-white">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewCompany(item.ticker);
+                            }}
+                            className="text-[#4D88FF] hover:underline font-bold text-left cursor-pointer transition-all focus:outline-none"
+                          >
+                            {item.ticker}
+                          </button>
+                        </td>
                         <td className={`py-2.5 px-3 ${isUp ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
                           {item.currency || '$'}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
