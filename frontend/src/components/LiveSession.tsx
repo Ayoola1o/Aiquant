@@ -102,18 +102,6 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
         const newBotState = data.bots[newBotId];
         setBots(data.bots || {});
         setSelectedBotId(newBotId);
-        
-        if (newBotState) {
-          setActive(newBotState.is_active);
-          setSymbol(newBotState.symbol);
-          setCash(newBotState.cash);
-          setPortfolioValue(newBotState.portfolio_value);
-          setPositions(newBotState.positions || {});
-          setTrades(newBotState.trades || []);
-          setCandles(newBotState.candles || []);
-          setLogs(newBotState.logs || []);
-          setActiveCandle(newBotState.active_candle);
-        }
         setBotName(`Custom Bot ${Object.keys(data.bots || {}).length + 1}`);
       } else {
         alert('Failed to compile strategy script or spawn bot.');
@@ -208,6 +196,16 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
     }
   };
 
+  const handleResetAccount = async () => {
+    if (window.confirm("Are you sure you want to reset the default account cash to $10,000?")) {
+      try {
+        await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        fetchAllBots();
+      } catch (err) {
+        console.error('Account reset failed:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     connectWebSocket();
