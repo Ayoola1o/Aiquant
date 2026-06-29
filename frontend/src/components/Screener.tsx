@@ -61,6 +61,8 @@ export default function Screener() {
   const [viewMode, setViewMode] = useState<'matrix' | 'company'>('matrix');
   const [selectedCompanyData, setSelectedCompanyData] = useState<any | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedPerfTab, setSelectedPerfTab] = useState('WoW');
+  const [selectedFinancialTab, setSelectedFinancialTab] = useState<'income' | 'balance' | 'cashflow'>('income');
 
   const fetchScreener = async () => {
     setLoading(true);
@@ -283,173 +285,394 @@ export default function Screener() {
           </div>
         </div>
 
-        {/* Dashboard 3-Column Grid */}
+        {/* --- Key Metrics & Chart Dashboard Section --- */}
+        <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
+          {/* Past 5 Days */}
+          <div className="flex items-center gap-2 select-none">
+            <span className="text-[10px] text-slate-500 uppercase font-bold">Past 5 Days:</span>
+            <div className="flex flex-wrap gap-2">
+              {data.past_5_days && data.past_5_days.map((d: any, idx: number) => {
+                const isPos = d.pct > 0;
+                const isNeg = d.pct < 0;
+                return (
+                  <span key={idx} className={`text-[10px] font-bold px-2.5 py-0.5 rounded ${
+                    isPos ? 'bg-[#2EE59D]/10 text-[#2EE59D] border border-[#2EE59D]/20' :
+                    isNeg ? 'bg-[#FF4B55]/10 text-[#FF4B55] border border-[#FF4B55]/20' :
+                    'bg-white/5 text-slate-400 border border-white/10'
+                  }`}>
+                    {d.day}: {isPos ? '+' : ''}{d.pct}%
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Market Update Box */}
+          <div className="bg-[#0F1115] border border-white/5 rounded-xl p-4">
+            <div className="text-[9px] text-[#4D88FF] font-bold uppercase tracking-wider mb-1">
+              ● Market Update
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed font-sans font-light">
+              {data.market_update}
+            </p>
+          </div>
+
+          {/* Key Metrics Grid */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Key Metrics</span>
+              <select className="px-2 py-1 bg-[#0F1115] border border-white/5 rounded-lg text-[10px] font-semibold text-slate-300 outline-none">
+                <option>Price</option>
+                <option>Volume</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              {/* Current Price */}
+              <div className="bg-[#0F1115] border-2 border-[#4D88FF] rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Current Price</span>
+                <span className={`text-xs font-mono font-bold mt-1 flex items-center gap-1 ${isUp ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
+                  {isUp ? '▲' : '▼'} {data.currency || '$'}{data.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              {/* Price Change */}
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Price Change</span>
+                <span className={`text-xs font-mono font-bold mt-1 ${data.price_change_raw >= 0 ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
+                  {data.price_change}
+                </span>
+              </div>
+              {/* Prev Close */}
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Prev Close</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.prev_close}</span>
+              </div>
+              {/* 24h Volume */}
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">24h Volume</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.volume_24h}</span>
+              </div>
+              {/* 30D Avg Vol */}
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">30D Avg Vol.</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.volume_30d_avg}</span>
+              </div>
+              {/* Market Cap */}
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Market Cap</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.market_cap}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Price Data Grid */}
+          <div className="space-y-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider block">Price Data</span>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Open</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.open_price}</span>
+              </div>
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Close</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.close_price}</span>
+              </div>
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">High</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.high_price}</span>
+              </div>
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Low</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.low_price}</span>
+              </div>
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">52W High</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.high_52w}</span>
+              </div>
+              <div className="bg-[#0F1115] border border-white/5 rounded-xl p-3 flex flex-col justify-center min-h-[64px]">
+                <span className="text-[9px] text-slate-500 font-bold uppercase">52W Low</span>
+                <span className="text-xs font-mono font-bold text-slate-300 mt-1">{data.low_52w}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Intraday Chart Section */}
+          <div className="space-y-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider block">Jun 29, 2026</span>
+            <div className="h-48 w-full bg-[#0F1115] rounded-xl border border-white/5 p-4 relative">
+              {/* Floating High and Low tags on chart */}
+              <div className="absolute top-4 left-1/4 bg-[#2EE59D]/10 border border-[#2EE59D]/20 px-2 py-0.5 rounded text-[9px] font-mono text-[#2EE59D]">
+                High: {data.chart_high_node?.label}
+              </div>
+              <div className="absolute bottom-12 right-1/3 bg-[#FF4B55]/10 border border-[#FF4B55]/20 px-2 py-0.5 rounded text-[9px] font-mono text-[#FF4B55]">
+                Low: {data.chart_low_node?.label}
+              </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={historyData}>
+                  <defs>
+                    <linearGradient id="glowChart" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4D88FF" stopOpacity={0.35}/>
+                      <stop offset="95%" stopColor="#4D88FF" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" hide />
+                  <YAxis domain={['auto', 'auto']} hide />
+                  <Tooltip 
+                    contentStyle={{ background: '#0a101e', borderColor: '#1e293b' }}
+                    labelStyle={{ color: '#94a3b8', fontSize: 9 }}
+                    itemStyle={{ fontSize: 10 }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#4D88FF" 
+                    strokeWidth={2}
+                    fill="url(#glowChart)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Performance Overview Grid */}
+          <div className="space-y-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider block">Performance Overview</span>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              {data.performance && Object.keys(data.performance).map((key) => {
+                const val = data.performance[key];
+                const isPos = val >= 0;
+                const isSelected = selectedPerfTab === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedPerfTab(key)}
+                    className={`bg-[#0F1115] rounded-xl p-3 flex flex-col justify-center min-h-[64px] transition-all cursor-pointer text-left focus:outline-none ${
+                      isSelected ? 'border-2 border-[#4D88FF]' : 'border border-white/5'
+                    }`}
+                  >
+                    <span className="text-[9px] text-slate-500 font-bold uppercase">{key}</span>
+                    <span className={`text-xs font-mono font-bold mt-1 ${isPos ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
+                      {isPos ? '+' : ''}{val}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* --- Fundamental Statements & AI Analysis Section --- */}
         <div className="grid md:grid-cols-3 gap-6 items-start">
           
-          {/* Card 1: Financial Foundation */}
-          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-[#4D88FF]" />
-                Financial Foundation
-              </h3>
-              <span className="text-[10px] text-[#A1A5B0] font-light">TTM Balance Sheet & Income Statements</span>
+          {/* Card 1: Tabbed Financial Statements */}
+          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5 md:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#4D88FF]" />
+                  Financial Statements
+                </h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Detailed TTM Performance, Health, and Liquidity Books</span>
+              </div>
+              
+              {/* Statement Tabs */}
+              <div className="flex bg-[#0F1115] border border-white/5 p-1 rounded-lg">
+                <button
+                  onClick={() => setSelectedFinancialTab('income')}
+                  className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    selectedFinancialTab === 'income' ? 'bg-[#4D88FF] text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Income Statement
+                </button>
+                <button
+                  onClick={() => setSelectedFinancialTab('balance')}
+                  className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    selectedFinancialTab === 'balance' ? 'bg-[#4D88FF] text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Balance Sheet
+                </button>
+                <button
+                  onClick={() => setSelectedFinancialTab('cashflow')}
+                  className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    selectedFinancialTab === 'cashflow' ? 'bg-[#4D88FF] text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Cash Flow
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {/* Total Revenue */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">Total Revenue (TTM)</span>
-                <span className="text-sm font-mono font-bold text-white">{data.revenue_ttm}</span>
-              </div>
+            <div className="space-y-4 min-h-[300px] flex flex-col justify-between">
+              {/* Tab 1: Income Statement */}
+              {selectedFinancialTab === 'income' && (
+                <div className="space-y-3.5 animate-fadeIn">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Total Revenue (TTM)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.revenue_ttm}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Cost of Goods Sold (COGS)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.cogs}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Gross Profit</span>
+                    <span className="text-sm font-mono font-bold text-[#2EE59D]">{data.gross_profit}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Operating Expenses (OPEX)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.opex}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">EBIT (Operating Income)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.ebit}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Net Income (TTM)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.net_income_ttm}</span>
+                  </div>
+                </div>
+              )}
 
-              {/* Gross Margin */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">Gross Profit Margin</span>
-                <span className="text-sm font-mono font-bold text-[#2EE59D]">{data.gross_margin}</span>
-              </div>
+              {/* Tab 2: Balance Sheet */}
+              {selectedFinancialTab === 'balance' && (
+                <div className="space-y-3.5 animate-fadeIn">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Cash & Cash Equivalents</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.cash_and_equivalents}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Total Assets</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.total_assets}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Total Liabilities</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.total_liabilities}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Retained Earnings</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.retained_earnings}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Shareholders' Equity</span>
+                    <span className="text-sm font-mono font-bold text-[#4D88FF]">{data.shareholders_equity}</span>
+                  </div>
+                </div>
+              )}
 
-              {/* Net Income */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">Net Income (TTM)</span>
-                <span className="text-sm font-mono font-bold text-white">{data.net_income_ttm}</span>
-              </div>
-
-              {/* Free Cash Flow */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">Free Cash Flow (FCF)</span>
-                <span className="text-sm font-mono font-bold text-[#4D88FF]">{data.fcf}</span>
-              </div>
+              {/* Tab 3: Cash Flow Statement */}
+              {selectedFinancialTab === 'cashflow' && (
+                <div className="space-y-3.5 animate-fadeIn">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Operating Cash Flow</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.operating_cash_flow}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Capital Expenditures (CapEx)</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.capex}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Free Cash Flow (FCF)</span>
+                    <span className="text-sm font-mono font-bold text-[#2EE59D]">{data.fcf}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Financing Cash Flow</span>
+                    <span className="text-sm font-mono font-bold text-white">{data.financing_cash_flow}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Cash vs Debt comparison widget */}
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-4 border-t border-white/5">
                 <div className="flex justify-between text-[9px] uppercase font-bold text-slate-400">
-                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#2EE59D]" /> Cash: {data.total_cash}</span>
-                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#FF4B55]" /> Debt: {data.total_debt}</span>
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#2EE59D]" /> Cash Reserves: {data.total_cash}</span>
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#FF4B55]" /> Total Debt: {data.total_debt}</span>
                 </div>
                 {/* Stacked progress bar */}
-                <div className="h-2.5 rounded-full bg-[#0F1115] overflow-hidden flex border border-white/5">
+                <div className="h-2 rounded-full bg-[#0F1115] overflow-hidden flex border border-white/5">
                   <div className="bg-[#2EE59D] h-full transition-all" style={{ width: `${cashWeight}%` }} />
                   <div className="bg-[#FF4B55] h-full transition-all" style={{ width: `${debtWeight}%` }} />
                 </div>
                 <div className="flex justify-between text-[9px] font-mono text-slate-500">
-                  <span>Liquid Reserves ({cashWeight}%)</span>
-                  <span>Leverage ({debtWeight}%)</span>
+                  <span>Liquid Assets ({cashWeight}%)</span>
+                  <span>Debt Leverage ({debtWeight}%)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Market Valuation & Chart */}
-          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Coins className="w-4 h-4 text-[#4D88FF]" />
-                Market Valuation Layers
-              </h3>
-              <span className="text-[10px] text-[#A1A5B0] font-light">Market capitalization & valuation ratios</span>
-            </div>
-
-            <div className="space-y-4">
-              {/* Market Cap */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">Market Capitalization</span>
-                <span className="text-sm font-mono font-bold text-white">{data.market_cap}</span>
+          {/* Card 2: Valuation Layers & AI Insights */}
+          <div className="flex flex-col gap-6 md:col-span-1">
+            {/* Valuation ratios */}
+            <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-[#4D88FF]" />
+                  Market Valuation
+                </h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Asset multiple layers</span>
               </div>
-
-              {/* P/E Ratio */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">P/E Ratio</span>
-                <span className="text-sm font-mono font-bold text-white">{data.pe_ratio}</span>
-              </div>
-
-              {/* EV/EBITDA */}
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-xs text-slate-400">EV/EBITDA</span>
-                <span className="text-sm font-mono font-bold text-white">{data.ev_ebitda}</span>
-              </div>
-
-              {/* Model projection 24h Area Chart */}
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-[10px] text-[#A1A5B0] font-semibold uppercase tracking-wider">Model Projection 24h</span>
-                <div className="h-24 w-full bg-[#0F1115] rounded-xl border border-white/5 p-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={historyData}>
-                      <defs>
-                        <linearGradient id="companyGlow" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={isUp ? "#2EE59D" : "#FF4B55"} stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor={isUp ? "#2EE59D" : "#FF4B55"} stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="time" hide />
-                      <YAxis domain={['auto', 'auto']} hide />
-                      <Tooltip 
-                        contentStyle={{ background: '#0a101e', borderColor: '#1e293b' }}
-                        labelStyle={{ color: '#94a3b8', fontSize: 9 }}
-                        itemStyle={{ fontSize: 10 }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke={isUp ? "#2EE59D" : "#FF4B55"} 
-                        strokeWidth={1.5}
-                        fill="url(#companyGlow)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                  <span className="text-xs text-slate-400">Market Cap</span>
+                  <span className="text-sm font-mono font-bold text-white">{data.market_cap}</span>
+                </div>
+                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                  <span className="text-xs text-slate-400">P/E Ratio</span>
+                  <span className="text-sm font-mono font-bold text-white">{data.pe_ratio}</span>
+                </div>
+                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                  <span className="text-xs text-slate-400">EV/EBITDA</span>
+                  <span className="text-sm font-mono font-bold text-white">{data.ev_ebitda}</span>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Card 3: AI Contextual & Qualitative Insights */}
-          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-[#4D88FF]" />
-                AI Contextual superpower
-              </h3>
-              <span className="text-[10px] text-[#A1A5B0] font-light">NLP transcript audits & sentiment reports</span>
-            </div>
+            {/* AI Insights Card */}
+            <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-[#4D88FF]" />
+                  AI Contextual Audit
+                </h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">NLP analysis insights</span>
+              </div>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2 p-3 bg-[#0F1115] border border-white/5 rounded-xl">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Sector & Classification</span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-[10px] font-semibold text-[#4D88FF] bg-[#4D88FF]/10 px-2.5 py-1 rounded-lg">
+                      {data.sector}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
+                      {data.industry}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="flex flex-col gap-4">
-              {/* Sector & Industry Classification */}
-              <div className="flex flex-col gap-2 p-3 bg-[#0F1115] border border-white/5 rounded-xl">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Sector & Classification</span>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-[10px] font-semibold text-[#4D88FF] bg-[#4D88FF]/10 px-2.5 py-1 rounded-lg">
-                    {data.sector}
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg">
-                    {data.industry}
+                <div className="flex justify-between items-center p-3 bg-[#0F1115] border border-white/5 rounded-xl">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Guidance Sentiment</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 ${
+                    data.forward_guidance === 'Positive' ? 'text-[#2EE59D] bg-[#2EE59D]/10' :
+                    data.forward_guidance === 'Neutral' ? 'text-[#FFD33D] bg-[#FFD33D]/10' :
+                    'text-[#FF4B55] bg-[#FF4B55]/10'
+                  }`}>
+                    <BookOpen className="w-3 h-3" />
+                    {data.forward_guidance}
                   </span>
                 </div>
-              </div>
 
-              {/* Guidance Sentiment Badge */}
-              <div className="flex justify-between items-center p-3 bg-[#0F1115] border border-white/5 rounded-xl">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Forward Guidance Sentiment</span>
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1 ${
-                  data.forward_guidance === 'Positive' ? 'text-[#2EE59D] bg-[#2EE59D]/10' :
-                  data.forward_guidance === 'Neutral' ? 'text-[#FFD33D] bg-[#FFD33D]/10' :
-                  'text-[#FF4B55] bg-[#FF4B55]/10'
-                }`}>
-                  <BookOpen className="w-3 h-3" />
-                  {data.forward_guidance}
-                </span>
-              </div>
-
-              {/* Growth Driver Quote */}
-              <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl relative overflow-hidden">
-                <span className="absolute -right-2 -bottom-2 text-indigo-500/5 font-extrabold text-7xl select-none font-sans">
-                  AI
-                </span>
-                <h4 className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Cpu className="w-3.5 h-3.5" /> Core Growth Engine
-                </h4>
-                <p className="text-xs italic text-slate-300 leading-relaxed font-sans font-light">
-                  "{data.core_growth_driver}"
-                </p>
+                <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl relative overflow-hidden">
+                  <span className="absolute -right-2 -bottom-2 text-indigo-500/5 font-extrabold text-7xl select-none font-sans">
+                    AI
+                  </span>
+                  <h4 className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <Cpu className="w-3.5 h-3.5" /> Growth Engine
+                  </h4>
+                  <p className="text-xs italic text-slate-300 leading-relaxed font-sans font-light">
+                    "{data.core_growth_driver}"
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -458,6 +681,7 @@ export default function Screener() {
       </div>
     );
   }
+
 
   return (
     <div className="grid md:grid-cols-4 gap-6 min-h-[calc(100vh-140px)] select-none text-[#E1E3E8] items-start">

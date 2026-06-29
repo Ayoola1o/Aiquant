@@ -729,6 +729,140 @@ COMPANY_DETAILS = {
     }
 }
 
+def generate_market_metrics(ticker: str, price: float, currency: str):
+    import random
+    seed = sum(ord(c) for c in ticker) + 7
+    random.seed(seed)
+    
+    # Establish base multiplier (Billion/Million)
+    if currency == "$":
+        base_mult = random.uniform(10.0, 300.0) if price > 100 else random.uniform(0.5, 9.0)
+        unit = "B"
+    else: # Naira
+        base_mult = random.uniform(100.0, 1500.0)
+        unit = "B"
+        
+    revenue_val = base_mult
+    cogs_pct = random.uniform(0.2, 0.6)
+    cogs_val = revenue_val * cogs_pct
+    gross_profit_val = revenue_val - cogs_val
+    
+    opex_pct = random.uniform(0.1, 0.25)
+    opex_val = revenue_val * opex_pct
+    ebit_val = gross_profit_val - opex_val
+    
+    tax_interest_pct = random.uniform(0.15, 0.3)
+    net_income_val = ebit_val * (1.0 - tax_interest_pct)
+    
+    # Balance Sheet
+    total_assets_val = revenue_val * random.uniform(1.2, 3.5)
+    total_liabilities_val = total_assets_val * random.uniform(0.3, 0.7)
+    shareholders_equity_val = total_assets_val - total_liabilities_val
+    
+    cash_val = total_assets_val * random.uniform(0.1, 0.25)
+    retained_earnings_val = shareholders_equity_val * random.uniform(0.4, 0.8)
+    
+    # Cash Flow
+    operating_cash_flow_val = net_income_val * random.uniform(1.0, 1.4)
+    capex_val = operating_cash_flow_val * random.uniform(0.15, 0.35)
+    free_cash_flow_val = operating_cash_flow_val - capex_val
+    financing_cash_flow_val = -1.0 * (net_income_val * random.uniform(-0.1, 0.3))
+    
+    # Format Helper
+    def fmt(val):
+        return f"{currency}{val:.2f} {unit}"
+        
+    # Past 5 days pct change
+    change_pct = round(random.uniform(-3.5, 3.5), 2)
+    price_change = round(price * (change_pct / 100.0), 2)
+    price_change_str = f"{'+' if price_change >= 0 else ''}{currency}{price_change:.2f}"
+    
+    prev_close = round(price - price_change, 2)
+    open_price = round(prev_close * (1 + random.uniform(-0.01, 0.01)), 2)
+    close_price = price
+    
+    high_price = round(max(price, prev_close, open_price) * (1 + random.uniform(0.005, 0.02)), 2)
+    low_price = round(min(price, prev_close, open_price) * (1 - random.uniform(0.005, 0.02)), 2)
+    
+    low_52w = round(price * random.uniform(0.4, 0.75), 2)
+    high_52w = round(price * random.uniform(1.15, 1.6), 2)
+    
+    vol_30d = round(random.uniform(1.5, 8.5), 2)
+    vol_24h = round(vol_30d * random.uniform(0.8, 2.2), 2)
+    vol_ratio = int(((vol_24h - vol_30d) / vol_30d) * 100)
+    vol_ratio_str = f"{'+' if vol_ratio >= 0 else ''}{vol_ratio}%"
+    
+    past_5 = [
+        {"day": "T", "pct": round(random.uniform(-4.5, 4.5), 2)},
+        {"day": "W", "pct": round(random.uniform(-4.5, 4.5), 2)},
+        {"day": "T", "pct": round(random.uniform(-4.5, 4.5), 2)},
+        {"day": "F", "pct": round(random.uniform(-4.5, 4.5), 2)},
+        {"day": "M", "pct": change_pct}
+    ]
+    
+    low_above = int(((price - low_52w) / low_52w) * 100)
+    high_below = int(((high_52w - price) / high_52w) * 100)
+    
+    market_update = (
+        f"{ticker} ({currency}{price:.2f}) is trading {'up' if change_pct >= 0 else 'down'} {change_pct:+.2f}%. "
+        f"YTD: +100.00%. Volume: {vol_24h:.2f}M ({vol_ratio_str} above 30D avg). "
+        f"52W range {currency}{low_52w:.2f}–{currency}{high_52w:.2f} ({low_above}% above low, {high_below}% below high). "
+        f"Last trade: Jun 29, 2026."
+    )
+    
+    perf = {
+        "day": change_pct,
+        "wow": round(random.uniform(-5.0, 8.0), 2),
+        "mtd": round(random.uniform(-15.0, 15.0), 2),
+        "qtd": round(random.uniform(-25.0, 20.0), 2),
+        "ytd": round(random.uniform(5.0, 120.0), 2),
+        "max": round(random.uniform(150.0, 1500.0), 2)
+    }
+
+    gross_margin = (gross_profit_val / revenue_val) * 100
+    
+    return {
+        "price_change": price_change_str,
+        "price_change_raw": price_change,
+        "prev_close": f"{currency}{prev_close:.2f}",
+        "volume_24h": f"{vol_24h:.2f} M",
+        "volume_30d_avg": f"{vol_30d:.2f} M",
+        "open_price": f"{currency}{open_price:.2f}",
+        "close_price": f"{currency}{close_price:.2f}",
+        "high_price": f"{currency}{high_price:.2f}",
+        "low_price": f"{currency}{low_price:.2f}",
+        "high_52w": f"{currency}{high_52w:.2f}",
+        "low_52w": f"{currency}{low_52w:.2f}",
+        "past_5_days": past_5,
+        "market_update": market_update,
+        "performance": perf,
+        "chart_high_node": {"value": high_price, "label": f"{currency}{high_price:.2f}"},
+        "chart_low_node": {"value": low_price, "label": f"{currency}{low_price:.2f}"},
+        
+        # Financial Foundation Sheets
+        "revenue_ttm": fmt(revenue_val),
+        "cogs": fmt(cogs_val),
+        "gross_profit": fmt(gross_profit_val),
+        "gross_margin": f"{gross_margin:.1f}%",
+        "opex": fmt(opex_val),
+        "ebit": fmt(ebit_val),
+        "net_income_ttm": fmt(net_income_val),
+        
+        "cash_and_equivalents": fmt(cash_val),
+        "total_assets": fmt(total_assets_val),
+        "total_liabilities": fmt(total_liabilities_val),
+        "retained_earnings": fmt(retained_earnings_val),
+        "shareholders_equity": fmt(shareholders_equity_val),
+        
+        "operating_cash_flow": fmt(operating_cash_flow_val),
+        "capex": fmt(capex_val),
+        "fcf": fmt(free_cash_flow_val),
+        "financing_cash_flow": fmt(financing_cash_flow_val),
+        
+        "total_cash": fmt(cash_val),
+        "total_debt": fmt(total_liabilities_val * random.uniform(0.4, 0.75))
+    }
+
 @app.get("/api/screener/company/{ticker}")
 def get_company_screener_details(ticker: str):
     """
@@ -736,7 +870,7 @@ def get_company_screener_details(ticker: str):
     """
     normalized_ticker = ticker.upper().strip()
     if normalized_ticker not in COMPANY_DETAILS:
-        return {
+        base_data = {
             "ticker": normalized_ticker,
             "name": f"{normalized_ticker} Holdings PLC",
             "price": 100.0,
@@ -757,7 +891,11 @@ def get_company_screener_details(ticker: str):
             "forward_guidance": "Neutral",
             "core_growth_driver": "Licensing of proprietary enterprise business systems and hosting service agreements."
         }
-    return COMPANY_DETAILS[normalized_ticker]
+    else:
+        base_data = COMPANY_DETAILS[normalized_ticker]
+        
+    metrics = generate_market_metrics(base_data["ticker"], base_data["price"], base_data["currency"])
+    return {**base_data, **metrics}
 
 @app.get("/api/profile")
 def get_user_profile():
