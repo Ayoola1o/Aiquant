@@ -17,12 +17,14 @@ interface StockMove {
   price: number;
   change: number;
   isUp: boolean;
+  currency?: string;
 }
 
 export default function Dashboard() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loadingNews, setLoadingNews] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState('BTC');
+  const [activeBots, setActiveBots] = useState<any[]>([]);
   
   // Real-world simulated index values
   const [indices, setIndices] = useState({
@@ -38,7 +40,10 @@ export default function Dashboard() {
     { symbol: 'AAPL', name: 'Apple Inc.', price: 212.40, change: 0.65, isUp: true },
     { symbol: 'TSLA', name: 'Tesla Inc.', price: 184.20, change: -1.75, isUp: false },
     { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 127.40, change: 4.88, isUp: true },
-    { symbol: 'MSFT', name: 'Microsoft', price: 442.10, change: -0.32, isUp: false }
+    { symbol: 'MSFT', name: 'Microsoft', price: 442.10, change: -0.32, isUp: false },
+    { symbol: 'MTNN', name: 'MTN Nigeria', price: 185.00, change: 2.85, isUp: true, currency: '₦' },
+    { symbol: 'DANGCEM', name: 'Dangote Cement', price: 530.00, change: 4.10, isUp: true, currency: '₦' },
+    { symbol: 'BUAFOODS', name: 'BUA Foods', price: 379.90, change: 3.50, isUp: true, currency: '₦' }
   ]);
 
   const [sectors] = useState([
@@ -47,6 +52,24 @@ export default function Dashboard() {
     { name: 'Healthcare', change: -0.12, class: 'bg-red-500/5 border-red-500/20 text-red-500' },
     { name: 'Energy', change: -1.45, class: 'bg-red-500/10 border-red-500/30 text-red-400' }
   ]);
+
+  const fetchBots = async () => {
+    try {
+      const res = await fetch('/api/live/bots');
+      if (res.ok) {
+        const data = await res.json();
+        setActiveBots(data.bots || []);
+      }
+    } catch (e) {
+      console.error("Error fetching bots:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchBots();
+    const interval = setInterval(fetchBots, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchNews = async (ticker: string) => {
     setLoadingNews(true);
@@ -113,7 +136,7 @@ export default function Dashboard() {
           {[...movers, ...movers].map((item, idx) => (
             <div key={idx} className="ticker-item border-r border-white/5">
               <span className="font-bold text-white">{item.symbol}</span>
-              <span className="text-slate-300 font-mono">${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-slate-300 font-mono">{item.currency || '$'}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span className={`flex items-center text-xs ${item.isUp ? 'text-emerald-400' : 'text-red-400'}`}>
                 {item.isUp ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
                 {item.change.toFixed(2)}%
@@ -207,45 +230,101 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Ticker Movers & AI Sentiment News */}
+      {/* Ticker Movers, Active Bots & AI Sentiment News */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Top Movers List */}
-        <div className="glass-panel p-6 col-span-1">
-          <h3 className="font-bold text-lg text-white mb-6">Platform Core Tickers</h3>
-          <div className="space-y-4">
-            {movers.map((item, idx) => (
-              <div
-                key={idx}
-                onClick={() => {
-                  const baseSymbol = item.symbol.replace("USDT", "").replace("-USD", "");
-                  setSelectedTicker(baseSymbol);
-                }}
-                className={`flex justify-between items-center p-3 rounded-xl border border-slate-900 bg-slate-950/20 hover:bg-indigo-500/5 hover:border-indigo-500/20 transition-all cursor-pointer ${
-                  selectedTicker === item.symbol.replace("USDT", "").replace("-USD", "") ? 'border-indigo-500/40 bg-indigo-500/5' : ''
-                }`}
-              >
-                <div>
-                  <span className="font-bold text-sm block text-white">{item.symbol}</span>
-                  <span className="text-[11px] text-slate-400">{item.name}</span>
+        
+        {/* Left Column: Tickers & Active Bots stacked vertically */}
+        <div className="col-span-1 flex flex-col gap-6">
+          
+          {/* Card 1: Platform Core Tickers */}
+          <div className="glass-panel p-6">
+            <h3 className="font-bold text-lg text-white mb-6">Platform Core Tickers</h3>
+            <div className="space-y-4">
+              {movers.map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    const baseSymbol = item.symbol.replace("USDT", "").replace("-USD", "");
+                    setSelectedTicker(baseSymbol);
+                  }}
+                  className={`flex justify-between items-center p-3 rounded-xl border border-slate-900 bg-slate-950/20 hover:bg-indigo-500/5 hover:border-indigo-500/20 transition-all cursor-pointer ${
+                    selectedTicker === item.symbol.replace("USDT", "").replace("-USD", "") ? 'border-indigo-500/40 bg-indigo-500/5' : ''
+                  }`}
+                >
+                  <div>
+                    <span className="font-bold text-sm block text-white">{item.symbol}</span>
+                    <span className="text-[11px] text-slate-400">{item.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold font-mono text-sm block text-white">
+                      {item.currency || '$'}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className={`inline-flex items-center text-xs font-semibold ${item.isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {item.isUp ? '+' : ''}{item.change.toFixed(2)}%
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-bold font-mono text-sm block text-white">
-                    ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className={`inline-flex items-center text-xs font-semibold ${item.isUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {item.isUp ? '+' : ''}{item.change.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {/* Card 2: Active Strategy Bots Status */}
+          <div className="glass-panel p-6 flex flex-col gap-5">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <Radio className="w-5 h-5 text-[#2EE59D]" />
+                Active Bots Status
+              </h3>
+              <span className="text-[10px] text-slate-500 font-mono">LIVE</span>
+            </div>
+
+            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+              {activeBots.length === 0 ? (
+                <div className="text-center py-8 border border-dashed border-white/5 rounded-xl">
+                  <span className="text-xs text-slate-500 block">No active strategy agents</span>
+                  <span className="text-[10px] text-slate-400 block mt-1">Spawn a bot in the Live Terminal tab</span>
+                </div>
+              ) : (
+                activeBots.map((bot, idx) => {
+                  const isRunning = bot.status === "RUNNING";
+                  const isPos = bot.pnl >= 0;
+                  return (
+                    <div key={idx} className="p-3 bg-slate-950/20 border border-slate-900 rounded-xl hover:border-slate-800 transition-all flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-white">{bot.name}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-[#2EE59D] animate-pulse' : 'bg-slate-500'}`} />
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          isRunning ? 'bg-[#2EE59D]/10 text-[#2EE59D]' : 'bg-white/5 text-slate-400'
+                        }`}>
+                          {bot.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-400">
+                        <span>Asset: <strong className="text-white">{bot.symbol}</strong></span>
+                        <span>TF: <strong className="text-white">{bot.timeframe}</strong></span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-white/5 pt-2 mt-1">
+                        <span className="text-[10px] text-slate-400">Cash: <strong className="text-white font-mono">${bot.cash?.toFixed(2)}</strong></span>
+                        <span className={`text-xs font-mono font-bold ${isPos ? 'text-[#2EE59D]' : 'text-[#FF4B55]'}`}>
+                          {isPos ? '+' : ''}${bot.pnl?.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
         </div>
 
-        {/* AI News Feed */}
+        {/* Right Column: AI News Feed (col-span-2) */}
         <div className="glass-panel p-6 col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg text-white flex items-center gap-2">
-              <Radio className="w-5 h-5 text-indigo-400" />
+              <RefreshCw className="w-5 h-5 text-indigo-400" />
               AI News & Sentiment Feed ({selectedTicker})
             </h3>
             <button
@@ -261,7 +340,7 @@ export default function Dashboard() {
               <span className="animate-pulse">Analyzing article semantics...</span>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[460px] overflow-y-auto pr-1">
               {news.map((item) => (
                 <div
                   key={item.id}
