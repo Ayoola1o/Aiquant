@@ -41,7 +41,6 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
   // Multi-bot list states
   const [bots, setBots] = useState<Record<string, any>>({});
   const [selectedBotId, setSelectedBotId] = useState('default');
-  const [detailChartTab, setDetailChartTab] = useState<'market' | 'equity'>('market');
 
   // Spawn Form states
   const [botName, setBotName] = useState('Custom Bot');
@@ -62,30 +61,7 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
     setAlpacaSecretKey(globalAlpacaSecretKey);
   }, [globalAlpacaSecretKey]);
 
-  // Default fallback states in case active bot state is loading
-  const [active, setActive] = useState(false);
-  const [symbol, setSymbol] = useState('BTCUSDT');
-  const [cash, setCash] = useState(10000.0);
-  const [portfolioValue, setPortfolioValue] = useState(10000.0);
-  const [positions, setPositions] = useState<any>({});
-  const [trades, setTrades] = useState<any[]>([]);
-  const [candles, setCandles] = useState<any[]>([]);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [activeCandle, setActiveCandle] = useState<any>(null);
-
-  // Manual order form states
-  const [orderAction, setOrderAction] = useState('BUY');
-  const [orderQty, setOrderQty] = useState(0.01);
-  const [orderType, setOrderType] = useState('MARKET');
-  const [orderPrice, setOrderPrice] = useState(0.0);
-
   const socketRef = useRef<WebSocket | null>(null);
-
-  // Compile combined chart data: historical closed candles + active ticking candle
-  const getChartData = () => {
-    if (!activeCandle) return candles;
-    return [...candles, activeCandle];
-  };
 
   const fetchAllBots = async () => {
     try {
@@ -219,7 +195,7 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
       const selectedStrategy = strategies.find(s => s.id === strategyId);
       socketRef.current.send(JSON.stringify({
         type: 'start',
-        symbol: symbol,
+        symbol: liveSymbol,
         strategy_code: selectedStrategy ? selectedStrategy.code : "",
         timeframe: liveTimeframe
       }));
@@ -232,59 +208,6 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
     }
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // In multi-bot environment, we route the order ticket to the currently selected bot
-      const res = await fetch('/api/live/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: orderAction,
-          qty: Number(orderQty),
-          type: orderType,
-          price: orderType === 'LIMIT' ? Number(orderPrice) : null,
-          bot_id: selectedBotId // backend routes order to this bot ID
-        })
-      });
-      if (!res.ok) {
-        alert('Order rejected by trading engine.');
-      }
-    } catch (err) {
-      console.error('Order submission failed:', err);
-    }
-  };
-
-  const handleResetAccount = async () => {
-    if (window.confirm("Are you sure you want to reset the default account cash to $10,000?")) {
-      try {
-        await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-        fetchAllBots();
-      } catch (err) {
-        console.error('Account reset failed:', err);
-      }
-    }
-  };
-
-  // Sync active view variables with selectedBotState
-  useEffect(() => {
-    const activeBotState = bots[selectedBotId];
-    if (activeBotState) {
-      setActive(activeBotState.is_active);
-      setSymbol(activeBotState.symbol);
-      setCash(activeBotState.cash);
-      setPortfolioValue(activeBotState.portfolio_value);
-      setPositions(activeBotState.positions || {});
-      setTrades(activeBotState.trades || []);
-      setCandles(activeBotState.candles || []);
-      setLogs(activeBotState.logs || []);
-      setActiveCandle(activeBotState.active_candle);
-      
-      if (activeBotState.active_candle && orderPrice === 0) {
-        setOrderPrice(activeBotState.active_candle.close);
-      }
-    }
-  }, [selectedBotId, bots]);
 
   useEffect(() => {
     connectWebSocket();
