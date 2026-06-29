@@ -355,21 +355,24 @@ def get_screener_data():
     including mock history, feature importance weights, and news.
     """
     tickers_data = [
-        {"ticker": "ARSA", "price": 1775.00, "direction": "Bullish", "confidence": 94.5, "model": "NeuroLSTM_x0.1", "features": "Sentiment Spike", "alpha": 3.35},
-        {"ticker": "NVDA", "price": 258.50, "direction": "Bearish", "confidence": 94.5, "model": "NeuroLSTM_x0.1", "features": "Sentiment Spike", "alpha": 3.37},
-        {"ticker": "NVDA", "price": 358.50, "direction": "Bullish", "confidence": 94.5, "model": "NeuroLSTM_x1.1", "features": "Order Flow Anomaly", "alpha": 3.25},
-        {"ticker": "ATH", "price": 192.50, "direction": "Bearish", "confidence": 94.5, "model": "NeuroLSTM_x1.1", "features": "Order Flow Anomaly", "alpha": 3.25},
-        {"ticker": "LBN", "price": 339.50, "direction": "Bullish", "confidence": 94.5, "model": "NeuroLSTM_x0.1", "features": "Order Flow Anomaly", "alpha": 3.25},
-        {"ticker": "ARX", "price": 235.55, "direction": "Bearish", "confidence": 90.7, "model": "NeuroLSTM_x0.1", "features": "Order Flow Anomaly", "alpha": 2.33},
-        {"ticker": "BOOT", "price": 195.05, "direction": "Bearish", "confidence": 94.5, "model": "NeuroLSTM_x2.1", "features": "Order Flow Anomaly", "alpha": -5.55},
-        {"ticker": "BBGS", "price": 155.00, "direction": "Bullish", "confidence": 93.5, "model": "NeuroLSTM_x0.1", "features": "Sentiment Spike", "alpha": -5.55},
-        {"ticker": "TEB", "price": 152.00, "direction": "Bullish", "confidence": 56.2, "model": "NeuroLSTM_x0.1", "features": "Sentiment Spike", "alpha": 5.55},
-        {"ticker": "TECH", "price": 187.30, "direction": "Bearish", "confidence": 55.2, "model": "NeuroLSTM_x1.1", "features": "Order Flow Anomaly", "alpha": 5.33},
-        {"ticker": "TSEX", "price": 193.30, "direction": "Bearish", "confidence": 55.2, "model": "NeuroLSTM_x1.1", "features": "Order Flow Anomaly", "alpha": 5.37},
-        {"ticker": "TSEX", "price": 193.50, "direction": "Bullish", "confidence": 98.5, "model": "NeuroLSTM_x1.1", "features": "Order Flow Anomaly", "alpha": 5.37},
-        {"ticker": "NVDX", "price": 123.56, "direction": "Bearish", "confidence": 98.5, "model": "NeuroLSTM_x3.1", "features": "Order Flow Anomaly", "alpha": -2.57},
-        {"ticker": "NVOM", "price": 375.50, "direction": "Bullish", "confidence": 96.5, "model": "NeuroLSTM_x3.1", "features": "Order Flow Anomaly", "alpha": 1.99},
-        {"ticker": "NVDA", "price": 375.50, "direction": "Bearish", "confidence": 94.5, "model": "NeuroLSTM_x0.1", "features": "Order Flow Anomaly", "alpha": -1.99}
+        # S&P 500 / Nasdaq
+        {"ticker": "NVDA", "price": 915.20, "direction": "Bullish", "confidence": 94.5, "model": "NeuroLSTM_x1.1", "features": "Sentiment Spike", "alpha": 3.37, "currency": "$"},
+        {"ticker": "AAPL", "price": 182.50, "direction": "Bearish", "confidence": 88.2, "model": "NeuroLSTM_x0.1", "features": "Order Flow Anomaly", "alpha": -1.25, "currency": "$"},
+        {"ticker": "MSFT", "price": 420.30, "direction": "Bullish", "confidence": 92.4, "model": "NeuroLSTM_x1.1", "features": "Sentiment Spike", "alpha": 2.15, "currency": "$"},
+        {"ticker": "TSLA", "price": 175.40, "direction": "Bearish", "confidence": 76.8, "model": "NeuroLSTM_x0.1", "features": "Anomaly Detection", "alpha": -3.10, "currency": "$"},
+        {"ticker": "AMD", "price": 160.50, "direction": "Bullish", "confidence": 81.5, "model": "NeuroLSTM_x2.1", "features": "Order Flow Anomaly", "alpha": 1.45, "currency": "$"},
+        
+        # NGX (Nigeria)
+        {"ticker": "MTNN", "price": 185.00, "direction": "Bullish", "confidence": 91.2, "model": "NGX_Quant_v1.0", "features": "Telecom Vol Spike", "alpha": 2.85, "currency": "₦"},
+        {"ticker": "DANGCEM", "price": 530.00, "direction": "Bullish", "confidence": 95.8, "model": "NGX_Quant_v1.0", "features": "Industrial Momentum", "alpha": 4.10, "currency": "₦"},
+        {"ticker": "BUAFOODS", "price": 379.90, "direction": "Bullish", "confidence": 93.4, "model": "NGX_Quant_v1.0", "features": "Consumer Demand", "alpha": 3.50, "currency": "₦"},
+        {"ticker": "ZENITHBANK", "price": 35.20, "direction": "Bullish", "confidence": 87.5, "model": "NGX_Quant_v1.0", "features": "Dividend Yield Outperformance", "alpha": 1.95, "currency": "₦"},
+        {"ticker": "GTCO", "price": 40.50, "direction": "Bullish", "confidence": 89.1, "model": "NGX_Quant_v1.0", "features": "High Net Margin", "alpha": 2.20, "currency": "₦"},
+        {"ticker": "ACCESSCORP", "price": 17.50, "direction": "Bearish", "confidence": 74.3, "model": "NGX_Quant_v1.0", "features": "Asset Quality Stress", "alpha": -0.85, "currency": "₦"},
+        {"ticker": "UBA", "price": 21.80, "direction": "Bullish", "confidence": 88.0, "model": "NGX_Quant_v1.0", "features": "Pan-African Expansion", "alpha": 2.50, "currency": "₦"},
+        {"ticker": "SEPLAT", "price": 3100.00, "direction": "Bullish", "confidence": 94.0, "model": "NGX_Quant_v1.0", "features": "Crude Price Tailwinds", "alpha": 5.15, "currency": "₦"},
+        {"ticker": "TRANSCORP", "price": 11.20, "direction": "Bullish", "confidence": 92.1, "model": "NGX_Quant_v1.0", "features": "Power Segment Growth", "alpha": 3.80, "currency": "₦"},
+        {"ticker": "FBNH", "price": 22.10, "direction": "Bearish", "confidence": 79.5, "model": "NGX_Quant_v1.0", "features": "Recapitalization Pressure", "alpha": -1.10, "currency": "₦"}
     ]
 
     # Generate mock 24h history for sparklines
