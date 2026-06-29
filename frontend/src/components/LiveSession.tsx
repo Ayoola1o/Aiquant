@@ -99,7 +99,6 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
       });
       if (res.ok) {
         const data = await res.json();
-        const newBotState = data.bots[newBotId];
         setBots(data.bots || {});
         setSelectedBotId(newBotId);
         setBotName(`Custom Bot ${Object.keys(data.bots || {}).length + 1}`);
