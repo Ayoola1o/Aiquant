@@ -10,6 +10,7 @@ import quant_engine as qe
 from ai_assistant import generate_strategy_script, refine_strategy_script, get_news_sentiment
 from backtest_engine import run_historical_backtest
 from trading_engine import live_session
+from social_scraper import scraper
 
 app = FastAPI(
     title="Aiquant API",
@@ -896,6 +897,13 @@ def get_company_screener_details(ticker: str):
         
     metrics = generate_market_metrics(base_data["ticker"], base_data["price"], base_data["currency"])
     return {**base_data, **metrics}
+
+@app.get("/api/social/sentiment")
+def get_social_sentiment(ticker: str):
+    """
+    Retrieves real-time scraped social discussion logs and aggregated sentiment metrics.
+    """
+    return scraper.get_aggregated_sentiment(ticker)
 
 @app.get("/api/profile")
 def get_user_profile():

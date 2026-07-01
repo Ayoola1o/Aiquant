@@ -63,6 +63,8 @@ export default function Screener() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [selectedPerfTab, setSelectedPerfTab] = useState('WoW');
   const [selectedFinancialTab, setSelectedFinancialTab] = useState<'income' | 'balance' | 'cashflow'>('income');
+  const [socialFeed, setSocialFeed] = useState<any>(null);
+  const [loadingSocial, setLoadingSocial] = useState(false);
 
   const fetchScreener = async () => {
     setLoading(true);
@@ -199,6 +201,21 @@ export default function Screener() {
     setHistoryData(pts);
   }, [selectedTicker, screenerList]);
 
+  const fetchSocialSentiment = async (ticker: string) => {
+    setLoadingSocial(true);
+    try {
+      const res = await fetch(`/api/social/sentiment?ticker=${ticker}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSocialFeed(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch social sentiment:", e);
+    } finally {
+      setLoadingSocial(false);
+    }
+  };
+
   const handleViewCompany = async (ticker: string) => {
     setSelectedTicker(ticker);
     setLoadingDetails(true);
@@ -208,6 +225,7 @@ export default function Screener() {
         const data = await res.json();
         setSelectedCompanyData(data);
         setViewMode('company');
+        fetchSocialSentiment(ticker);
       }
     } catch (e) {
       console.error("Failed to fetch company details:", e);
@@ -674,6 +692,78 @@ export default function Screener() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Social Sentiment Radar Card */}
+            <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-[#4D88FF]" />
+                  Social Sentiment Buzz
+                </h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Live Scraped Consensus (Reddit, StockTwits, X)</span>
+              </div>
+
+              {loadingSocial || !socialFeed ? (
+                <div className="py-12 flex justify-center items-center text-slate-500 text-xs animate-pulse">
+                  Scraping discussion APIs...
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {/* Consensus Indicator Bar */}
+                  <div className="p-3 bg-[#0F1115] border border-white/5 rounded-xl space-y-2">
+                    <div className="flex justify-between text-[9px] uppercase font-bold text-slate-400">
+                      <span className="text-[#2EE59D]">Bullish: {socialFeed.bullish_pct}%</span>
+                      <span className="text-[#FF4B55]">Bearish: {socialFeed.bearish_pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#0F1115] overflow-hidden flex border border-white/5">
+                      <div className="bg-[#2EE59D] h-full transition-all" style={{ width: `${socialFeed.bullish_pct}%` }} />
+                      <div className="bg-[#FF4B55] h-full transition-all" style={{ width: `${socialFeed.bearish_pct}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[8px] text-slate-500 font-mono">
+                      <span>Total Buzz: {socialFeed.total_posts} threads</span>
+                      <span>Consensus: {socialFeed.bullish_pct > 55 ? "Strong Buy" : socialFeed.bearish_pct > 55 ? "Short Bias" : "Neutral"}</span>
+                    </div>
+                  </div>
+
+                  {/* Scraped Posts Feed */}
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {socialFeed.posts && socialFeed.posts.map((post: any, idx: number) => {
+                      const isBull = post.sentiment === "Bullish";
+                      const isBear = post.sentiment === "Bearish";
+                      return (
+                        <div key={idx} className="p-3 bg-[#0F1115] border border-white/5 rounded-xl space-y-1.5 hover:border-slate-800 transition-all">
+                          <div className="flex justify-between items-center text-[9px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-1.5 py-0.5 rounded font-mono font-bold ${
+                                post.source === "Reddit" ? "bg-orange-500/10 text-orange-400" :
+                                post.source === "StockTwits" ? "bg-[#4D88FF]/10 text-[#4D88FF]" :
+                                "bg-slate-800 text-slate-300"
+                              }`}>
+                                {post.source}
+                              </span>
+                              <span className="text-slate-400">{post.username}</span>
+                            </div>
+                            <span className="text-slate-500">{post.timestamp}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 font-sans leading-relaxed break-words font-light">
+                            {post.text}
+                          </p>
+                          <div className="flex justify-end">
+                            <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-md ${
+                              isBull ? 'text-[#2EE59D] bg-[#2EE59D]/5 border border-[#2EE59D]/10' :
+                              isBear ? 'text-[#FF4B55] bg-[#FF4B55]/5 border border-[#FF4B55]/10' :
+                              'text-slate-400 bg-white/5 border border-white/10'
+                            }`}>
+                              {post.sentiment}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
