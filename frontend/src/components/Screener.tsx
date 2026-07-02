@@ -24,7 +24,8 @@ import {
   Coins,
   Scale,
   Building2,
-  BookOpen
+  BookOpen,
+  RefreshCw
 } from 'lucide-react';
 
 interface ScreenerItem {
