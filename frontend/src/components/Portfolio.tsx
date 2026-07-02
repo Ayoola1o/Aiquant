@@ -53,10 +53,14 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
     }
   }, [alpacaKeyId, alpacaSecretKey, hasAlpacaKeys]);
 
-  const handleLiquidate = async () => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleLiquidate = () => {
     if (!hasAlpacaKeys) return;
-    if (!window.confirm("Are you sure you want to close ALL open positions and cancel ALL pending orders on Alpaca?")) return;
-    
+    setShowConfirmModal(true);
+  };
+
+  const executeLiquidation = async () => {
     setLiquidating(true);
     setAlpacaError('');
     setLiquidateSuccess(false);
@@ -501,6 +505,45 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
           </div>
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#1A1D24] border border-red-500/20 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Confirm Account Liquidation</h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Destructive portfolio action</span>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-300 leading-relaxed font-sans font-light">
+              Are you sure you want to close <strong>ALL</strong> open positions and cancel <strong>ALL</strong> pending orders on your connected Alpaca Paper Account? This will instantly release your capital at current market prices.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  executeLiquidation();
+                }}
+                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all cursor-pointer focus:outline-none"
+              >
+                Confirm Liquidation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
