@@ -325,6 +325,35 @@ def get_alpaca_account(creds: AlpacaCredentials):
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Failed to connect to Alpaca: {str(e)}")
 
+@app.post("/api/alpaca/liquidate")
+def liquidate_alpaca_positions(creds: AlpacaCredentials):
+    """
+    Closes all open positions and cancels all pending orders on the Alpaca paper account.
+    """
+    import requests as req
+
+    headers = {
+        "APCA-API-KEY-ID": creds.alpaca_key_id,
+        "APCA-API-SECRET-KEY": creds.alpaca_secret_key,
+    }
+    base = "https://paper-api.alpaca.markets/v2"
+
+    try:
+        # Cancel all open orders and liquidate positions
+        # DELETE /v2/positions?cancel_orders=true
+        res = req.delete(f"{base}/positions?cancel_orders=true", headers=headers, timeout=10)
+        if res.status_code == 200 or res.status_code == 207:
+            # Loop over active bots and trigger sync
+            for bot_id, bot in live_session.bots.items():
+                if bot.alpaca_key_id == creds.alpaca_key_id:
+                    bot.sync_alpaca_account()
+                    bot.sync_alpaca_positions()
+            return {"status": "success", "detail": "Positions liquidated and pending orders cancelled successfully."}
+        else:
+            raise HTTPException(status_code=res.status_code, detail=f"Alpaca liquidate error: {res.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/live/order")
 def place_live_order(req: OrderRequest):
     bot_id = req.bot_id or "default"

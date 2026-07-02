@@ -17,6 +17,8 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
   const [alpacaLoading, setAlpacaLoading] = useState(false);
   const [alpacaError, setAlpacaError] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
+  const [liquidating, setLiquidating] = useState(false);
+  const [liquidateSuccess, setLiquidateSuccess] = useState(false);
 
   // Simulated bot portfolio fallback states
   const [cash, setCash] = useState(10000.0);
@@ -50,6 +52,35 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
       setAlpacaLoading(false);
     }
   }, [alpacaKeyId, alpacaSecretKey, hasAlpacaKeys]);
+
+  const handleLiquidate = async () => {
+    if (!hasAlpacaKeys) return;
+    if (!window.confirm("Are you sure you want to close ALL open positions and cancel ALL pending orders on Alpaca?")) return;
+    
+    setLiquidating(true);
+    setAlpacaError('');
+    setLiquidateSuccess(false);
+    try {
+      const res = await fetch('/api/alpaca/liquidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alpaca_key_id: alpacaKeyId, alpaca_secret_key: alpacaSecretKey }),
+      });
+      if (res.ok) {
+        setLiquidateSuccess(true);
+        // Refresh account details
+        fetchAlpacaAccount();
+        setTimeout(() => setLiquidateSuccess(false), 5000);
+      } else {
+        const err = await res.json();
+        setAlpacaError(err.detail || 'Failed to liquidate positions.');
+      }
+    } catch (e) {
+      setAlpacaError('Network error: failed to connect to liquidation server.');
+    } finally {
+      setLiquidating(false);
+    }
+  };
 
   // Fetch bot live status for fallback
   const fetchLiveStatus = useCallback(async () => {
@@ -146,10 +177,22 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
             <button
               onClick={fetchAlpacaAccount}
               disabled={alpacaLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-white/10 rounded-lg text-[10px] font-bold hover:border-slate-700 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-white/10 rounded-lg text-[10px] font-bold hover:border-slate-700 transition-all disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3 h-3 ${alpacaLoading ? 'animate-spin' : ''}`} />
               Refresh
+            </button>
+            <button
+              onClick={handleLiquidate}
+              disabled={alpacaLoading || liquidating}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                liquidateSuccess
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-red-500/10 text-[#FF4B55] border-[#FF4B55]/20 hover:bg-red-500/20 hover:border-[#FF4B55]/40'
+              }`}
+            >
+              <AlertTriangle className="w-3 h-3 text-[#FF4B55]" />
+              {liquidating ? 'Liquidating...' : liquidateSuccess ? 'Done' : 'Liquidate All'}
             </button>
             <a
               href="https://app.alpaca.markets/paper-trading"
