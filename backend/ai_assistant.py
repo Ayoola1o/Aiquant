@@ -33,19 +33,42 @@ BASE_STRATEGY_TEMPLATE = """class CustomStrategy(BaseStrategy):
 """
 
 
-def generate_strategy_script(prompt: str, openai_api_key: str = "", gemini_api_key: str = "") -> str:
+def generate_strategy_script(
+    prompt: str,
+    openai_api_key: str = "",
+    gemini_api_key: str = "",
+    openrouter_api_key: str = "",
+    nvidia_api_key: str = "",
+    ai_model: str = "",
+    openai_model: str = "",
+    gemini_model: str = "",
+    openrouter_model: str = "",
+    nvidia_model: str = ""
+) -> str:
     """
     Parses a user natural language prompt and generates a fully functioning Python Strategy class.
     If api keys are provided, it calls the corresponding LLM to generate the strategy.
     """
-    if openai_api_key:
+    selected_provider = ai_model.lower() if ai_model else ""
+    if not selected_provider:
+        if openai_api_key:
+            selected_provider = "openai"
+        elif gemini_api_key:
+            selected_provider = "gemini"
+        elif openrouter_api_key:
+            selected_provider = "openrouter"
+        elif nvidia_api_key:
+            selected_provider = "nvidia"
+
+    if selected_provider == "openai" and openai_api_key:
         try:
             headers = {
                 "Authorization": f"Bearer {openai_api_key}",
                 "Content-Type": "application/json"
             }
+            model_to_use = openai_model or "gpt-4o"
             payload = {
-                "model": "gpt-4o",
+                "model": model_to_use,
                 "messages": [
                     {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
                     {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
@@ -59,9 +82,12 @@ def generate_strategy_script(prompt: str, openai_api_key: str = "", gemini_api_k
         except Exception as e:
             print(f"OpenAI Generation failed: {e}. Falling back to default generator.")
 
-    elif gemini_api_key:
+    elif selected_provider == "gemini" and gemini_api_key:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+            model_to_use = gemini_model or "gemini-1.5-flash"
+            if model_to_use.startswith("models/"):
+                model_to_use = model_to_use.replace("models/", "")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_to_use}:generateContent?key={gemini_api_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [{
@@ -75,6 +101,52 @@ def generate_strategy_script(prompt: str, openai_api_key: str = "", gemini_api_k
                 return clean_llm_code(raw_code)
         except Exception as e:
             print(f"Gemini Generation failed: {e}. Falling back to default generator.")
+
+    elif selected_provider == "openrouter" and openrouter_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Aiquant"
+            }
+            model_to_use = openrouter_model or "anthropic/claude-3.5-sonnet"
+            payload = {
+                "model": model_to_use,
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"OpenRouter Generation failed: {e}. Falling back to default generator.")
+
+    elif selected_provider == "nvidia" and nvidia_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {nvidia_api_key}",
+                "Content-Type": "application/json"
+            }
+            model_to_use = nvidia_model or "meta/llama-3.1-nemotron-70b-instruct"
+            payload = {
+                "model": model_to_use,
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"NVIDIA Generation failed: {e}. Falling back to default generator.")
 
     prompt_lower = prompt.lower()
     
@@ -187,19 +259,43 @@ def generate_strategy_script(prompt: str, openai_api_key: str = "", gemini_api_k
     )
 
 
-def refine_strategy_script(code: str, adjustment: str, openai_api_key: str = "", gemini_api_key: str = "") -> str:
+def refine_strategy_script(
+    code: str,
+    adjustment: str,
+    openai_api_key: str = "",
+    gemini_api_key: str = "",
+    openrouter_api_key: str = "",
+    nvidia_api_key: str = "",
+    ai_model: str = "",
+    openai_model: str = "",
+    gemini_model: str = "",
+    openrouter_model: str = "",
+    nvidia_model: str = ""
+) -> str:
     """
     Refines a given Python strategy script based on user adjustments (e.g. adding stop-loss, changing sizes).
     If api keys are provided, it calls the corresponding LLM to refine the strategy.
     """
-    if openai_api_key:
+    selected_provider = ai_model.lower() if ai_model else ""
+    if not selected_provider:
+        if openai_api_key:
+            selected_provider = "openai"
+        elif gemini_api_key:
+            selected_provider = "gemini"
+        elif openrouter_api_key:
+            selected_provider = "openrouter"
+        elif nvidia_api_key:
+            selected_provider = "nvidia"
+
+    if selected_provider == "openai" and openai_api_key:
         try:
             headers = {
                 "Authorization": f"Bearer {openai_api_key}",
                 "Content-Type": "application/json"
             }
+            model_to_use = openai_model or "gpt-4o"
             payload = {
-                "model": "gpt-4o",
+                "model": model_to_use,
                 "messages": [
                     {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
                     {"role": "user", "content": f"Modify this Python strategy code:\n\n{code}\n\nAdjustments requested:\n{adjustment}\n\nOutput only the updated complete python strategy code."}
@@ -213,9 +309,12 @@ def refine_strategy_script(code: str, adjustment: str, openai_api_key: str = "",
         except Exception as e:
             print(f"OpenAI Refinement failed: {e}. Falling back to default refiner.")
 
-    elif gemini_api_key:
+    elif selected_provider == "gemini" and gemini_api_key:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+            model_to_use = gemini_model or "gemini-1.5-flash"
+            if model_to_use.startswith("models/"):
+                model_to_use = model_to_use.replace("models/", "")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_to_use}:generateContent?key={gemini_api_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [{
@@ -229,6 +328,52 @@ def refine_strategy_script(code: str, adjustment: str, openai_api_key: str = "",
                 return clean_llm_code(raw_code)
         except Exception as e:
             print(f"Gemini Refinement failed: {e}. Falling back to default refiner.")
+
+    elif selected_provider == "openrouter" and openrouter_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Aiquant"
+            }
+            model_to_use = openrouter_model or "anthropic/claude-3.5-sonnet"
+            payload = {
+                "model": model_to_use,
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Modify this Python strategy code:\n\n{code}\n\nAdjustments requested:\n{adjustment}\n\nOutput only the updated complete python strategy code."}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"OpenRouter Refinement failed: {e}. Falling back to default refiner.")
+
+    elif selected_provider == "nvidia" and nvidia_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {nvidia_api_key}",
+                "Content-Type": "application/json"
+            }
+            model_to_use = nvidia_model or "meta/llama-3.1-nemotron-70b-instruct"
+            payload = {
+                "model": model_to_use,
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Modify this Python strategy code:\n\n{code}\n\nAdjustments requested:\n{adjustment}\n\nOutput only the updated complete python strategy code."}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"NVIDIA Refinement failed: {e}. Falling back to default refiner.")
 
     adj_lower = adjustment.lower()
     

@@ -22,7 +22,6 @@ import {
   Newspaper,
   ChevronLeft,
   Coins,
-  Scale,
   Building2,
   BookOpen,
   RefreshCw
@@ -234,6 +233,15 @@ export default function Screener() {
       setLoadingDetails(false);
     }
   };
+
+  if (loadingDetails) {
+    return (
+      <div className="h-96 flex flex-col items-center justify-center text-xs text-slate-500 space-y-3">
+        <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+        <span>Loading company metrics &amp; sentiment data...</span>
+      </div>
+    );
+  }
 
   if (viewMode === 'company' && selectedCompanyData) {
     const data = selectedCompanyData;

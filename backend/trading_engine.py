@@ -17,6 +17,175 @@ if BUILDGUIDE_PATH not in sys.path:
     sys.path.append(BUILDGUIDE_PATH)
 
 
+class RiskManager:
+    """
+    Multi-layered risk management system sitting between Strategy signals and execution.
+    Features: Volatility-Based ATR Sizing, Fat-Finger Order Caps, Price Collar Spread limits,
+    Correlation limits, Max Simultaneous Trades, Daily Drawdown Circuit Breakers, and Heartbeat checks.
+    """
+    def __init__(self, profile=None):
+        self.profile = profile or {
+            "atr_sizing_enabled": False,
+            "atr_risk_percent": 1.0,
+            "atr_period": 14,
+            "atr_multiplier": 2.0,
+            
+            "max_order_value_enabled": False,
+            "max_order_value": 5000.0,
+            
+            "price_collar_enabled": False,
+            "max_spread_percent": 0.5,
+            
+            "correlation_limit_enabled": False,
+            "max_allocation_per_asset": 20.0,
+            
+            "max_simultaneous_trades_enabled": False,
+            "max_simultaneous_trades": 5,
+            
+            "max_drawdown_enabled": False,
+            "max_drawdown_percent": 3.0,
+            
+            "heartbeat_check_enabled": False,
+            "max_heartbeat_stale_seconds": 30
+        }
+        self.paused = False
+        self.daily_starting_equity = None
+        self.last_equity_check_time = 0.0
+
+    def update_profile(self, new_profile):
+        if isinstance(new_profile, dict):
+            self.profile.update(new_profile)
+
+    def get_current_spread_percent(self, bot, symbol):
+        """
+        Gets current bid-ask spread % from Alpaca for live keys, otherwise falls back to simulated spread.
+        """
+        if bot.alpaca_key_id and bot.alpaca_secret_key:
+            try:
+                alpaca_sym = symbol.replace("USDT", "USD")
+                is_crypto = len(alpaca_sym) > 4 and "USD" in alpaca_sym
+                url = (f"https://data.alpaca.markets/v1beta3/crypto/us/latest/quotes?symbols={alpaca_sym}"
+                       if is_crypto
+                       else f"https://data.alpaca.markets/v2/stocks/{alpaca_sym}/quotes/latest")
+                r = requests.get(url, headers=bot._alpaca_headers(), timeout=3)
+                if r.status_code == 200:
+                    data = r.json()
+                    quote = data.get("quotes", {}).get(alpaca_sym, {}) if is_crypto else data.get("quote", {})
+                    bid = float(quote.get("bp") or quote.get("bidprice") or 0.0)
+                    ask = float(quote.get("ap") or quote.get("askprice") or 0.0)
+                    if bid > 0 and ask > 0:
+                        spread = ask - bid
+                        return (spread / bid) * 100.0
+            except Exception:
+                pass
+        # Simulated standard spread range (0.02% to 0.08%)
+        return np.random.uniform(0.02, 0.08)
+
+    def validate_order(self, bot, action: str, qty: float, price: float) -> tuple[bool, float, str]:
+        """
+        Validates the order payload. Returns (is_allowed, validated_quantity, status_message).
+        """
+        profile = self.profile
+        action = action.upper()
+
+        # 1. Master System Pause
+        if self.paused:
+            return False, 0.0, "RISK_SYSTEM_PAUSED"
+
+        # 2. Connection Heartbeat Check
+        if profile.get("heartbeat_check_enabled"):
+            last_tick = getattr(bot, "last_tick_time", None)
+            if last_tick and (time.time() - last_tick) > profile.get("max_heartbeat_stale_seconds", 30):
+                bot.log(f"[RISK] Order rejected: Stale data feed detected (last tick {time.time() - last_tick:.1f}s ago)")
+                return False, 0.0, "STALE_DATA_FEED"
+
+        # 3. Max Daily Drawdown Circuit Breaker
+        portfolio_value = bot.cash + sum(bot.positions.get(s, 0.0) * price for s in bot.positions)
+        if profile.get("max_drawdown_enabled"):
+            now = time.time()
+            if self.daily_starting_equity is None or (now - self.last_equity_check_time) > 86400:
+                self.daily_starting_equity = portfolio_value
+                self.last_equity_check_time = now
+            
+            drawdown = (self.daily_starting_equity - portfolio_value) / (self.daily_starting_equity or 1.0)
+            if drawdown >= (profile.get("max_drawdown_percent", 3.0) / 100.0):
+                self.paused = True
+                bot.log(
+                    f"[CRITICAL RISK] Daily Drawdown limit of {profile.get('max_drawdown_percent')}% reached! "
+                    f"Equity: ${portfolio_value:,.2f} vs Day Start: ${self.daily_starting_equity:,.2f}. Triggering emergency pause."
+                )
+                # Flatten active positions
+                pos_qty = bot.positions.get(bot.symbol, 0.0)
+                if pos_qty > 0:
+                    bot.place_market_order("SELL", pos_qty)
+                bot.is_active = False
+                return False, 0.0, "DAILY_DRAWDOWN_CIRCUIT_BREAKER_BREACHED"
+
+        # 4. Maximum Simultaneous Open Trades (Only for opening a new long/short position)
+        is_opening = False
+        held_qty = bot.positions.get(bot.symbol, 0.0)
+        if action == "BUY" and held_qty <= 0:
+            is_opening = True
+        elif action == "SELL" and held_qty >= 0 and bot.alpaca_key_id:
+            # check if shorting is enabled and we are opening a short
+            is_opening = True
+
+        if is_opening and profile.get("max_simultaneous_trades_enabled"):
+            active_positions = sum(1 for sym, q in bot.positions.items() if q > 0.0)
+            if active_positions >= profile.get("max_simultaneous_trades", 5):
+                bot.log(f"[RISK] Order rejected: Max simultaneous active positions ({active_positions}/{profile.get('max_simultaneous_trades')}) reached.")
+                return False, 0.0, "MAX_SIMULTANEOUS_TRADES_EXCEEDED"
+
+        # 5. Sector/Asset Allocation Limit (Only for opening/adding to buy trades)
+        if action == "BUY" and profile.get("correlation_limit_enabled"):
+            order_cost = qty * price
+            max_alloc = portfolio_value * (profile.get("max_allocation_per_asset", 20.0) / 100.0)
+            if order_cost > max_alloc:
+                new_qty = round(max_alloc / price, 6)
+                bot.log(f"[RISK] Order cost ${order_cost:,.2f} exceeds asset allocation limit of {profile.get('max_allocation_per_asset')}%. Downsizing qty {qty:.6f} -> {new_qty:.6f}")
+                qty = new_qty
+                if qty <= 0.000001:
+                    return False, 0.0, "EXCEEDS_ALLOCATION_LIMIT"
+
+        # 6. Volatility-Based ATR Sizing (Override buy qty on open)
+        if action == "BUY" and is_opening and profile.get("atr_sizing_enabled"):
+            if len(bot.candles) >= 1:
+                last_c = bot.candles[-1]
+                atr = last_c.get("atr", price * 0.01)
+                if atr > 0:
+                    risk_amount = portfolio_value * (profile.get("atr_risk_percent", 1.0) / 100.0)
+                    stop_loss_distance = profile.get("atr_multiplier", 2.0) * atr
+                    target_qty = round(risk_amount / stop_loss_distance, 6)
+                    bot.log(
+                        f"[RISK] Volatility-based ATR sizing: ATR={atr:.4f}, StopDist={stop_loss_distance:.4f}, "
+                        f"Target Risk=${risk_amount:,.2f} (1%). Overriding qty {qty:.6f} -> {target_qty:.6f}"
+                    )
+                    qty = target_qty
+                    if qty <= 0.000001:
+                        return False, 0.0, "ATR_SIZING_TOO_SMALL"
+
+        # 7. Max Single Order Dollar Value Cap
+        if profile.get("max_order_value_enabled"):
+            order_value = qty * price
+            max_val = profile.get("max_order_value", 5000.0)
+            if order_value > max_val:
+                new_qty = round(max_val / price, 6)
+                bot.log(f"[RISK] Order value ${order_value:,.2f} exceeds Max Single Order Cap (${max_val:,.2f}). Downsizing qty {qty:.6f} -> {new_qty:.6f}")
+                qty = new_qty
+                if qty <= 0.000001:
+                    return False, 0.0, "EXCEEDS_MAX_ORDER_VALUE"
+
+        # 8. Price Collar Spread Protection
+        if profile.get("price_collar_enabled"):
+            spread_pct = self.get_current_spread_percent(bot, bot.symbol)
+            max_spread = profile.get("max_spread_percent", 0.5)
+            if spread_pct > max_spread:
+                bot.log(f"[RISK] Order rejected: Spread ({spread_pct:.3f}%) exceeds Price Collar limit ({max_spread}%). Slippage risk too high.")
+                return False, 0.0, "PRICE_COLLAR_SPREAD_BREACH"
+
+        return True, qty, "PASSED"
+
+
 class TradingBot:
     """
     Represents an independent active strategy execution bot.
@@ -32,7 +201,7 @@ class TradingBot:
 
     def __init__(self, bot_id, name, symbol, strategy_code, timeframe,
                  starting_cash=10000.0, feed_source="binance",
-                 alpaca_key_id="", alpaca_secret_key=""):
+                 alpaca_key_id="", alpaca_secret_key="", risk_profile=None):
         self.bot_id = bot_id
         self.name = name
         self.symbol = symbol.upper()
@@ -41,6 +210,9 @@ class TradingBot:
         self.feed_source = feed_source.lower()
         self.alpaca_key_id = alpaca_key_id
         self.alpaca_secret_key = alpaca_secret_key
+        
+        self.risk_manager = RiskManager(risk_profile)
+        self.last_tick_time = time.time()
 
         self.is_active = False
         self.start_time = None
@@ -301,8 +473,32 @@ class TradingBot:
     # ------------------------------------------------------------------
     # Order execution
     # ------------------------------------------------------------------
-    def place_market_order(self, action: str, qty: float) -> bool:
+    def place_market_order(self, action: str, qty: float, notional: float = 0.0) -> bool:
+        """
+        Places a market order on Alpaca (paper) or local simulator.
+        If notional > 0, sends a fractional dollar-amount order instead of qty.
+        Short-selling is allowed when the Alpaca account has shorting_enabled=True.
+        """
         action = action.upper()
+        current_price = self.active_candle["close"] if self.active_candle else (self.candles[-1]["close"] if self.candles else 0.0)
+
+        # ── Pre-execution Risk Manager Validation ──────────────────────
+        if hasattr(self, "risk_manager") and current_price > 0:
+            qty_to_validate = qty
+            if notional > 0 and qty_to_validate <= 0:
+                qty_to_validate = notional / current_price
+            
+            allowed, new_qty, reason = self.risk_manager.validate_order(self, action, qty_to_validate, current_price)
+            if not allowed:
+                self.log(f"[RISK] Order BLOCKED: {reason}")
+                return False
+            if new_qty != qty_to_validate:
+                self.log(f"[RISK] Order RESIZED: {qty_to_validate:.6f} -> {new_qty:.6f} ({reason})")
+                if notional > 0:
+                    notional = new_qty * current_price
+                    qty = new_qty
+                else:
+                    qty = new_qty
 
         # ── Alpaca Paper ───────────────────────────────────────────────
         if self.alpaca_key_id and self.alpaca_secret_key:
@@ -310,33 +506,34 @@ class TradingBot:
             current_price = self.active_candle["close"] if self.active_candle else (self.candles[-1]["close"] if self.candles else 0.0)
 
             # 1. Validate Account State & Available Buying Power
+            shorting_enabled = False
             try:
                 acc_res = requests.get("https://paper-api.alpaca.markets/v2/account", headers=self._alpaca_headers(), timeout=5)
                 if acc_res.status_code == 200:
                     acc_info = acc_res.json()
+                    shorting_enabled = acc_info.get("shorting_enabled", False)
                     if acc_info.get("trading_blocked", False):
                         self.log("[Alpaca] Order rejected: Account is blocked from trading.")
                         return False
-                    
-                    if action == "BUY" and current_price > 0:
+
+                    if action == "BUY" and notional <= 0 and current_price > 0:
                         buying_power = float(acc_info.get("buying_power", 0.0))
                         order_cost = qty * current_price
                         if order_cost > buying_power:
-                            # Apply a 2% safety buffer for price slippage & fee padding
                             safe_buying_power = buying_power * 0.98
                             if safe_buying_power <= 0.0:
-                                self.log(f"[Alpaca] BUY rejected: Available buying power (${buying_power:,.2f}) is too low.")
+                                self.log(f"[Alpaca] BUY rejected: Buying power (${buying_power:,.2f}) too low.")
                                 return False
                             old_qty = qty
                             qty = round(safe_buying_power / current_price, 6)
-                            self.log(f"[Alpaca] Insufficient buying power (${buying_power:,.2f}). Downsizing BUY order from {old_qty:.6f} to {qty:.6f} (notional: ${qty * current_price:,.2f})")
+                            self.log(f"[Alpaca] Downsizing BUY {old_qty:.6f} to {qty:.6f} (BP=${buying_power:,.2f})")
                 else:
-                    self.log(f"[Alpaca] Account validation request returned: {acc_res.text}")
+                    self.log(f"[Alpaca] Account validation returned: {acc_res.text}")
             except Exception as e:
-                self.log(f"[Alpaca] Account validation check exception: {e}")
+                self.log(f"[Alpaca] Account validation exception: {e}")
 
-            # 2. Validate Position Size (for SELL orders) to prevent over-selling or accidental shorting
-            if action == "SELL":
+            # 2. Validate Position Size (for SELL — allow short if account permits)
+            if action == "SELL" and notional <= 0:
                 try:
                     pos_res = requests.get("https://paper-api.alpaca.markets/v2/positions", headers=self._alpaca_headers(), timeout=5)
                     if pos_res.status_code == 200:
@@ -348,28 +545,61 @@ class TradingBot:
                                 break
                         if qty > held_qty:
                             if held_qty <= 0.0:
-                                self.log(f"[Alpaca] SELL rejected: No open position in {alpaca_sym} to sell.")
-                                return False
-                            old_qty = qty
-                            qty = held_qty
-                            self.log(f"[Alpaca] Requested SELL quantity {old_qty:.6f} exceeds held position. Capping SELL to {qty:.6f}")
+                                if shorting_enabled:
+                                    self.log(f"[Alpaca] SHORT SELL {qty} {alpaca_sym} (shorting_enabled).")
+                                else:
+                                    self.log(f"[Alpaca] SELL rejected: No position in {alpaca_sym} & shorting not enabled.")
+                                    return False
+                            else:
+                                old_qty = qty
+                                qty = held_qty
+                                self.log(f"[Alpaca] Capping SELL to held qty {qty:.6f}")
                     else:
-                        self.log(f"[Alpaca] Position validation request returned: {pos_res.text}")
+                        self.log(f"[Alpaca] Position validation returned: {pos_res.text}")
                 except Exception as e:
-                    self.log(f"[Alpaca] Position validation check exception: {e}")
+                    self.log(f"[Alpaca] Position validation exception: {e}")
 
-            # 3. Limit Order notional to Alpaca's $200k paper cap
-            if current_price > 0:
-                notional = qty * current_price
-                if notional > 195000.0:
+            # 3. Cap notional to Alpaca's $200k/order limit with a safety buffer.
+            #    We use $175k (not $195k) because Alpaca evaluates notional at
+            #    EXECUTION price, not at our local candle price. On volatile
+            #    assets like BTC, the price can rise 10-15% between cap-time and
+            #    fill-time — which would push a $195k order over $200k and get
+            #    it rejected (as seen in production: cap→3.156 BTC @ $61,779 but
+            #    Alpaca sees $67,919 = $214,357 notional → rejected).
+            ALPACA_NOTIONAL_SAFE_CAP = 175_000.0  # $175k = 12.5% buffer below $200k limit
+            if notional <= 0 and current_price > 0:
+                order_notional = qty * current_price
+                if order_notional > ALPACA_NOTIONAL_SAFE_CAP:
                     old_qty = qty
-                    qty = round(195000.0 / current_price, 6)
-                    self.log(f"[Alpaca] Order notional ${notional:,.2f} exceeds limit. Capping quantity from {old_qty:.6f} to {qty:.6f}")
+                    qty = round(ALPACA_NOTIONAL_SAFE_CAP / current_price, 6)
+                    new_notional = qty * current_price
+                    self.log(
+                        f"[Alpaca] Order notional ${order_notional:,.2f} exceeds safe cap ${ALPACA_NOTIONAL_SAFE_CAP:,.0f}. "
+                        f"Capping qty {old_qty:.6f} -> {qty:.6f} (est. ${new_notional:,.2f} — "
+                        f"12.5% buffer below Alpaca $200k limit protects against execution-price slippage)"
+                    )
 
-            payload = {"symbol": alpaca_sym, "qty": str(qty),
-                       "side": action.lower(), "type": "market", "time_in_force": "gtc"}
-            try:
+            # 4. Build payload — notional (fractional $) or qty
+            if notional > 0:
+                payload = {
+                    "symbol": alpaca_sym,
+                    "notional": str(round(notional, 2)),
+                    "side": action.lower(),
+                    "type": "market",
+                    "time_in_force": "day",  # notional orders require TIF=day
+                }
+                self.log(f"[Alpaca] Sending FRACTIONAL MARKET {action} ${notional:.2f} of {alpaca_sym}…")
+            else:
+                payload = {
+                    "symbol": alpaca_sym,
+                    "qty": str(qty),
+                    "side": action.lower(),
+                    "type": "market",
+                    "time_in_force": "gtc",
+                }
                 self.log(f"[Alpaca] Sending MARKET {action} {qty} {alpaca_sym}…")
+
+            try:
                 r = requests.post("https://paper-api.alpaca.markets/v2/orders",
                                   headers={**self._alpaca_headers(), "Content-Type": "application/json"},
                                   json=payload, timeout=6)
@@ -378,14 +608,15 @@ class TradingBot:
                     fill_price = float(order.get("filled_avg_price") or 0)
                     if fill_price == 0 and self.active_candle:
                         fill_price = self.active_candle["close"]
-                    self.log(f"[Alpaca] Order filled — id: {order.get('id')}")
+                    actual_qty = float(order.get("filled_qty") or qty)
+                    self.log(f"[Alpaca] Order accepted — id: {order.get('id')} | status: {order.get('status')}")
                     time.sleep(1)
                     old_cost = self.avg_cost
                     self.sync_alpaca_account()
                     self.sync_alpaca_positions()
-                    pnl = (fill_price - old_cost) * qty if action == "SELL" and old_cost else 0.0
+                    pnl = (fill_price - old_cost) * actual_qty if action == "SELL" and old_cost else 0.0
                     self.realized_pnl += pnl
-                    self._record_trade(action, fill_price, qty, 0.0, pnl)
+                    self._record_trade(action, fill_price, actual_qty, 0.0, pnl)
                     return True
                 else:
                     self.log(f"[Alpaca] Order rejected: {r.text}")
@@ -393,6 +624,108 @@ class TradingBot:
             except Exception as e:
                 self.log(f"[Alpaca] Order exception: {e}")
                 return False
+
+    # ------------------------------------------------------------------
+    # Advanced orders: limit / stop / stop_limit / trailing_stop
+    # ------------------------------------------------------------------
+    def place_advanced_order(
+        self,
+        action: str,
+        order_type: str,
+        qty: float = 0.0,
+        notional: float = 0.0,
+        limit_price: float = 0.0,
+        stop_price: float = 0.0,
+        trail_price: float = 0.0,
+        trail_percent: float = 0.0,
+        time_in_force: str = "gtc",
+        extended_hours: bool = False,
+    ) -> bool:
+        """
+        Places limit, stop, stop_limit, or trailing_stop orders on Alpaca paper.
+        Falls back to local log if no Alpaca keys configured.
+        """
+        action = action.upper()
+        ot = order_type.lower()
+        current_price = self.active_candle["close"] if self.active_candle else (self.candles[-1]["close"] if self.candles else 0.0)
+        price_to_validate = limit_price or stop_price or current_price
+
+        # ── Pre-execution Risk Manager Validation ──────────────────────
+        if hasattr(self, "risk_manager") and price_to_validate > 0:
+            qty_to_validate = qty
+            if notional > 0 and qty_to_validate <= 0:
+                qty_to_validate = notional / price_to_validate
+            
+            allowed, new_qty, reason = self.risk_manager.validate_order(self, action, qty_to_validate, price_to_validate)
+            if not allowed:
+                self.log(f"[RISK] Advanced Order BLOCKED: {reason}")
+                return False
+            if new_qty != qty_to_validate:
+                self.log(f"[RISK] Advanced Order RESIZED: {qty_to_validate:.6f} -> {new_qty:.6f} ({reason})")
+                if notional > 0:
+                    notional = new_qty * price_to_validate
+                    qty = new_qty
+                else:
+                    qty = new_qty
+
+        if not (self.alpaca_key_id and self.alpaca_secret_key):
+            self.log(f"[SIM] Advanced {ot.upper()} {action} queued (no Alpaca keys).")
+            return True
+
+        alpaca_sym = self.symbol.replace("USDT", "USD")
+        payload: dict = {
+            "symbol": alpaca_sym,
+            "side": action.lower(),
+            "type": ot,
+            "time_in_force": time_in_force,
+            "extended_hours": extended_hours,
+        }
+
+        if notional > 0:
+            payload["notional"] = str(round(notional, 2))
+            payload["time_in_force"] = "day"
+        elif qty > 0:
+            payload["qty"] = str(qty)
+        else:
+            self.log("[Alpaca] Advanced order: qty or notional must be > 0.")
+            return False
+
+        if ot in ("limit", "stop_limit"):
+            if limit_price <= 0:
+                self.log(f"[Alpaca] {ot} order: limit_price required.")
+                return False
+            payload["limit_price"] = str(limit_price)
+        if ot in ("stop", "stop_limit"):
+            if stop_price <= 0:
+                self.log(f"[Alpaca] {ot} order: stop_price required.")
+                return False
+            payload["stop_price"] = str(stop_price)
+        if ot == "trailing_stop":
+            if trail_price > 0:
+                payload["trail_price"] = str(trail_price)
+            elif trail_percent > 0:
+                payload["trail_percent"] = str(trail_percent)
+            else:
+                self.log("[Alpaca] trailing_stop: trail_price or trail_percent required.")
+                return False
+
+        try:
+            self.log(f"[Alpaca] Sending {ot.upper()} {action} {qty or f'${notional:.2f}'} {alpaca_sym}…")
+            r = requests.post(
+                "https://paper-api.alpaca.markets/v2/orders",
+                headers={**self._alpaca_headers(), "Content-Type": "application/json"},
+                json=payload, timeout=6
+            )
+            if r.status_code in (200, 201):
+                order = r.json()
+                self.log(f"[Alpaca] {ot.upper()} order placed — id: {order.get('id')} | status: {order.get('status')}")
+                return True
+            else:
+                self.log(f"[Alpaca] {ot.upper()} order rejected: {r.text}")
+                return False
+        except Exception as e:
+            self.log(f"[Alpaca] {ot.upper()} order exception: {e}")
+            return False
 
         # ── Local simulated paper ──────────────────────────────────────
         with self._lock:
@@ -501,6 +834,7 @@ class TradingBot:
     # ------------------------------------------------------------------
     def _update_active_candle(self, price: float, qty: float):
         now = time.time()
+        self.last_tick_time = now
         # Accelerated duration for mock feed so strategies fire trades immediately (every 8s)
         duration = 8.0 if self.feed_source == "mock" else self.candle_duration
 
@@ -607,7 +941,7 @@ class TradingBot:
                     if act in ("BUY", "SELL") and qty > 0:
                         sma_val = candle_enriched.get('sma', price)
                         rsi_val = candle_enriched.get('rsi', 50)
-                        self.log(f"[Strategy→{act}] qty={qty:.6f} | close={price:.4f} sma={sma_val:.4f} rsi={rsi_val:.1f}")
+                        self.log(f"[Strategy->{act}] qty={qty:.6f} | close={price:.4f} sma={sma_val:.4f} rsi={rsi_val:.1f}")
                         self.place_market_order(act, qty)
             except Exception as e:
                 self.log(f"[Strategy] Error on candle eval: {e}")
@@ -638,8 +972,8 @@ class TradingBot:
                 idx += 1
                 err = str(e)
                 if idx >= 4 or any(x in err for x in ("Failed to resolve", "gaierror", "NameResolution")):
-                    self.log(f"Binance unavailable ({e}). Switching to Mock feed.")
-                    self.feed_source = "mock"
+                    self.log(f"Binance unavailable ({e}). Switching to Alpaca WebSocket feed.")
+                    self.feed_source = "alpaca_ws"
                     return
                 self.log(f"Binance WS error: {e}. Retrying in 5s…")
                 await asyncio.sleep(5)
@@ -649,12 +983,30 @@ class TradingBot:
         ticker = self.symbol.replace("USDT", "-USD")
         while self.is_active and self.feed_source == "yfinance":
             try:
-                df = yf.download(ticker, period="1d", interval="1m", progress=False)
-                if not df.empty:
-                    if isinstance(df.columns, pd.MultiIndex):
-                        df.columns = df.columns.get_level_values(0)
-                    row = df.iloc[-1]
-                    self._update_active_candle(float(row["Close"]), float(row.get("Volume", 1.0)))
+                price = 0.0
+                qty = 1.0
+                # For crypto assets, fetch from Binance public REST API first to prevent yfinance rate limits
+                if "USD" in ticker or self.symbol.endswith("USDT"):
+                    try:
+                        clean_sym = self.symbol.upper()
+                        res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={clean_sym}", timeout=3)
+                        if res.status_code == 200:
+                            price = float(res.json().get("price", 0.0))
+                            qty = 1.0
+                    except Exception:
+                        pass
+                
+                if price <= 0:
+                    df = yf.download(ticker, period="1d", interval="1m", progress=False)
+                    if not df.empty:
+                        if isinstance(df.columns, pd.MultiIndex):
+                            df.columns = df.columns.get_level_values(0)
+                        row = df.iloc[-1]
+                        price = float(row["Close"])
+                        qty = float(row.get("Volume", 1.0))
+                
+                if price > 0:
+                    self._update_active_candle(price, qty)
                 await asyncio.sleep(6)
             except Exception as e:
                 err = str(e)
@@ -693,14 +1045,25 @@ class TradingBot:
                             price = float(trade.get("p", 0.0))
                             qty = float(trade.get("s", 1.0))
 
-                # Fallback to yfinance
+                # Fallback to Binance spot API or yfinance
                 if price <= 0:
-                    df = yf.download(ticker, period="1d", interval="1m", progress=False)
-                    if not df.empty:
-                        if isinstance(df.columns, pd.MultiIndex):
-                            df.columns = df.columns.get_level_values(0)
-                        price = float(df.iloc[-1]["Close"])
-                        qty = float(df.iloc[-1].get("Volume", 1.0))
+                    if "USD" in ticker or self.symbol.endswith("USDT"):
+                        try:
+                            clean_sym = self.symbol.upper()
+                            res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={clean_sym}", timeout=3)
+                            if res.status_code == 200:
+                                price = float(res.json().get("price", 0.0))
+                                qty = 1.0
+                        except Exception:
+                            pass
+                    
+                    if price <= 0:
+                        df = yf.download(ticker, period="1d", interval="1m", progress=False)
+                        if not df.empty:
+                            if isinstance(df.columns, pd.MultiIndex):
+                                df.columns = df.columns.get_level_values(0)
+                            price = float(df.iloc[-1]["Close"])
+                            qty = float(df.iloc[-1].get("Volume", 1.0))
 
                 if price > 0:
                     self._update_active_candle(price, qty)
@@ -714,6 +1077,94 @@ class TradingBot:
                     return
                 self.log(f"Alpaca error: {e}. Retrying in 8s…")
                 await asyncio.sleep(8)
+
+    async def _alpaca_ws_loop(self):
+        self.log(f"Starting Alpaca WebSocket feed for {self.symbol}…")
+        if not self.alpaca_key_id or not self.alpaca_secret_key:
+            self.log("[Alpaca WS] Missing API keys. Cannot start WebSocket stream. Falling back to Mock.")
+            self.feed_source = "mock"
+            return
+
+        alpaca_sym = self.symbol.replace("USDT", "USD")
+        is_crypto = len(alpaca_sym) > 4 and "USD" in alpaca_sym
+        
+        # Determine URI
+        # Crypto: wss://stream.data.alpaca.markets/v1beta3/crypto/us
+        # Stock: wss://stream.data.alpaca.markets/v2/iex
+        uri = (
+            "wss://stream.data.alpaca.markets/v1beta3/crypto/us"
+            if is_crypto
+            else "wss://stream.data.alpaca.markets/v2/iex"
+        )
+
+        # Normalize symbol name: Alpaca Crypto uses BTC/USD instead of BTCUSD or BTC/USDT
+        if is_crypto:
+            if "/" not in alpaca_sym:
+                alpaca_sym = f"{alpaca_sym[:-3]}/{alpaca_sym[-3:]}"
+
+        self.log(f"[Alpaca WS] Connecting to {uri} subscribing to trades for {alpaca_sym}")
+        
+        try:
+            async with websockets.connect(uri, open_timeout=10) as ws:
+                # 1. Read welcome message
+                welcome_raw = await ws.recv()
+                welcome = json.loads(welcome_raw)
+                self.log(f"[Alpaca WS] Connected welcome: {welcome}")
+
+                # 2. Authenticate
+                auth_payload = {
+                    "action": "auth",
+                    "key": self.alpaca_key_id,
+                    "secret": self.alpaca_secret_key
+                }
+                await ws.send(json.dumps(auth_payload))
+                
+                auth_resp = await ws.recv()
+                auth_data = json.loads(auth_resp)
+                self.log(f"[Alpaca WS] Auth Response: {auth_data}")
+
+                authenticated = False
+                if isinstance(auth_data, list):
+                    for item in auth_data:
+                        if item.get("T") == "success" and item.get("msg") == "authenticated":
+                            authenticated = True
+                elif isinstance(auth_data, dict):
+                    if auth_data.get("T") == "success" and auth_data.get("msg") == "authenticated":
+                        authenticated = True
+
+                if not authenticated:
+                    self.log("[Alpaca WS] Auth failed. Switching to Mock feed.")
+                    self.feed_source = "mock"
+                    return
+
+                # 3. Subscribe to trades
+                sub_payload = {
+                    "action": "subscribe",
+                    "trades": [alpaca_sym]
+                }
+                await ws.send(json.dumps(sub_payload))
+                self.log(f"[Alpaca WS] Subscription request sent for trades on {alpaca_sym}")
+
+                # 4. Stream message loop
+                async for raw in ws:
+                    if not self.is_active or self.feed_source != "alpaca_ws":
+                        break
+                    
+                    msg_data = json.loads(raw)
+                    if isinstance(msg_data, list):
+                        for item in msg_data:
+                            # Stream packet format for trades:
+                            # {"T": "t", "S": "BTC/USD", "p": 63000.0, "s": 0.04, "t": "timestamp"}
+                            if item.get("T") == "t":
+                                price = float(item.get("p", 0.0))
+                                qty = float(item.get("s", 0.0))
+                                if price > 0:
+                                    self._update_active_candle(price, qty)
+                    await asyncio.sleep(0)
+                    
+        except Exception as e:
+            self.log(f"[Alpaca WS] Connection closed or error: {e}. Switching to Mock feed.")
+            self.feed_source = "mock"
 
     async def _mock_loop(self):
         self.log(f"Starting Local Mock Simulation for {self.symbol}…")
@@ -753,6 +1204,8 @@ class TradingBot:
                 await self._yfinance_loop()
             elif fs == "alpaca":
                 await self._alpaca_loop()
+            elif fs == "alpaca_ws":
+                await self._alpaca_ws_loop()
             elif fs == "mock":
                 await self._mock_loop()
             else:
@@ -820,22 +1273,33 @@ class LiveSessionManager:
     def __init__(self):
         self.bots: dict[str, TradingBot] = {}
         self.connected_websockets: set = set()
+        self.global_risk_profile: dict = {}
         self._lock = threading.Lock()
 
     def log(self, message: str):
         print(f"[LiveSessionManager] {message}", flush=True)
+
+    def update_global_risk_profile(self, profile: dict):
+        with self._lock:
+            self.global_risk_profile = profile
+            for bot in self.bots.values():
+                if hasattr(bot, "risk_manager"):
+                    bot.risk_manager.update_profile(profile)
+        self.log("Global risk profile updated across all active strategy bots.")
 
     # ------------------------------------------------------------------
     # Bot lifecycle
     # ------------------------------------------------------------------
     def start_bot(self, bot_id, name, symbol, strategy_code, timeframe,
                   starting_cash=10000.0, feed_source="binance",
-                  alpaca_key_id="", alpaca_secret_key="") -> bool:
+                  alpaca_key_id="", alpaca_secret_key="", risk_profile=None) -> bool:
         with self._lock:
             if bot_id in self.bots:
                 self.bots[bot_id].stop()
+            profile_to_use = risk_profile or self.global_risk_profile
             bot = TradingBot(bot_id, name, symbol, strategy_code, timeframe,
-                             starting_cash, feed_source, alpaca_key_id, alpaca_secret_key)
+                             starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
+                             risk_profile=profile_to_use)
             self.bots[bot_id] = bot
         bot.start()
         return True
@@ -904,9 +1368,9 @@ class LiveSessionManager:
         self.start_bot("default", "Manual Trading Bot", "BTCUSDT", "", "10s",
                        starting_cash, "mock")
 
-    def start_session(self, symbol="BTCUSDT", strategy_code="", timeframe="10s") -> bool:
+    def start_session(self, symbol="BTCUSDT", strategy_code="", timeframe="10s", risk_profile=None) -> bool:
         return self.start_bot("default", "Default Bot", symbol, strategy_code, timeframe,
-                              feed_source="mock")
+                              feed_source="mock", risk_profile=risk_profile)
 
     def stop_session(self):
         self.stop_bot("default")

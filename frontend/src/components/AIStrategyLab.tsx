@@ -8,6 +8,13 @@ interface AIStrategyLabProps {
   setSelectedStrategyId: (id: string) => void;
   openAiApiKey?: string;
   geminiApiKey?: string;
+  openRouterApiKey?: string;
+  nvidiaApiKey?: string;
+  aiModel?: string;
+  openaiModel?: string;
+  geminiModel?: string;
+  openRouterModel?: string;
+  nvidiaModel?: string;
 }
 
 interface Message {
@@ -22,7 +29,14 @@ export default function AIStrategyLab({
   selectedStrategyId, 
   setSelectedStrategyId,
   openAiApiKey = '',
-  geminiApiKey = ''
+  geminiApiKey = '',
+  openRouterApiKey = '',
+  nvidiaApiKey = '',
+  aiModel = 'gemini',
+  openaiModel = 'gpt-4o',
+  geminiModel = 'gemini-1.5-flash',
+  openRouterModel = 'anthropic/claude-3.5-sonnet',
+  nvidiaModel = 'meta/llama-3.1-nemotron-70b-instruct'
 }: AIStrategyLabProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,7 +71,18 @@ export default function AIStrategyLab({
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, openai_api_key: openAiApiKey, gemini_api_key: geminiApiKey })
+        body: JSON.stringify({ 
+          prompt, 
+          openai_api_key: openAiApiKey, 
+          gemini_api_key: geminiApiKey,
+          openrouter_api_key: openRouterApiKey,
+          nvidia_api_key: nvidiaApiKey,
+          ai_model: aiModel,
+          openai_model: openaiModel,
+          gemini_model: geminiModel,
+          openrouter_model: openRouterModel,
+          nvidia_model: nvidiaModel
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -102,7 +127,14 @@ export default function AIStrategyLab({
           code: workingCode,
           adjustment: adjustment,
           openai_api_key: openAiApiKey,
-          gemini_api_key: geminiApiKey
+          gemini_api_key: geminiApiKey,
+          openrouter_api_key: openRouterApiKey,
+          nvidia_api_key: nvidiaApiKey,
+          ai_model: aiModel,
+          openai_model: openaiModel,
+          gemini_model: geminiModel,
+          openrouter_model: openRouterModel,
+          nvidia_model: nvidiaModel
         })
       });
       if (res.ok) {

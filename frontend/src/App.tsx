@@ -169,6 +169,130 @@ function QuantApp() {
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() =>
     localStorage.getItem('neuroquant_gemini_api_key') || ''
   );
+  const [openRouterApiKey, setOpenRouterApiKey] = useState<string>(() =>
+    localStorage.getItem('neuroquant_openrouter_api_key') || ''
+  );
+  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>(() =>
+    localStorage.getItem('neuroquant_nvidia_api_key') || ''
+  );
+
+  // Global AI Model Settings
+  const [aiModel, setAiModel] = useState<string>(() =>
+    localStorage.getItem('neuroquant_ai_model') || 'gemini'
+  );
+  const [openaiModel, setOpenaiModel] = useState<string>(() =>
+    localStorage.getItem('neuroquant_openai_model') || 'gpt-4o'
+  );
+  const [geminiModel, setGeminiModel] = useState<string>(() =>
+    localStorage.getItem('neuroquant_gemini_model') || 'gemini-1.5-flash'
+  );
+  const [openRouterModel, setOpenRouterModel] = useState<string>(() =>
+    localStorage.getItem('neuroquant_openrouter_model') || 'anthropic/claude-3.5-sonnet'
+  );
+  const [nvidiaModel, setNvidiaModel] = useState<string>(() =>
+    localStorage.getItem('neuroquant_nvidia_model') || 'meta/llama-3.1-nemotron-70b-instruct'
+  );
+
+  // ── Risk Management States ───────────────────────────────────────
+  const [atrSizingEnabled, setAtrSizingEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_atr_sizing_enabled') === 'true'
+  );
+  const [atrRiskPercent, setAtrRiskPercent] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_atr_risk_percent') || '1.0')
+  );
+  const [atrPeriod, setAtrPeriod] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_atr_period') || '14')
+  );
+  const [atrMultiplier, setAtrMultiplier] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_atr_multiplier') || '2.0')
+  );
+
+  const [maxOrderValueEnabled, setMaxOrderValueEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_max_order_value_enabled') === 'true'
+  );
+  const [maxOrderValue, setMaxOrderValue] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_order_value') || '5000.0')
+  );
+
+  const [priceCollarEnabled, setPriceCollarEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_price_collar_enabled') === 'true'
+  );
+  const [maxSpreadPercent, setMaxSpreadPercent] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_spread_percent') || '0.5')
+  );
+
+  const [correlationLimitEnabled, setCorrelationLimitEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_correlation_limit_enabled') === 'true'
+  );
+  const [maxAllocationPerAsset, setMaxAllocationPerAsset] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_allocation_per_asset') || '20.0')
+  );
+
+  const [maxSimultaneousTradesEnabled, setMaxSimultaneousTradesEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_max_simultaneous_trades_enabled') === 'true'
+  );
+  const [maxSimultaneousTrades, setMaxSimultaneousTrades] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_simultaneous_trades') || '5')
+  );
+
+  const [maxDrawdownEnabled, setMaxDrawdownEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_max_drawdown_enabled') === 'true'
+  );
+  const [maxDrawdownPercent, setMaxDrawdownPercent] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_drawdown_percent') || '3.0')
+  );
+
+  const [heartbeatCheckEnabled, setHeartbeatCheckEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_heartbeat_check_enabled') === 'true'
+  );
+  const [maxHeartbeatStaleSeconds, setMaxHeartbeatStaleSeconds] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_max_heartbeat_stale_seconds') || '30')
+  );
+
+  // Sync Risk settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('neuroquant_risk_atr_sizing_enabled', String(atrSizingEnabled));
+    localStorage.setItem('neuroquant_risk_atr_risk_percent', String(atrRiskPercent));
+    localStorage.setItem('neuroquant_risk_atr_period', String(atrPeriod));
+    localStorage.setItem('neuroquant_risk_atr_multiplier', String(atrMultiplier));
+    localStorage.setItem('neuroquant_risk_max_order_value_enabled', String(maxOrderValueEnabled));
+    localStorage.setItem('neuroquant_risk_max_order_value', String(maxOrderValue));
+    localStorage.setItem('neuroquant_risk_price_collar_enabled', String(priceCollarEnabled));
+    localStorage.setItem('neuroquant_risk_max_spread_percent', String(maxSpreadPercent));
+    localStorage.setItem('neuroquant_risk_correlation_limit_enabled', String(correlationLimitEnabled));
+    localStorage.setItem('neuroquant_risk_max_allocation_per_asset', String(maxAllocationPerAsset));
+    localStorage.setItem('neuroquant_risk_max_simultaneous_trades_enabled', String(maxSimultaneousTradesEnabled));
+    localStorage.setItem('neuroquant_risk_max_simultaneous_trades', String(maxSimultaneousTrades));
+    localStorage.setItem('neuroquant_risk_max_drawdown_enabled', String(maxDrawdownEnabled));
+    localStorage.setItem('neuroquant_risk_max_drawdown_percent', String(maxDrawdownPercent));
+    localStorage.setItem('neuroquant_risk_heartbeat_check_enabled', String(heartbeatCheckEnabled));
+    localStorage.setItem('neuroquant_risk_max_heartbeat_stale_seconds', String(maxHeartbeatStaleSeconds));
+  }, [
+    atrSizingEnabled, atrRiskPercent, atrPeriod, atrMultiplier,
+    maxOrderValueEnabled, maxOrderValue, priceCollarEnabled, maxSpreadPercent,
+    correlationLimitEnabled, maxAllocationPerAsset, maxSimultaneousTradesEnabled, maxSimultaneousTrades,
+    maxDrawdownEnabled, maxDrawdownPercent, heartbeatCheckEnabled, maxHeartbeatStaleSeconds
+  ]);
+
+  const riskProfile = {
+    atr_sizing_enabled: atrSizingEnabled,
+    atr_risk_percent: atrRiskPercent,
+    atr_period: atrPeriod,
+    atr_multiplier: atrMultiplier,
+    max_order_value_enabled: maxOrderValueEnabled,
+    max_order_value: maxOrderValue,
+    price_collar_enabled: priceCollarEnabled,
+    max_spread_percent: maxSpreadPercent,
+    correlation_limit_enabled: correlationLimitEnabled,
+    max_allocation_per_asset: maxAllocationPerAsset,
+    max_simultaneous_trades_enabled: maxSimultaneousTradesEnabled,
+    max_simultaneous_trades: maxSimultaneousTrades,
+    max_drawdown_enabled: maxDrawdownEnabled,
+    max_drawdown_percent: maxDrawdownPercent,
+    heartbeat_check_enabled: heartbeatCheckEnabled,
+    max_heartbeat_stale_seconds: maxHeartbeatStaleSeconds
+  };
+
 
   // Sync strategies to localStorage
   useEffect(() => {
@@ -181,11 +305,28 @@ function QuantApp() {
     localStorage.setItem('neuroquant_alpaca_secret_key', alpacaSecretKey);
   }, [alpacaKeyId, alpacaSecretKey]);
 
-  // Sync AI Assistant API credentials to localStorage
+  // Sync AI Assistant API credentials & models to localStorage
   useEffect(() => {
     localStorage.setItem('neuroquant_openai_api_key', openAiApiKey);
     localStorage.setItem('neuroquant_gemini_api_key', geminiApiKey);
-  }, [openAiApiKey, geminiApiKey]);
+    localStorage.setItem('neuroquant_openrouter_api_key', openRouterApiKey);
+    localStorage.setItem('neuroquant_nvidia_api_key', nvidiaApiKey);
+    localStorage.setItem('neuroquant_ai_model', aiModel);
+    localStorage.setItem('neuroquant_openai_model', openaiModel);
+    localStorage.setItem('neuroquant_gemini_model', geminiModel);
+    localStorage.setItem('neuroquant_openrouter_model', openRouterModel);
+    localStorage.setItem('neuroquant_nvidia_model', nvidiaModel);
+  }, [
+    openAiApiKey, 
+    geminiApiKey, 
+    openRouterApiKey, 
+    nvidiaApiKey, 
+    aiModel, 
+    openaiModel, 
+    geminiModel, 
+    openRouterModel, 
+    nvidiaModel
+  ]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -450,12 +591,21 @@ function QuantApp() {
                 setSelectedStrategyId={setSelectedStrategyId} 
                 openAiApiKey={openAiApiKey}
                 geminiApiKey={geminiApiKey}
+                openRouterApiKey={openRouterApiKey}
+                nvidiaApiKey={nvidiaApiKey}
+                aiModel={aiModel}
+                openaiModel={openaiModel}
+                geminiModel={geminiModel}
+                openRouterModel={openRouterModel}
+                nvidiaModel={nvidiaModel}
               />
             } />
             <Route path="/backtester" element={
               <Backtester 
                 strategies={strategies} 
                 selectedStrategyId={selectedStrategyId} 
+                alpacaKeyId={alpacaKeyId}
+                alpacaSecretKey={alpacaSecretKey}
               />
             } />
             <Route path="/live" element={
@@ -464,6 +614,7 @@ function QuantApp() {
                 selectedStrategyId={selectedStrategyId}
                 alpacaKeyId={alpacaKeyId}
                 alpacaSecretKey={alpacaSecretKey}
+                riskProfile={riskProfile}
               />
             } />
             <Route path="/portfolio" element={
@@ -482,6 +633,53 @@ function QuantApp() {
                 setOpenAiApiKey={setOpenAiApiKey}
                 geminiApiKey={geminiApiKey}
                 setGeminiApiKey={setGeminiApiKey}
+                openRouterApiKey={openRouterApiKey}
+                setOpenRouterApiKey={setOpenRouterApiKey}
+                nvidiaApiKey={nvidiaApiKey}
+                setNvidiaApiKey={setNvidiaApiKey}
+                aiModel={aiModel}
+                setAiModel={setAiModel}
+                openaiModel={openaiModel}
+                setOpenaiModel={setOpenaiModel}
+                geminiModel={geminiModel}
+                setGeminiModel={setGeminiModel}
+                openRouterModel={openRouterModel}
+                setOpenRouterModel={setOpenRouterModel}
+                nvidiaModel={nvidiaModel}
+                setNvidiaModel={setNvidiaModel}
+                
+                atrSizingEnabled={atrSizingEnabled}
+                setAtrSizingEnabled={setAtrSizingEnabled}
+                atrRiskPercent={atrRiskPercent}
+                setAtrRiskPercent={setAtrRiskPercent}
+                atrPeriod={atrPeriod}
+                setAtrPeriod={setAtrPeriod}
+                atrMultiplier={atrMultiplier}
+                setAtrMultiplier={setAtrMultiplier}
+                maxOrderValueEnabled={maxOrderValueEnabled}
+                setMaxOrderValueEnabled={setMaxOrderValueEnabled}
+                maxOrderValue={maxOrderValue}
+                setMaxOrderValue={setMaxOrderValue}
+                priceCollarEnabled={priceCollarEnabled}
+                setPriceCollarEnabled={setPriceCollarEnabled}
+                maxSpreadPercent={maxSpreadPercent}
+                setMaxSpreadPercent={setMaxSpreadPercent}
+                correlationLimitEnabled={correlationLimitEnabled}
+                setCorrelationLimitEnabled={setCorrelationLimitEnabled}
+                maxAllocationPerAsset={maxAllocationPerAsset}
+                setMaxAllocationPerAsset={setMaxAllocationPerAsset}
+                maxSimultaneousTradesEnabled={maxSimultaneousTradesEnabled}
+                setMaxSimultaneousTradesEnabled={setMaxSimultaneousTradesEnabled}
+                maxSimultaneousTrades={maxSimultaneousTrades}
+                setMaxSimultaneousTrades={setMaxSimultaneousTrades}
+                maxDrawdownEnabled={maxDrawdownEnabled}
+                setMaxDrawdownEnabled={setMaxDrawdownEnabled}
+                maxDrawdownPercent={maxDrawdownPercent}
+                setMaxDrawdownPercent={setMaxDrawdownPercent}
+                heartbeatCheckEnabled={heartbeatCheckEnabled}
+                setHeartbeatCheckEnabled={setHeartbeatCheckEnabled}
+                maxHeartbeatStaleSeconds={maxHeartbeatStaleSeconds}
+                setMaxHeartbeatStaleSeconds={setMaxHeartbeatStaleSeconds}
               />
             } />
             <Route path="/profile" element={<UserProfile />} />

@@ -40,10 +40,150 @@ except Exception as e:
     print("Prediction engine will use local RandomForest fallback.")
 
 
-def fetch_historical_data(ticker: str, period: str = "1mo", interval: str = "1h") -> pd.DataFrame:
+def get_alpaca_dates(period: str):
+    from datetime import datetime, timedelta
+    end_dt = datetime.utcnow()
+    
+    if "_" in period:
+        start_str, end_str = period.split("_")
+        try:
+            start_dt = datetime.strptime(start_str, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_str, "%Y-%m-%d")
+        except Exception:
+            start_dt = end_dt - timedelta(days=30)
+    else:
+        days_map = {
+            "1d": 1,
+            "5d": 5,
+            "1mo": 30,
+            "3mo": 90,
+            "6mo": 180,
+            "1y": 365,
+            "2y": 730,
+            "5y": 1825,
+            "10y": 3650
+        }
+        days = days_map.get(period, 30)
+        start_dt = end_dt - timedelta(days=days)
+        
+    return start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"), end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def fetch_alpaca_historical_data(
+    ticker: str,
+    period: str,
+    interval: str,
+    key_id: str,
+    secret_key: str
+) -> pd.DataFrame:
     """
-    Fetches real-world historical OHLCV data using Yahoo Finance.
+    Fetches historical OHLCV data from Alpaca Market Data API.
     """
+    import requests
+    from datetime import datetime
+    
+    # Map interval to Alpaca timeframe
+    tf_map = {
+        "1m": "1Min",
+        "5m": "5Min",
+        "15m": "15Min",
+        "30m": "30Min",
+        "1h": "1Hour",
+        "2h": "2Hour",
+        "4h": "4Hour",
+        "1d": "1Day"
+    }
+    timeframe = tf_map.get(interval, "1Hour")
+    
+    # Get start/end dates
+    start, end = get_alpaca_dates(period)
+    
+    # Normalize ticker (e.g. BTC-USD -> BTC/USD)
+    alpaca_sym = ticker.upper()
+    if alpaca_sym.endswith("USDT"):
+        alpaca_sym = alpaca_sym.replace("USDT", "USD")
+    elif alpaca_sym.endswith("-USD"):
+        alpaca_sym = alpaca_sym.replace("-USD", "USD")
+        
+    is_crypto = len(alpaca_sym) > 4 and "USD" in alpaca_sym
+    
+    # Alpaca expects BTC/USD instead of BTCUSD
+    if is_crypto and "/" not in alpaca_sym:
+        alpaca_sym = f"{alpaca_sym[:-3]}/{alpaca_sym[-3:]}"
+        
+    url = (
+        "https://data.alpaca.markets/v1beta3/crypto/us/bars"
+        if is_crypto
+        else "https://data.alpaca.markets/v2/stocks/bars"
+    )
+    
+    headers = {
+        "APCA-API-KEY-ID": key_id,
+        "APCA-API-SECRET-KEY": secret_key
+    }
+    
+    params = {
+        "symbols": alpaca_sym,
+        "timeframe": timeframe,
+        "start": start,
+        "end": end,
+        "limit": 10000
+    }
+    
+    print(f"Fetching Alpaca historical data for {alpaca_sym} (timeframe={timeframe}, start={start}, end={end})...")
+    res = requests.get(url, headers=headers, params=params, timeout=10)
+    if res.status_code != 200:
+        raise ValueError(f"Alpaca API returned {res.status_code}: {res.text}")
+        
+    data = res.json()
+    bars = data.get("bars", {}).get(alpaca_sym, [])
+    if not bars:
+        raise ValueError(f"No bars returned from Alpaca for symbol {alpaca_sym}")
+        
+    # Convert bars to pandas DataFrame
+    # Alpaca bar keys: 't' (timestamp), 'o' (open), 'h' (high), 'l' (low), 'c' (close), 'v' (volume)
+    records = []
+    for b in bars:
+        records.append({
+            "timestamp": b.get("t"),
+            "open": float(b.get("o", 0.0)),
+            "high": float(b.get("h", 0.0)),
+            "low": float(b.get("l", 0.0)),
+            "close": float(b.get("c", 0.0)),
+            "volume": float(b.get("v", 0.0))
+        })
+        
+    df = pd.DataFrame(records)
+    # Ensure timestamp is formatted as string ISO format
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+    return df
+
+
+def fetch_historical_data(
+    ticker: str,
+    period: str = "1mo",
+    interval: str = "1h",
+    alpaca_key_id: str = "",
+    alpaca_secret_key: str = ""
+) -> pd.DataFrame:
+    """
+    Fetches real-world historical OHLCV data using Alpaca (first) or Yahoo Finance (as fallback).
+    """
+    if alpaca_key_id and alpaca_secret_key:
+        try:
+            df = fetch_alpaca_historical_data(
+                ticker=ticker,
+                period=period,
+                interval=interval,
+                key_id=alpaca_key_id,
+                secret_key=alpaca_secret_key
+            )
+            if not df.empty:
+                print(f"Successfully fetched {len(df)} candles from Alpaca for backtesting.")
+                return df
+        except Exception as e:
+            print(f"Alpaca historical data fetch failed ({e}). Falling back to Yahoo Finance.")
+
     try:
         # Resolve tickers to Yahoo Finance standard if needed (e.g. BTCUSDT -> BTC-USD)
         yf_ticker = ticker

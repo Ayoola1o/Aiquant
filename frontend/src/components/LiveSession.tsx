@@ -7,6 +7,7 @@ interface LiveSessionProps {
   selectedStrategyId: string;
   alpacaKeyId?: string;
   alpacaSecretKey?: string;
+  riskProfile?: any;
 }
 
 // Custom Candlestick rendering shape (same as predictor)
@@ -37,7 +38,13 @@ const CandlestickShape = (props: any) => {
   );
 };
 
-export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyId: globalAlpacaKeyId = '', alpacaSecretKey: globalAlpacaSecretKey = '' }: LiveSessionProps) {
+export default function LiveSession({
+  strategies,
+  selectedStrategyId,
+  alpacaKeyId: globalAlpacaKeyId = '',
+  alpacaSecretKey: globalAlpacaSecretKey = '',
+  riskProfile = null
+}: LiveSessionProps) {
   // Multi-bot list states
   const [bots, setBots] = useState<Record<string, any>>({});
   const [selectedBotId, setSelectedBotId] = useState('default');
@@ -103,7 +110,8 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
           starting_cash: Number(startingCash),
           feed_source: liveFeedSource,
           alpaca_key_id: alpacaKeyId,
-          alpaca_secret_key: alpacaSecretKey
+          alpaca_secret_key: alpacaSecretKey,
+          risk_profile: riskProfile
         })
       });
       if (res.ok) {

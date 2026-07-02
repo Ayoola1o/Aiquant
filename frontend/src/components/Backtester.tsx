@@ -16,9 +16,16 @@ import {
 interface BacktesterProps {
   strategies: Array<{ id: string; name: string; code: string }>;
   selectedStrategyId: string;
+  alpacaKeyId?: string;
+  alpacaSecretKey?: string;
 }
 
-export default function Backtester({ strategies, selectedStrategyId }: BacktesterProps) {
+export default function Backtester({ 
+  strategies, 
+  selectedStrategyId, 
+  alpacaKeyId = '', 
+  alpacaSecretKey = '' 
+}: BacktesterProps) {
   // Filter Metrics states
   const [tradingPeriod, setTradingPeriod] = useState('2y');
   const [customStartDate, setCustomStartDate] = useState('2020-01-01');
@@ -79,7 +86,9 @@ export default function Backtester({ strategies, selectedStrategyId }: Backteste
           period: mappedPeriod,
           interval: timeframe,
           starting_capital: 10000.0,
-          commission_pct: 0.001
+          commission_pct: 0.001,
+          alpaca_key_id: alpacaKeyId,
+          alpaca_secret_key: alpacaSecretKey
         })
       });
       
@@ -94,7 +103,11 @@ export default function Backtester({ strategies, selectedStrategyId }: Backteste
           logsList.push(`[System] Initializing backtest simulation...`);
           logsList.push(`[System] Symbol: ${mappedSymbol.toUpperCase()}`);
           logsList.push(`[System] Timeframe: ${timeframe}`);
-          logsList.push(`[System] Downloading historical candles from Yahoo Finance...`);
+          if (alpacaKeyId && alpacaSecretKey) {
+            logsList.push(`[System] Downloading historical candles from Alpaca Market Data API...`);
+          } else {
+            logsList.push(`[System] Downloading historical candles from Yahoo Finance...`);
+          }
           logsList.push(`[System] Data fetched successfully. Total bars: ${data.equity_curve.length}`);
           logsList.push(`[System] Running strategy simulation...`);
           
