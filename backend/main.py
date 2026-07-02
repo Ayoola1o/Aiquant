@@ -357,7 +357,8 @@ def liquidate_alpaca_positions(creds: AlpacaCredentials):
 @app.post("/api/alpaca/liquidate/{symbol}")
 def liquidate_single_position(symbol: str, creds: AlpacaCredentials):
     """
-    Closes the position for a specific symbol on the Alpaca paper account.
+    Closes the position for a specific symbol on the Alpaca paper account,
+    cancelling any open orders for that symbol first to prevent blockage.
     """
     import requests as req
 
@@ -366,19 +367,31 @@ def liquidate_single_position(symbol: str, creds: AlpacaCredentials):
         "APCA-API-SECRET-KEY": creds.alpaca_secret_key,
     }
     base = "https://paper-api.alpaca.markets/v2"
+    sym = symbol.upper().strip()
 
     try:
-        # Close position for specific symbol
+        # 1. Fetch and cancel open orders for this symbol first
+        orders_res = req.get(f"{base}/orders?status=open&symbols={sym}", headers=headers, timeout=5)
+        if orders_res.status_code == 200:
+            open_orders = orders_res.json()
+            for order in open_orders:
+                order_id = order.get("id")
+                req.delete(f"{base}/orders/{order_id}", headers=headers, timeout=5)
+
+        # 2. Close position for the specific symbol
         # DELETE /v2/positions/{symbol}
-        res = req.delete(f"{base}/positions/{symbol.upper().strip()}", headers=headers, timeout=10)
-        if res.status_code == 200 or res.status_code == 207:
+        res = req.delete(f"{base}/positions/{sym}", headers=headers, timeout=10)
+        if res.status_code in (200, 207):
             # Loop over active bots and trigger sync
             for bot_id, bot in live_session.bots.items():
                 if bot.alpaca_key_id == creds.alpaca_key_id:
                     bot.sync_alpaca_account()
                     bot.sync_alpaca_positions()
-            return {"status": "success", "detail": f"Position for {symbol} liquidated successfully."}
+            return {"status": "success", "detail": f"Open orders cancelled and position for {symbol} closed successfully."}
         else:
+            # 404 means no position exists, which is a successful no-op
+            if res.status_code == 404:
+                return {"status": "success", "detail": f"No active position to close for {symbol}."}
             raise HTTPException(status_code=res.status_code, detail=f"Alpaca liquidate single error: {res.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

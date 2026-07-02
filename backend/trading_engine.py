@@ -307,9 +307,58 @@ class TradingBot:
         # ── Alpaca Paper ───────────────────────────────────────────────
         if self.alpaca_key_id and self.alpaca_secret_key:
             alpaca_sym = self.symbol.replace("USDT", "USD")
-            
-            # Prevent order rejection by capping the order notional to Alpaca's $200k limit
             current_price = self.active_candle["close"] if self.active_candle else (self.candles[-1]["close"] if self.candles else 0.0)
+
+            # 1. Validate Account State & Available Buying Power
+            try:
+                acc_res = requests.get("https://paper-api.alpaca.markets/v2/account", headers=self._alpaca_headers(), timeout=5)
+                if acc_res.status_code == 200:
+                    acc_info = acc_res.json()
+                    if acc_info.get("trading_blocked", False):
+                        self.log("[Alpaca] Order rejected: Account is blocked from trading.")
+                        return False
+                    
+                    if action == "BUY" and current_price > 0:
+                        buying_power = float(acc_info.get("buying_power", 0.0))
+                        order_cost = qty * current_price
+                        if order_cost > buying_power:
+                            # Apply a 2% safety buffer for price slippage & fee padding
+                            safe_buying_power = buying_power * 0.98
+                            if safe_buying_power <= 0.0:
+                                self.log(f"[Alpaca] BUY rejected: Available buying power (${buying_power:,.2f}) is too low.")
+                                return False
+                            old_qty = qty
+                            qty = round(safe_buying_power / current_price, 6)
+                            self.log(f"[Alpaca] Insufficient buying power (${buying_power:,.2f}). Downsizing BUY order from {old_qty:.6f} to {qty:.6f} (notional: ${qty * current_price:,.2f})")
+                else:
+                    self.log(f"[Alpaca] Account validation request returned: {acc_res.text}")
+            except Exception as e:
+                self.log(f"[Alpaca] Account validation check exception: {e}")
+
+            # 2. Validate Position Size (for SELL orders) to prevent over-selling or accidental shorting
+            if action == "SELL":
+                try:
+                    pos_res = requests.get("https://paper-api.alpaca.markets/v2/positions", headers=self._alpaca_headers(), timeout=5)
+                    if pos_res.status_code == 200:
+                        positions_info = pos_res.json()
+                        held_qty = 0.0
+                        for pos in positions_info:
+                            if pos.get("symbol") == alpaca_sym:
+                                held_qty = float(pos.get("qty", 0.0))
+                                break
+                        if qty > held_qty:
+                            if held_qty <= 0.0:
+                                self.log(f"[Alpaca] SELL rejected: No open position in {alpaca_sym} to sell.")
+                                return False
+                            old_qty = qty
+                            qty = held_qty
+                            self.log(f"[Alpaca] Requested SELL quantity {old_qty:.6f} exceeds held position. Capping SELL to {qty:.6f}")
+                    else:
+                        self.log(f"[Alpaca] Position validation request returned: {pos_res.text}")
+                except Exception as e:
+                    self.log(f"[Alpaca] Position validation check exception: {e}")
+
+            # 3. Limit Order notional to Alpaca's $200k paper cap
             if current_price > 0:
                 notional = qty * current_price
                 if notional > 195000.0:
