@@ -163,6 +163,12 @@ function QuantApp() {
   const [alpacaSecretKey, setAlpacaSecretKey] = useState<string>(() =>
     localStorage.getItem('neuroquant_alpaca_secret_key') || ''
   );
+  const [openAiApiKey, setOpenAiApiKey] = useState<string>(() =>
+    localStorage.getItem('neuroquant_openai_api_key') || ''
+  );
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() =>
+    localStorage.getItem('neuroquant_gemini_api_key') || ''
+  );
 
   // Sync strategies to localStorage
   useEffect(() => {
@@ -174,6 +180,12 @@ function QuantApp() {
     localStorage.setItem('neuroquant_alpaca_key_id', alpacaKeyId);
     localStorage.setItem('neuroquant_alpaca_secret_key', alpacaSecretKey);
   }, [alpacaKeyId, alpacaSecretKey]);
+
+  // Sync AI Assistant API credentials to localStorage
+  useEffect(() => {
+    localStorage.setItem('neuroquant_openai_api_key', openAiApiKey);
+    localStorage.setItem('neuroquant_gemini_api_key', geminiApiKey);
+  }, [openAiApiKey, geminiApiKey]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -436,6 +448,8 @@ function QuantApp() {
                 setStrategies={setStrategies} 
                 selectedStrategyId={selectedStrategyId} 
                 setSelectedStrategyId={setSelectedStrategyId} 
+                openAiApiKey={openAiApiKey}
+                geminiApiKey={geminiApiKey}
               />
             } />
             <Route path="/backtester" element={
@@ -464,6 +478,10 @@ function QuantApp() {
                 setAlpacaKeyId={setAlpacaKeyId}
                 alpacaSecretKey={alpacaSecretKey}
                 setAlpacaSecretKey={setAlpacaSecretKey}
+                openAiApiKey={openAiApiKey}
+                setOpenAiApiKey={setOpenAiApiKey}
+                geminiApiKey={geminiApiKey}
+                setGeminiApiKey={setGeminiApiKey}
               />
             } />
             <Route path="/profile" element={<UserProfile />} />

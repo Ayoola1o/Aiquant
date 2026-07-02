@@ -1,4 +1,14 @@
 import re
+import requests
+
+def clean_llm_code(text: str) -> str:
+    """
+    Cleans markdown code block wraps (like ```python) from the LLM response text.
+    """
+    # Remove markdown code blocks if present
+    text = re.sub(r'^```python\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
+    return text.strip()
 
 # Base Strategy Template that all generated strategies inherit from
 BASE_STRATEGY_TEMPLATE = """class CustomStrategy(BaseStrategy):
@@ -23,10 +33,49 @@ BASE_STRATEGY_TEMPLATE = """class CustomStrategy(BaseStrategy):
 """
 
 
-def generate_strategy_script(prompt: str) -> str:
+def generate_strategy_script(prompt: str, openai_api_key: str = "", gemini_api_key: str = "") -> str:
     """
     Parses a user natural language prompt and generates a fully functioning Python Strategy class.
+    If api keys are provided, it calls the corresponding LLM to generate the strategy.
     """
+    if openai_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {openai_api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"OpenAI Generation failed: {e}. Falling back to default generator.")
+
+    elif gemini_api_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [{
+                    "parts": [{"text": f"You are a professional AI quantitative developer assistant. Output ONLY executable python code without markdown formatting (no ```python blocks). Write a CustomStrategy(BaseStrategy) class conforming to: \n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}]
+                }],
+                "generationConfig": {"temperature": 0.2}
+            }
+            res = requests.post(url, json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"Gemini Generation failed: {e}. Falling back to default generator.")
+
     prompt_lower = prompt.lower()
     
     # Default parameters
@@ -138,10 +187,49 @@ def generate_strategy_script(prompt: str) -> str:
     )
 
 
-def refine_strategy_script(code: str, adjustment: str) -> str:
+def refine_strategy_script(code: str, adjustment: str, openai_api_key: str = "", gemini_api_key: str = "") -> str:
     """
     Refines a given Python strategy script based on user adjustments (e.g. adding stop-loss, changing sizes).
+    If api keys are provided, it calls the corresponding LLM to refine the strategy.
     """
+    if openai_api_key:
+        try:
+            headers = {
+                "Authorization": f"Bearer {openai_api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Modify this Python strategy code:\n\n{code}\n\nAdjustments requested:\n{adjustment}\n\nOutput only the updated complete python strategy code."}
+                ],
+                "temperature": 0.2
+            }
+            res = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["choices"][0]["message"]["content"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"OpenAI Refinement failed: {e}. Falling back to default refiner.")
+
+    elif gemini_api_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [{
+                    "parts": [{"text": f"You are a professional AI quantitative developer assistant. Output ONLY executable python code without markdown formatting (no ```python blocks). Modify this Python strategy code:\n\n{code}\n\nAdjustments requested:\n{adjustment}\n\nOutput only the updated complete python strategy code."}]
+                }],
+                "generationConfig": {"temperature": 0.2}
+            }
+            res = requests.post(url, json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                raw_code = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return clean_llm_code(raw_code)
+        except Exception as e:
+            print(f"Gemini Refinement failed: {e}. Falling back to default refiner.")
+
     adj_lower = adjustment.lower()
     
     # 1. Inject Stop-Loss logic if requested

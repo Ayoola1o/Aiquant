@@ -6,9 +6,22 @@ interface SettingsProps {
   setAlpacaKeyId: (v: string) => void;
   alpacaSecretKey: string;
   setAlpacaSecretKey: (v: string) => void;
+  openAiApiKey: string;
+  setOpenAiApiKey: (v: string) => void;
+  geminiApiKey: string;
+  setGeminiApiKey: (v: string) => void;
 }
 
-export default function Settings({ alpacaKeyId, setAlpacaKeyId, alpacaSecretKey, setAlpacaSecretKey }: SettingsProps) {
+export default function Settings({ 
+  alpacaKeyId, 
+  setAlpacaKeyId, 
+  alpacaSecretKey, 
+  setAlpacaSecretKey,
+  openAiApiKey,
+  setOpenAiApiKey,
+  geminiApiKey,
+  setGeminiApiKey
+}: SettingsProps) {
   // Local-only settings (not globally shared)
   const [binanceKey, setBinanceKey] = useState('');
 
@@ -88,6 +101,30 @@ export default function Settings({ alpacaKeyId, setAlpacaKeyId, alpacaSecretKey,
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
               placeholder="Key for live high-frequency order placement"
             />
+          </div>
+
+          <div>
+            <label className="block text-slate-400 text-xs font-semibold mb-2">OpenAI API Key (Optional)</label>
+            <input
+              type="password"
+              value={openAiApiKey}
+              onChange={(e) => setOpenAiApiKey(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+              placeholder="sk-••••••••••••••••••••••••••••••••"
+            />
+            <p className="text-[10px] text-slate-600 mt-1">Used to generate highly customized strategies in AI Strategy Lab.</p>
+          </div>
+
+          <div>
+            <label className="block text-slate-400 text-xs font-semibold mb-2">Gemini API Key (Optional)</label>
+            <input
+              type="password"
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+              placeholder="AIzaSy••••••••••••••••••••••••••••••••"
+            />
+            <p className="text-[10px] text-slate-600 mt-1">Fallback generator model key for custom agent scripts.</p>
           </div>
         </div>
 

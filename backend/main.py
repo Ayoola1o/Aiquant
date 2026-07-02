@@ -49,10 +49,14 @@ class OptimizeRequest(BaseModel):
 
 class AIGenerateRequest(BaseModel):
     prompt: str
+    openai_api_key: Optional[str] = ""
+    gemini_api_key: Optional[str] = ""
 
 class AIRefineRequest(BaseModel):
     code: str
     adjustment: str
+    openai_api_key: Optional[str] = ""
+    gemini_api_key: Optional[str] = ""
 
 class OrderRequest(BaseModel):
     action: str
@@ -168,17 +172,28 @@ def optimize_portfolio_endpoint(req: OptimizeRequest):
 @app.post("/api/ai/generate")
 def ai_generate_strategy(req: AIGenerateRequest):
     """
-    Generates a Python Strategy script from a natural language prompt.
+    Generates a Python Strategy script from a natural language prompt,
+    supporting OpenAI or Gemini API keys.
     """
-    code = generate_strategy_script(req.prompt)
+    code = generate_strategy_script(
+        req.prompt,
+        openai_api_key=req.openai_api_key,
+        gemini_api_key=req.gemini_api_key
+    )
     return {"code": code}
 
 @app.post("/api/ai/refine")
 def ai_refine_strategy(req: AIRefineRequest):
     """
-    Refines a Python script with adjustment instructions.
+    Refines a Python script with adjustment instructions,
+    supporting OpenAI or Gemini API keys.
     """
-    updated_code = refine_strategy_script(req.code, req.adjustment)
+    updated_code = refine_strategy_script(
+        req.code,
+        req.adjustment,
+        openai_api_key=req.openai_api_key,
+        gemini_api_key=req.gemini_api_key
+    )
     return {"code": updated_code}
 
 @app.get("/api/news")

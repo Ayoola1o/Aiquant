@@ -6,6 +6,8 @@ interface AIStrategyLabProps {
   setStrategies: React.Dispatch<React.SetStateAction<Array<{ id: string; name: string; code: string }>>>;
   selectedStrategyId: string;
   setSelectedStrategyId: (id: string) => void;
+  openAiApiKey?: string;
+  geminiApiKey?: string;
 }
 
 interface Message {
@@ -18,7 +20,9 @@ export default function AIStrategyLab({
   strategies, 
   setStrategies, 
   selectedStrategyId, 
-  setSelectedStrategyId 
+  setSelectedStrategyId,
+  openAiApiKey = '',
+  geminiApiKey = ''
 }: AIStrategyLabProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +57,7 @@ export default function AIStrategyLab({
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, openai_api_key: openAiApiKey, gemini_api_key: geminiApiKey })
       });
       if (res.ok) {
         const data = await res.json();
@@ -96,7 +100,9 @@ export default function AIStrategyLab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: workingCode,
-          adjustment: adjustment
+          adjustment: adjustment,
+          openai_api_key: openAiApiKey,
+          gemini_api_key: geminiApiKey
         })
       });
       if (res.ok) {
