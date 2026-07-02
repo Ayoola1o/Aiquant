@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Bar, AreaChart, Area } from 'recharts';
-import { Play, Square, Cpu, Plus, Power, Activity, Terminal } from 'lucide-react';
+import { Play, Square, Cpu, Plus, Power, Activity, Terminal, AlertTriangle } from 'lucide-react';
 
 interface LiveSessionProps {
   strategies: Array<{ id: string; name: string; code: string }>;
@@ -52,6 +52,7 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
   // Pre-fill from global settings — user can still override per-bot
   const [alpacaKeyId, setAlpacaKeyId] = useState(globalAlpacaKeyId);
   const [alpacaSecretKey, setAlpacaSecretKey] = useState(globalAlpacaSecretKey);
+  const [selectedBotToTerminate, setSelectedBotToTerminate] = useState<string | null>(null);
 
   useEffect(() => {
     setAlpacaKeyId(globalAlpacaKeyId);
@@ -118,14 +119,17 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
     }
   };
 
-  const handleTerminateBot = async (botId: string) => {
+  const handleTerminateBot = (botId: string) => {
     if (botId === 'default') {
       alert("Default bot cannot be deleted, you can only stop its session.");
       return;
     }
-    if (!window.confirm(`Are you sure you want to terminate bot: ${bots[botId]?.name || botId}?`)) {
-      return;
-    }
+    setSelectedBotToTerminate(botId);
+  };
+
+  const executeTerminateBot = async () => {
+    if (!selectedBotToTerminate) return;
+    const botId = selectedBotToTerminate;
     try {
       const res = await fetch(`/api/live/bots/stop/${botId}`, {
         method: 'POST'
@@ -139,6 +143,8 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
       }
     } catch (e) {
       console.error("Failed to stop bot:", e);
+    } finally {
+      setSelectedBotToTerminate(null);
     }
   };
 
@@ -660,6 +666,42 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
 
         </div>{/* end RIGHT MAIN */}
       </div>{/* end two-column master */}
+
+      {/* Custom Confirmation Modal for Bot Termination */}
+      {selectedBotToTerminate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#1A1D24] border border-red-500/20 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Terminate Strategy Bot</h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Destructive session action</span>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-300 leading-relaxed font-sans font-light">
+              Are you sure you want to terminate bot: <strong className="text-white font-bold">{bots[selectedBotToTerminate]?.name || selectedBotToTerminate}</strong>? This will stop its live feed parsing execution thread and remove it from your console dashboard.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setSelectedBotToTerminate(null)}
+                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeTerminateBot}
+                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all cursor-pointer focus:outline-none"
+              >
+                Terminate Bot
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
