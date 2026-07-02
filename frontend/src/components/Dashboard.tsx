@@ -58,7 +58,12 @@ export default function Dashboard() {
       const res = await fetch('/api/live/bots');
       if (res.ok) {
         const data = await res.json();
-        setActiveBots(data.bots || []);
+        const botsObj = data.bots || {};
+        const botsList = Object.keys(botsObj).map(key => ({
+          id: key,
+          ...botsObj[key]
+        }));
+        setActiveBots(botsList);
       }
     } catch (e) {
       console.error("Error fetching bots:", e);
