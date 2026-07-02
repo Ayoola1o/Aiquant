@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -28,8 +29,17 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [session, setSession] = useState<string | null>(null); // null = landing, 'auth' = login screen, 'Username' = logged in
-  const [activeTab, setActiveTab] = useState('dashboard');
+  return (
+    <BrowserRouter>
+      <QuantApp />
+    </BrowserRouter>
+  );
+}
+
+function QuantApp() {
+  const [session, setSession] = useState<string | null>(() => {
+    return localStorage.getItem('neuroquant_session') || null;
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // Managed Strategy lists persisted via localStorage
@@ -165,23 +175,41 @@ export default function App() {
     localStorage.setItem('neuroquant_alpaca_secret_key', alpacaSecretKey);
   }, [alpacaKeyId, alpacaSecretKey]);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const handleLoginSuccess = (username: string) => {
     setSession(username);
-    setActiveTab('dashboard');
+    localStorage.setItem('neuroquant_session', username);
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
     setSession(null);
+    localStorage.removeItem('neuroquant_session');
+    navigate('/');
   };
 
-  // Render Auth screen
-  if (session === 'auth') {
-    return <Auth onLoginSuccess={handleLoginSuccess} onBack={() => setSession(null)} />;
+  // Checks if current path is a public page (Landing Page or Login)
+  const isPublicPage = location.pathname === '/' || location.pathname === '/login';
+
+  if (!session) {
+    if (isPublicPage) {
+      return (
+        <Routes>
+          <Route path="/" element={<LandingPage onLaunch={() => navigate('/login')} />} />
+          <Route path="/login" element={<Auth onLoginSuccess={handleLoginSuccess} onBack={() => navigate('/')} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      );
+    } else {
+      return <Navigate to="/login" replace />;
+    }
   }
 
-  // Render Landing Page
-  if (session === null) {
-    return <LandingPage onLaunch={() => setSession('auth')} />;
+  // If logged in and on a public page, redirect to dashboard
+  if (isPublicPage) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Render Main Platform Layout
@@ -194,7 +222,10 @@ export default function App() {
         <div className="space-y-8">
           {/* Logo & Close Button */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0">
+            <div 
+              className="flex items-center gap-3 min-w-0 cursor-pointer" 
+              onClick={() => navigate('/dashboard')}
+            >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center font-bold text-base text-black shadow-md shadow-indigo-500/10 shrink-0">
                 AQ
               </div>
@@ -215,9 +246,9 @@ export default function App() {
           <nav className="space-y-1.5">
             {/* Dashboard */}
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => navigate('/dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'dashboard' 
+                location.pathname === '/dashboard' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -228,9 +259,9 @@ export default function App() {
 
             {/* AI Predictor */}
             <button
-              onClick={() => setActiveTab('predictor')}
+              onClick={() => navigate('/predictor')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'predictor' 
+                location.pathname === '/predictor' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -241,9 +272,9 @@ export default function App() {
 
             {/* AI Asset Screener */}
             <button
-              onClick={() => setActiveTab('screener')}
+              onClick={() => navigate('/screener')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'screener' 
+                location.pathname === '/screener' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -254,9 +285,9 @@ export default function App() {
 
             {/* AI Strategy Lab */}
             <button
-              onClick={() => setActiveTab('strategylab')}
+              onClick={() => navigate('/strategylab')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'strategylab' 
+                location.pathname === '/strategylab' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -267,9 +298,9 @@ export default function App() {
 
             {/* Backtester */}
             <button
-              onClick={() => setActiveTab('backtester')}
+              onClick={() => navigate('/backtester')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'backtester' 
+                location.pathname === '/backtester' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -280,9 +311,9 @@ export default function App() {
 
             {/* Live Terminal */}
             <button
-              onClick={() => setActiveTab('live')}
+              onClick={() => navigate('/live')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'live' 
+                location.pathname === '/live' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -293,9 +324,9 @@ export default function App() {
 
             {/* Portfolio */}
             <button
-              onClick={() => setActiveTab('portfolio')}
+              onClick={() => navigate('/portfolio')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'portfolio' 
+                location.pathname === '/portfolio' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -306,9 +337,9 @@ export default function App() {
 
             {/* Settings */}
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => navigate('/settings')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'settings' 
+                location.pathname === '/settings' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -319,9 +350,9 @@ export default function App() {
 
             {/* User Profile */}
             <button
-              onClick={() => setActiveTab('profile')}
+              onClick={() => navigate('/profile')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'profile' 
+                location.pathname === '/profile' 
                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
@@ -335,7 +366,7 @@ export default function App() {
         {/* Profile Card & Logout */}
         <div className="space-y-4">
           <div 
-            onClick={() => setActiveTab('profile')}
+            onClick={() => navigate('/profile')}
             className="p-3 bg-slate-900/40 border border-white/5 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
           >
             <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">
@@ -375,15 +406,15 @@ export default function App() {
               </button>
             )}
             <h1 className="font-extrabold text-lg tracking-wide uppercase text-white truncate">
-              {activeTab === 'dashboard' && 'Market Dashboard'}
-              {activeTab === 'screener' && 'Quant Signal Matrix / AI Asset Screener'}
-              {activeTab === 'predictor' && 'AI Price Forecasting'}
-              {activeTab === 'strategylab' && 'AI Strategy Playground'}
-              {activeTab === 'backtester' && 'Strategy Backtesting'}
-              {activeTab === 'live' && 'Live simulated Session'}
-              {activeTab === 'portfolio' && 'Portfolio & Risk Diagnostics'}
-              {activeTab === 'settings' && 'Platform Configuration'}
-              {activeTab === 'profile' && 'Alexander Ramirez (Alex R.) - User Profile Terminal'}
+              {location.pathname === '/dashboard' && 'Market Dashboard'}
+              {location.pathname === '/screener' && 'Quant Signal Matrix / AI Asset Screener'}
+              {location.pathname === '/predictor' && 'AI Price Forecasting'}
+              {location.pathname === '/strategylab' && 'AI Strategy Playground'}
+              {location.pathname === '/backtester' && 'Strategy Backtesting'}
+              {location.pathname === '/live' && 'Live simulated Session'}
+              {location.pathname === '/portfolio' && 'Portfolio & Risk Diagnostics'}
+              {location.pathname === '/settings' && 'Platform Configuration'}
+              {location.pathname === '/profile' && 'Alexander Ramirez (Alex R.) - User Profile Terminal'}
             </h1>
           </div>
           
@@ -395,46 +426,49 @@ export default function App() {
 
         {/* Content Box */}
         <main className="p-8 flex-1 overflow-y-auto">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'screener' && <Screener />}
-          {activeTab === 'predictor' && <AIPredictor />}
-          {activeTab === 'strategylab' && (
-            <AIStrategyLab 
-              strategies={strategies} 
-              setStrategies={setStrategies} 
-              selectedStrategyId={selectedStrategyId} 
-              setSelectedStrategyId={setSelectedStrategyId} 
-            />
-          )}
-          {activeTab === 'backtester' && (
-            <Backtester 
-              strategies={strategies} 
-              selectedStrategyId={selectedStrategyId} 
-            />
-          )}
-          {activeTab === 'live' && (
-            <LiveSession
-              strategies={strategies}
-              selectedStrategyId={selectedStrategyId}
-              alpacaKeyId={alpacaKeyId}
-              alpacaSecretKey={alpacaSecretKey}
-            />
-          )}
-          {activeTab === 'portfolio' && (
-            <Portfolio
-              alpacaKeyId={alpacaKeyId}
-              alpacaSecretKey={alpacaSecretKey}
-            />
-          )}
-          {activeTab === 'settings' && (
-            <Settings
-              alpacaKeyId={alpacaKeyId}
-              setAlpacaKeyId={setAlpacaKeyId}
-              alpacaSecretKey={alpacaSecretKey}
-              setAlpacaSecretKey={setAlpacaSecretKey}
-            />
-          )}
-          {activeTab === 'profile' && <UserProfile />}
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/predictor" element={<AIPredictor />} />
+            <Route path="/screener" element={<Screener />} />
+            <Route path="/strategylab" element={
+              <AIStrategyLab 
+                strategies={strategies} 
+                setStrategies={setStrategies} 
+                selectedStrategyId={selectedStrategyId} 
+                setSelectedStrategyId={setSelectedStrategyId} 
+              />
+            } />
+            <Route path="/backtester" element={
+              <Backtester 
+                strategies={strategies} 
+                selectedStrategyId={selectedStrategyId} 
+              />
+            } />
+            <Route path="/live" element={
+              <LiveSession
+                strategies={strategies}
+                selectedStrategyId={selectedStrategyId}
+                alpacaKeyId={alpacaKeyId}
+                alpacaSecretKey={alpacaSecretKey}
+              />
+            } />
+            <Route path="/portfolio" element={
+              <Portfolio
+                alpacaKeyId={alpacaKeyId}
+                alpacaSecretKey={alpacaSecretKey}
+              />
+            } />
+            <Route path="/settings" element={
+              <Settings
+                alpacaKeyId={alpacaKeyId}
+                setAlpacaKeyId={setAlpacaKeyId}
+                alpacaSecretKey={alpacaSecretKey}
+                setAlpacaSecretKey={setAlpacaSecretKey}
+              />
+            } />
+            <Route path="/profile" element={<UserProfile />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </main>
       </div>
     </div>
