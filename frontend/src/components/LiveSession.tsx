@@ -61,6 +61,14 @@ export default function LiveSession({ strategies, selectedStrategyId, alpacaKeyI
     setAlpacaSecretKey(globalAlpacaSecretKey);
   }, [globalAlpacaSecretKey]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sym = params.get('symbol');
+    if (sym) {
+      setLiveSymbol(sym.toUpperCase());
+    }
+  }, []);
+
   const socketRef = useRef<WebSocket | null>(null);
 
   const fetchAllBots = async () => {

@@ -352,6 +352,35 @@ def liquidate_alpaca_positions(creds: AlpacaCredentials):
         else:
             raise HTTPException(status_code=res.status_code, detail=f"Alpaca liquidate error: {res.text}")
     except Exception as e:
+        raise HTTPException(status_code=505, detail=str(e))
+
+@app.post("/api/alpaca/liquidate/{symbol}")
+def liquidate_single_position(symbol: str, creds: AlpacaCredentials):
+    """
+    Closes the position for a specific symbol on the Alpaca paper account.
+    """
+    import requests as req
+
+    headers = {
+        "APCA-API-KEY-ID": creds.alpaca_key_id,
+        "APCA-API-SECRET-KEY": creds.alpaca_secret_key,
+    }
+    base = "https://paper-api.alpaca.markets/v2"
+
+    try:
+        # Close position for specific symbol
+        # DELETE /v2/positions/{symbol}
+        res = req.delete(f"{base}/positions/{symbol.upper().strip()}", headers=headers, timeout=10)
+        if res.status_code == 200 or res.status_code == 207:
+            # Loop over active bots and trigger sync
+            for bot_id, bot in live_session.bots.items():
+                if bot.alpaca_key_id == creds.alpaca_key_id:
+                    bot.sync_alpaca_account()
+                    bot.sync_alpaca_positions()
+            return {"status": "success", "detail": f"Position for {symbol} liquidated successfully."}
+        else:
+            raise HTTPException(status_code=res.status_code, detail=f"Alpaca liquidate single error: {res.text}")
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/live/order")

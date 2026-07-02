@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { Shield, TrendingUp, BarChart2, DollarSign, Activity, Key, RefreshCw, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface PortfolioProps {
 }
 
 export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: PortfolioProps) {
+  const navigate = useNavigate();
   const hasAlpacaKeys = alpacaKeyId.length > 4 && alpacaSecretKey.length > 4;
 
   // Alpaca Paper account data
@@ -19,6 +21,7 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
   const [liquidating, setLiquidating] = useState(false);
   const [liquidateSuccess, setLiquidateSuccess] = useState(false);
+  const [selectedLiquidateSym, setSelectedLiquidateSym] = useState<string | null>(null);
 
   // Simulated bot portfolio fallback states
   const [cash, setCash] = useState(10000.0);
@@ -83,6 +86,31 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
       setAlpacaError('Network error: failed to connect to liquidation server.');
     } finally {
       setLiquidating(false);
+    }
+  };
+
+  const executeSingleLiquidation = async () => {
+    if (!selectedLiquidateSym) return;
+    setLiquidating(true);
+    setAlpacaError('');
+    try {
+      const res = await fetch(`/api/alpaca/liquidate/${selectedLiquidateSym}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alpaca_key_id: alpacaKeyId, alpaca_secret_key: alpacaSecretKey }),
+      });
+      if (res.ok) {
+        // Refresh account details
+        fetchAlpacaAccount();
+      } else {
+        const err = await res.json();
+        setAlpacaError(err.detail || 'Failed to close position.');
+      }
+    } catch (e) {
+      setAlpacaError('Network error: failed to close position.');
+    } finally {
+      setLiquidating(false);
+      setSelectedLiquidateSym(null);
     }
   };
 
@@ -291,7 +319,7 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
             <div className="overflow-auto">
               <table className="w-full text-xs font-mono">
                 <thead>
-                  <tr className="text-[10px] text-slate-500 uppercase border-b border-white/5">
+                  <tr className="text-[10px] text-slate-500 uppercase border-b border-white/5 font-bold">
                     <th className="text-left pb-2">Symbol</th>
                     <th className="text-right pb-2">Qty</th>
                     <th className="text-right pb-2">Avg Entry</th>
@@ -299,6 +327,7 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                     <th className="text-right pb-2">Market Value</th>
                     <th className="text-right pb-2">Unreal. P&L</th>
                     <th className="text-right pb-2">Today %</th>
+                    <th className="text-right pb-2 pr-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="space-y-1">
@@ -315,6 +344,24 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                       </td>
                       <td className={`text-right ${p.change_today >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {(p.change_today * 100).toFixed(2)}%
+                      </td>
+                      <td className="py-2 text-right pr-1">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => navigate(`/live?symbol=${p.symbol}`)}
+                            className="px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-[#4D88FF] border border-[#4D88FF]/10 hover:border-[#4D88FF]/30 text-[10px] font-bold cursor-pointer transition-all focus:outline-none"
+                            title="Trade in Live Terminal"
+                          >
+                            Trade
+                          </button>
+                          <button
+                            onClick={() => setSelectedLiquidateSym(p.symbol)}
+                            className="px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-[#FF4B55] border border-[#FF4B55]/10 hover:border-[#FF4B55]/30 text-[10px] font-bold cursor-pointer transition-all focus:outline-none"
+                            title="Close position"
+                          >
+                            Close
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -337,10 +384,17 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                   <div className="w-full space-y-2">
                     {Object.entries(positions).map(([sym, qty]: any) => (
                       qty > 0 && (
-                        <div key={sym} className="flex justify-between items-center text-xs border-b border-white/5 pb-2">
-                          <span className="font-bold text-white">{sym}</span>
-                          <span className="font-mono text-slate-300">{qty} units</span>
-                          <span className="font-mono text-indigo-300">${(qty * livePrice).toFixed(2)}</span>
+                        <div key={sym} className="flex justify-between items-center text-xs border-b border-white/5 pb-2 hover:bg-white/[0.01] p-1.5 rounded transition-colors">
+                          <div>
+                            <span className="font-bold text-white">{sym}</span>
+                            <span className="text-[10px] text-slate-500 block font-mono mt-0.5">{qty} units · ${(qty * livePrice).toFixed(2)}</span>
+                          </div>
+                          <button
+                            onClick={() => navigate(`/live?symbol=${sym}`)}
+                            className="px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-[#4D88FF] border border-[#4D88FF]/10 hover:border-[#4D88FF]/30 text-[10px] font-bold cursor-pointer transition-all focus:outline-none"
+                          >
+                            Trade
+                          </button>
                         </div>
                       )
                     ))}
@@ -539,6 +593,43 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                 className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all cursor-pointer focus:outline-none"
               >
                 Confirm Liquidation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal for Single Position */}
+      {selectedLiquidateSym && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#1A1D24] border border-red-500/20 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Confirm Asset Liquidation</h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Destructive portfolio action</span>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-300 leading-relaxed font-sans font-light">
+              Are you sure you want to close your position in <strong className="text-white font-bold">{selectedLiquidateSym}</strong> on your connected Alpaca Paper Account? This will sell your holding at the current market price.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setSelectedLiquidateSym(null)}
+                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeSingleLiquidation}
+                disabled={liquidating}
+                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all cursor-pointer focus:outline-none disabled:opacity-50"
+              >
+                {liquidating ? 'Closing...' : 'Close Position'}
               </button>
             </div>
           </div>
