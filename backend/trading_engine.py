@@ -11,10 +11,44 @@ import pandas as pd
 import yfinance as yf
 from quant_engine import compute_indicators
 from backtest_engine import BaseStrategy
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+from alpaca.data.requests import CryptoLatestTradeRequest, StockLatestTradeRequest
+from alpaca.data.live import CryptoDataStream, StockDataStream
 
 BUILDGUIDE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "buildguide"))
 if BUILDGUIDE_PATH not in sys.path:
     sys.path.append(BUILDGUIDE_PATH)
+
+
+def _get_fallback_crypto_price(symbol: str) -> float:
+    """
+    Attempts to fetch the latest crypto price from Binance public API.
+    If geoblocked or offline, falls back to Coinbase public API.
+    """
+    symbol = symbol.upper()
+    # 1. Try Binance
+    try:
+        res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}", timeout=3)
+        if res.status_code == 200:
+            val = float(res.json().get("price", 0.0))
+            if val > 0:
+                return val
+    except Exception:
+        pass
+        
+    # 2. Try Coinbase fallback
+    try:
+        coinbase_sym = symbol.replace("USDT", "-USD")
+        res = requests.get(f"https://api.coinbase.com/v2/prices/{coinbase_sym}/spot", timeout=3)
+        if res.status_code == 200:
+            val = float(res.json().get("data", {}).get("amount", 0.0))
+            if val > 0:
+                return val
+    except Exception:
+        pass
+        
+    return 0.0
+
 
 
 class RiskManager:
@@ -138,11 +172,14 @@ class RiskManager:
 
         # 5. Sector/Asset Allocation Limit (Only for opening/adding to buy trades)
         if action == "BUY" and profile.get("correlation_limit_enabled"):
+            current_position_value = held_qty * price
             order_cost = qty * price
             max_alloc = portfolio_value * (profile.get("max_allocation_per_asset", 20.0) / 100.0)
-            if order_cost > max_alloc:
-                new_qty = round(max_alloc / price, 6)
-                bot.log(f"[RISK] Order cost ${order_cost:,.2f} exceeds asset allocation limit of {profile.get('max_allocation_per_asset')}%. Downsizing qty {qty:.6f} -> {new_qty:.6f}")
+            
+            if current_position_value + order_cost > max_alloc:
+                available_alloc = max(0.0, max_alloc - current_position_value)
+                new_qty = round(available_alloc / price, 6)
+                bot.log(f"[RISK] Order cost + current position exceeds asset allocation limit of {profile.get('max_allocation_per_asset')}%. Downsizing qty {qty:.6f} -> {new_qty:.6f}")
                 qty = new_qty
                 if qty <= 0.000001:
                     return False, 0.0, "EXCEEDS_ALLOCATION_LIMIT"
@@ -201,15 +238,17 @@ class TradingBot:
 
     def __init__(self, bot_id, name, symbol, strategy_code, timeframe,
                  starting_cash=10000.0, feed_source="binance",
-                 alpaca_key_id="", alpaca_secret_key="", risk_profile=None):
+                 alpaca_key_id="", alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None):
         self.bot_id = bot_id
         self.name = name
         self.symbol = symbol.upper()
         self.strategy_code = strategy_code
         self.timeframe = timeframe
         self.feed_source = feed_source.lower()
+        self.original_feed_source = feed_source.lower()
         self.alpaca_key_id = alpaca_key_id
         self.alpaca_secret_key = alpaca_secret_key
+        self.hyperliquid_private_key = hyperliquid_private_key
         
         self.risk_manager = RiskManager(risk_profile)
         self.last_tick_time = time.time()
@@ -233,7 +272,11 @@ class TradingBot:
 
         self.strategy_instance = None
         self.loop = None
-        self.thread = None
+        # State tracking
+        self.last_alpha_status: Optional[str] = None
+        self.last_alpha_rationale: Optional[str] = None
+
+        # Lock for thread-safe state access
         self._lock = threading.Lock()
         self._warmup_done = False   # set True after warmup candles are loaded
         self._candle_count_at_warmup = 0
@@ -261,6 +304,12 @@ class TradingBot:
         if not code_str:
             self.strategy_instance = None
             return True
+        import sys
+        import os
+        backend_path = os.path.abspath(os.path.dirname(__file__))
+        if backend_path not in sys.path:
+            sys.path.insert(0, backend_path)
+
         ns = {"BaseStrategy": BaseStrategy, "np": np, "pd": pd}
         loc = {}
         try:
@@ -313,10 +362,13 @@ class TradingBot:
             
         # 2. Try fetching from Binance first (preferred for crypto / fast / reliable)
         df = pd.DataFrame()
-        if "USDT" in self.symbol or "BTC" in self.symbol or "ETH" in self.symbol:
+        if any(x in self.symbol.upper() for x in ("USDT", "BTC", "ETH", "SOL", "ADA")):
             try:
                 from quant_engine import fetch_binance_history
-                df = fetch_binance_history(self.symbol, interval=binance_interval, limit=100)
+                binance_sym = self.symbol.replace("-", "").upper()
+                if "USD" in binance_sym and not binance_sym.endswith("USDT"):
+                    binance_sym = binance_sym.replace("USD", "USDT")
+                df = fetch_binance_history(binance_sym, interval=binance_interval, limit=100)
             except Exception as e:
                 self.log(f"Binance warmup fetch failed: {e}")
                 
@@ -500,6 +552,53 @@ class TradingBot:
                 else:
                     qty = new_qty
 
+        # ── Hyperliquid Testnet ───────────────────────────────────────────────
+        if hasattr(self, "hyperliquid_private_key") and self.hyperliquid_private_key:
+            try:
+                from hyperliquid.utils import constants
+                from hyperliquid.exchange import Exchange
+                from eth_account import Account
+
+                wallet = Account.from_key(self.hyperliquid_private_key)
+                exchange = Exchange(wallet, constants.TESTNET_API_URL)
+                
+                hl_sym = self.symbol.upper().replace("USDT", "").replace("USD", "")
+                is_buy = True if action == "BUY" else False
+                
+                if notional > 0:
+                    qty = round(notional / current_price, 6)
+                
+                self.log(f"[Hyperliquid] Sending MARKET {action} {qty} {hl_sym}...")
+                
+                slip_price = current_price * 1.05 if is_buy else current_price * 0.95
+                slip_price = round(slip_price, 4) 
+                
+                result = exchange.order(hl_sym, is_buy, qty, slip_price, {"limit": {"tif": "Ioc"}})
+                if result and result.get("status") == "ok":
+                    self.log(f"[Hyperliquid] Order accepted: {result}")
+                    old_cost = self.avg_cost
+                    fill_price = current_price
+                    actual_qty = qty
+                    pnl = (fill_price - old_cost) * actual_qty if action == "SELL" and old_cost else 0.0
+                    self.realized_pnl += pnl
+                    self._record_trade(action, fill_price, actual_qty, 0.0, pnl)
+                    
+                    if action == "BUY":
+                        self.positions[self.symbol] = self.positions.get(self.symbol, 0.0) + qty
+                        self.avg_cost = ((self.positions.get(self.symbol, 0.0) * self.avg_cost) + (qty * fill_price)) / (self.positions.get(self.symbol, 0.0) + qty)
+                    else:
+                        self.positions[self.symbol] = max(0.0, self.positions.get(self.symbol, 0.0) - qty)
+                        if self.positions[self.symbol] < 1e-8:
+                            self.avg_cost = 0.0
+                    
+                    return True
+                else:
+                    self.log(f"[Hyperliquid] Order rejected: {result}")
+                    return False
+            except Exception as e:
+                self.log(f"[Hyperliquid] Order exception: {e}")
+                return False
+
         # ── Alpaca Paper ───────────────────────────────────────────────
         if self.alpaca_key_id and self.alpaca_secret_key:
             alpaca_sym = self.symbol.replace("USDT", "USD")
@@ -624,6 +723,46 @@ class TradingBot:
             except Exception as e:
                 self.log(f"[Alpaca] Order exception: {e}")
                 return False
+        else:
+            # ── Local simulated paper fallback ──────────────────────────────
+            with self._lock:
+                price = current_price
+                if price <= 0:
+                    self.log("Cannot place simulated order — no active price available.")
+                    return False
+                
+                action = action.upper()
+                if action == "BUY":
+                    cost = qty * price
+                    fee = cost * 0.001
+                    if self.cash >= cost + fee:
+                        self.cash -= cost + fee
+                        prev = self.positions.get(self.symbol, 0.0)
+                        self.positions[self.symbol] = prev + qty
+                        self.avg_cost = ((prev * self.avg_cost) + (qty * price)) / (prev + qty) if (prev + qty) else price
+                        self._record_trade("BUY", price, qty, fee, 0.0)
+                        self.log(f"SIM BUY {qty} {self.symbol} @ ${price:,.2f}")
+                        return True
+                    self.log("BUY rejected — insufficient cash.")
+                    return False
+
+                elif action == "SELL":
+                    held = self.positions.get(self.symbol, 0.0)
+                    if held >= qty:
+                        revenue = qty * price
+                        fee = revenue * 0.001
+                        pnl = (price - self.avg_cost) * qty - fee
+                        self.cash += revenue - fee
+                        self.realized_pnl += pnl
+                        self.positions[self.symbol] = max(0.0, held - qty)
+                        if self.positions[self.symbol] < 1e-8:
+                            self.avg_cost = 0.0
+                        self._record_trade("SELL", price, qty, fee, pnl)
+                        self.log(f"SIM SELL {qty} {self.symbol} @ ${price:,.2f} | P&L: ${pnl:,.2f}")
+                        return True
+                    self.log("SELL rejected — insufficient position.")
+                    return False
+
 
     # ------------------------------------------------------------------
     # Advanced orders: limit / stop / stop_limit / trailing_stop
@@ -827,6 +966,8 @@ class TradingBot:
                 "equity_history": self.equity_history[-100:],
                 "active_candle": self.active_candle,
                 "logs": self.logs[-100:],
+                "last_alpha_status": self.last_alpha_status,
+                "last_alpha_rationale": self.last_alpha_rationale,
             }
 
     # ------------------------------------------------------------------
@@ -925,6 +1066,23 @@ class TradingBot:
         # ── Strategy signal evaluation (outside lock) ────────────────────
         if self.strategy_instance:
             try:
+                # Convert bot's candle list to 2D numpy array for Jesse indicators compatibility
+                candles_list = []
+                for c in self.candles:
+                    try:
+                        ts_ms = pd.to_datetime(c["timestamp"]).timestamp() * 1000.0
+                    except Exception:
+                        ts_ms = 0.0
+                    candles_list.append([
+                        ts_ms,
+                        float(c["open"]),
+                        float(c["high"]),
+                        float(c["low"]),
+                        float(c["close"]),
+                        float(c["volume"])
+                    ])
+                self.strategy_instance.candles = np.array(candles_list)
+
                 pos_qty = self.positions.get(self.symbol, 0.0)
                 state = {
                     "cash": self.cash,
@@ -970,13 +1128,29 @@ class TradingBot:
                         await asyncio.sleep(0)   # yield — don't block loop
             except Exception as e:
                 idx += 1
-                err = str(e)
-                if idx >= 4 or any(x in err for x in ("Failed to resolve", "gaierror", "NameResolution")):
-                    self.log(f"Binance unavailable ({e}). Switching to Alpaca WebSocket feed.")
-                    self.feed_source = "alpaca_ws"
-                    return
-                self.log(f"Binance WS error: {e}. Retrying in 5s…")
+                self.log(f"Binance WS error: {e}. Switching to Binance REST polling fallback.")
+                self.feed_source = "binance_rest"
+                return
+
+    async def _binance_rest_loop(self):
+        self.log(f"Starting Binance REST polling for {self.symbol}…")
+        poll_count = 0
+        while self.is_active and self.feed_source == "binance_rest":
+            try:
+                price = _get_fallback_crypto_price(self.symbol)
+                if price > 0:
+                    self._update_active_candle(price, 1.0)
+                
                 await asyncio.sleep(5)
+                poll_count += 1
+                # If we were originally configured for websocket, try to reconnect every 60 seconds
+                if self.original_feed_source == "binance" and poll_count >= 12:
+                    self.log("[Binance REST] 60 seconds passed since WebSocket disconnect. Attempting to restore WebSocket stream...")
+                    self.feed_source = "binance"
+                    break
+            except Exception as e:
+                self.log(f"Binance REST polling error: {e}. Retrying in 10s…")
+                await asyncio.sleep(10)
 
     async def _yfinance_loop(self):
         self.log(f"Starting Yahoo Finance polling for {self.symbol}…")
@@ -985,14 +1159,11 @@ class TradingBot:
             try:
                 price = 0.0
                 qty = 1.0
-                # For crypto assets, fetch from Binance public REST API first to prevent yfinance rate limits
+                # For crypto assets, fetch from Binance/Coinbase public REST API first to prevent yfinance rate limits
                 if "USD" in ticker or self.symbol.endswith("USDT"):
                     try:
-                        clean_sym = self.symbol.upper()
-                        res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={clean_sym}", timeout=3)
-                        if res.status_code == 200:
-                            price = float(res.json().get("price", 0.0))
-                            qty = 1.0
+                        price = _get_fallback_crypto_price(self.symbol)
+                        qty = 1.0
                     except Exception:
                         pass
                 
@@ -1024,36 +1195,42 @@ class TradingBot:
             self.sync_alpaca_positions()
 
         ticker = self.symbol.replace("USDT", "-USD")
+        poll_count = 0
         while self.is_active and self.feed_source == "alpaca":
             try:
                 price = 0.0
                 qty = 1.0
 
-                # Try Alpaca data API first
+                # Try Alpaca SDK Client first
                 if self.alpaca_key_id and self.alpaca_secret_key:
                     alpaca_sym = self.symbol.replace("USDT", "USD")
                     is_crypto = len(alpaca_sym) > 4 and "USD" in alpaca_sym
-                    url = (f"https://data.alpaca.markets/v1beta3/crypto/us/latest/trades?symbols={alpaca_sym}"
-                           if is_crypto
-                           else f"https://data.alpaca.markets/v2/stocks/{alpaca_sym}/trades/latest")
-                    r = requests.get(url, headers=self._alpaca_headers(), timeout=5)
-                    if r.status_code == 200:
-                        data = r.json()
-                        trade = (data.get("trades", {}).get(alpaca_sym, {})
-                                 if is_crypto else data.get("trade", {}))
-                        if trade:
-                            price = float(trade.get("p", 0.0))
-                            qty = float(trade.get("s", 1.0))
+                    
+                    try:
+                        if is_crypto:
+                            if "/" not in alpaca_sym:
+                                alpaca_sym = f"{alpaca_sym[:-3]}/{alpaca_sym[-3:]}"
+                            client = CryptoHistoricalDataClient(self.alpaca_key_id, self.alpaca_secret_key)
+                            req_obj = CryptoLatestTradeRequest(symbol_or_symbols=alpaca_sym)
+                            trade_res = client.get_crypto_latest_trade(req_obj)
+                        else:
+                            client = StockHistoricalDataClient(self.alpaca_key_id, self.alpaca_secret_key)
+                            req_obj = StockLatestTradeRequest(symbol_or_symbols=alpaca_sym)
+                            trade_res = client.get_stock_latest_trade(req_obj)
+                            
+                        if trade_res and alpaca_sym in trade_res:
+                            trade = trade_res[alpaca_sym]
+                            price = float(trade.price)
+                            qty = float(trade.size)
+                    except Exception as sdk_err:
+                        self.log(f"[Alpaca SDK] REST error: {sdk_err}. Falling back to public feed.")
 
-                # Fallback to Binance spot API or yfinance
+                # Fallback to Binance/Coinbase spot API or yfinance
                 if price <= 0:
                     if "USD" in ticker or self.symbol.endswith("USDT"):
                         try:
-                            clean_sym = self.symbol.upper()
-                            res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={clean_sym}", timeout=3)
-                            if res.status_code == 200:
-                                price = float(res.json().get("price", 0.0))
-                                qty = 1.0
+                            price = _get_fallback_crypto_price(self.symbol)
+                            qty = 1.0
                         except Exception:
                             pass
                     
@@ -1067,16 +1244,19 @@ class TradingBot:
 
                 if price > 0:
                     self._update_active_candle(price, qty)
+                
                 await asyncio.sleep(5)
-
+                poll_count += 1
+                
+                # Try to self-heal back to WebSocket if that was our original target feed
+                if self.original_feed_source == "alpaca_ws" and poll_count >= 12:
+                    self.log("[Alpaca REST] 60 seconds passed since WebSocket disconnect. Attempting to restore WebSocket stream...")
+                    self.feed_source = "alpaca_ws"
+                    break
+                    
             except Exception as e:
-                err = str(e)
-                if any(x in err for x in ("Failed to resolve", "gaierror", "NameResolution")):
-                    self.log(f"Alpaca offline ({e}). Switching to Mock.")
-                    self.feed_source = "mock"
-                    return
-                self.log(f"Alpaca error: {e}. Retrying in 8s…")
-                await asyncio.sleep(8)
+                self.log(f"[Alpaca REST] Error: {e}. Switching to Alpaca REST polling fallback.")
+                self.feed_source = "alpaca"
 
     async def _alpaca_ws_loop(self):
         self.log(f"Starting Alpaca WebSocket feed for {self.symbol}…")
@@ -1084,87 +1264,44 @@ class TradingBot:
             self.log("[Alpaca WS] Missing API keys. Cannot start WebSocket stream. Falling back to Mock.")
             self.feed_source = "mock"
             return
-
+ 
         alpaca_sym = self.symbol.replace("USDT", "USD")
         is_crypto = len(alpaca_sym) > 4 and "USD" in alpaca_sym
         
-        # Determine URI
-        # Crypto: wss://stream.data.alpaca.markets/v1beta3/crypto/us
-        # Stock: wss://stream.data.alpaca.markets/v2/iex
-        uri = (
-            "wss://stream.data.alpaca.markets/v1beta3/crypto/us"
-            if is_crypto
-            else "wss://stream.data.alpaca.markets/v2/iex"
-        )
-
-        # Normalize symbol name: Alpaca Crypto uses BTC/USD instead of BTCUSD or BTC/USDT
         if is_crypto:
             if "/" not in alpaca_sym:
                 alpaca_sym = f"{alpaca_sym[:-3]}/{alpaca_sym[-3:]}"
-
-        self.log(f"[Alpaca WS] Connecting to {uri} subscribing to trades for {alpaca_sym}")
+            stream = CryptoDataStream(self.alpaca_key_id, self.alpaca_secret_key)
+        else:
+            stream = StockDataStream(self.alpaca_key_id, self.alpaca_secret_key)
+ 
+        self.log(f"[Alpaca WS] Connecting and subscribing using SDK to trades for {alpaca_sym}")
         
         try:
-            async with websockets.connect(uri, open_timeout=10) as ws:
-                # 1. Read welcome message
-                welcome_raw = await ws.recv()
-                welcome = json.loads(welcome_raw)
-                self.log(f"[Alpaca WS] Connected welcome: {welcome}")
-
-                # 2. Authenticate
-                auth_payload = {
-                    "action": "auth",
-                    "key": self.alpaca_key_id,
-                    "secret": self.alpaca_secret_key
-                }
-                await ws.send(json.dumps(auth_payload))
-                
-                auth_resp = await ws.recv()
-                auth_data = json.loads(auth_resp)
-                self.log(f"[Alpaca WS] Auth Response: {auth_data}")
-
-                authenticated = False
-                if isinstance(auth_data, list):
-                    for item in auth_data:
-                        if item.get("T") == "success" and item.get("msg") == "authenticated":
-                            authenticated = True
-                elif isinstance(auth_data, dict):
-                    if auth_data.get("T") == "success" and auth_data.get("msg") == "authenticated":
-                        authenticated = True
-
-                if not authenticated:
-                    self.log("[Alpaca WS] Auth failed. Switching to Mock feed.")
-                    self.feed_source = "mock"
-                    return
-
-                # 3. Subscribe to trades
-                sub_payload = {
-                    "action": "subscribe",
-                    "trades": [alpaca_sym]
-                }
-                await ws.send(json.dumps(sub_payload))
-                self.log(f"[Alpaca WS] Subscription request sent for trades on {alpaca_sym}")
-
-                # 4. Stream message loop
-                async for raw in ws:
-                    if not self.is_active or self.feed_source != "alpaca_ws":
-                        break
-                    
-                    msg_data = json.loads(raw)
-                    if isinstance(msg_data, list):
-                        for item in msg_data:
-                            # Stream packet format for trades:
-                            # {"T": "t", "S": "BTC/USD", "p": 63000.0, "s": 0.04, "t": "timestamp"}
-                            if item.get("T") == "t":
-                                price = float(item.get("p", 0.0))
-                                qty = float(item.get("s", 0.0))
-                                if price > 0:
-                                    self._update_active_candle(price, qty)
-                    await asyncio.sleep(0)
-                    
+            async def trade_handler(data):
+                price = float(data.price)
+                qty = float(data.size)
+                if price > 0:
+                    self._update_active_candle(price, qty)
+ 
+            # Subscribe using SDK
+            stream.subscribe_trades(trade_handler, alpaca_sym)
+ 
+            # Monitor loop to stop stream if state changes
+            async def monitor_feed_source():
+                while self.is_active and self.feed_source == "alpaca_ws":
+                    await asyncio.sleep(1)
+                await stream.stop()
+ 
+            monitor_task = asyncio.create_task(monitor_feed_source())
+ 
+            # Run stream
+            await stream._run_forever()
+            await monitor_task
+            
         except Exception as e:
-            self.log(f"[Alpaca WS] Connection closed or error: {e}. Switching to Mock feed.")
-            self.feed_source = "mock"
+            self.log(f"[Alpaca WS] Connection closed or error: {e}. Switching to Alpaca REST polling fallback.")
+            self.feed_source = "alpaca"
 
     async def _mock_loop(self):
         self.log(f"Starting Local Mock Simulation for {self.symbol}…")
@@ -1206,6 +1343,8 @@ class TradingBot:
                 await self._alpaca_loop()
             elif fs == "alpaca_ws":
                 await self._alpaca_ws_loop()
+            elif fs == "binance_rest":
+                await self._binance_rest_loop()
             elif fs == "mock":
                 await self._mock_loop()
             else:
@@ -1248,16 +1387,191 @@ class TradingBot:
         self.thread.start()
         self.log(f"Bot started — feed: {self.feed_source}, symbol: {self.symbol}, tf: {self.timeframe}")
 
-    def stop(self):
+    def stop(self, close_pct: float = 1.0):
         with self._lock:
             if not self.is_active:
                 return
+            
+            # --- Flatten Book on Stop ---
+            try:
+                pos_qty = self.positions.get(self.symbol, 0.0)
+                qty_to_close = pos_qty * close_pct
+                if qty_to_close > 0.0001:
+                    self.log(f"Closing open position of {qty_to_close} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
+                    self.place_market_order("SELL", qty_to_close)
+                elif qty_to_close < -0.0001:
+                    self.log(f"Closing short position of {abs(qty_to_close)} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
+                    self.place_market_order("BUY", abs(qty_to_close))
+            except Exception as e:
+                self.log(f"Failed to close position on shutdown: {e}")
+            # ---------------------------
+
+            # Save session to history ledger
+            try:
+                from database import save_bot_session
+                import json
+                
+                start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time)) if self.start_time else "Unknown"
+                end_str = time.strftime('%Y-%m-%d %H:%M:%S')
+                
+                trades_json = []
+                wins = 0
+                losses = 0
+                
+                for t in self.trades:
+                    net_pnl = t.get("pnl", 0.0) - t.get("fee", 0.0)
+                    if t["action"] == "SELL" and t.get("pnl", 0.0) != 0.0:
+                        if net_pnl > 0:
+                            wins += 1
+                        else:
+                            losses += 1
+                            
+                    t_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t["timestamp"]))
+                    
+                    trades_json.append({
+                        "symbol": self.symbol,
+                        "side": t["action"],
+                        "qty": t["qty"],
+                        "entry_price": t["price"],
+                        "exit_price": t["price"],
+                        "entry_date": t_time,
+                        "exit_date": t_time,
+                        "pnl": t.get("pnl", 0.0),
+                        "r_multiple": 0.0,
+                        "fees": t.get("fee", 0.0),
+                        "net_pnl": net_pnl
+                    })
+                
+                pnl = self.cash - self.starting_cash
+                if len(self.trades) > 0:
+                    pnl = sum(t.get("pnl", 0.0) - t.get("fee", 0.0) for t in self.trades)
+                
+                bot_name = getattr(self, "strategy_name", f"AI Agent ({self.timeframe})")
+                
+                save_bot_session(
+                    bot_id=self.bot_id,
+                    strategy_name=bot_name,
+                    symbol=self.symbol,
+                    start_time=start_str,
+                    end_time=end_str,
+                    start_cash=self.starting_cash,
+                    end_cash=self.cash,
+                    pnl=pnl,
+                    total_trades=len(self.trades),
+                    wins=wins,
+                    losses=losses,
+                    trades_json=json.dumps(trades_json),
+                    last_alpha_rationale=self.last_alpha_rationale or ""
+                )
+                self.log("Session saved to History Ledger.")
+            except Exception as e:
+                self.log(f"Failed to save session history: {e}")
+                
             self.is_active = False
             self.start_time = None
         if self.loop and not self.loop.is_closed():
             self.loop.call_soon_threadsafe(self.loop.stop)
-        self.log("Bot stopped.")
+        self.log("Bot stopped and positions flattened.")
 
+# ======================================================================
+# AgenticLiveBot (Autonomous Mode)
+# ======================================================================
+
+class AgenticLiveBot(TradingBot):
+    def __init__(self, bot_id, name, symbol, strategy_code, timeframe,
+                 starting_cash=10000.0, feed_source="binance", alpaca_key_id="",
+                 alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None, agent_keys=None):
+        super().__init__(bot_id, name, symbol, strategy_code, timeframe,
+                         starting_cash, feed_source, alpaca_key_id, alpaca_secret_key, hyperliquid_private_key,
+                         risk_profile)
+        self.agent_keys = agent_keys or {}
+
+    def update_agent_keys(self, new_keys: dict):
+        """Hot-swap the ADK keys for this bot without restarting."""
+        self.agent_keys.update(new_keys)
+        self.log("Agent API keys successfully hot-swapped.")
+
+    async def _master_loop(self):
+        fs = self.feed_source
+        if fs == "alpaca":
+            asyncio.create_task(self._alpaca_loop())
+        elif fs == "yfinance":
+            asyncio.create_task(self._yfinance_loop())
+        elif fs == "binance_rest":
+            asyncio.create_task(self._binance_rest_loop())
+        elif fs == "mock":
+            asyncio.create_task(self._mock_loop())
+        else:
+            asyncio.create_task(self._binance_loop())
+            
+        asyncio.create_task(self._agent_evaluation_loop())
+        
+        while self.is_active:
+            await asyncio.sleep(1)
+
+    async def _agent_evaluation_loop(self):
+        """
+        Background loop that polls the Multi-Agent ADK every 60 seconds for cognitive trade validation.
+        """
+        from adk_agent import run_adk_validation
+        import json
+        self.log("Autonomous Agentic Loop Started.")
+        
+        while self.is_active:
+            await asyncio.sleep(60) # Demo polling frequency
+            self.log(f"Triggering ADK Daily Alpha Brief for {self.symbol}...")
+            
+            try:
+                pos_qty = self.positions.get(self.symbol, 0.0)
+                price = self.active_candle['close'] if self.active_candle else 0.0
+                port_val = self.cash + (pos_qty * price)
+                
+                # Extract account profile (positions, balance, etc.)
+                account_profile = {
+                    "balance": self.cash,
+                    "positions": {self.symbol: pos_qty},
+                    "unrealized_pnl": (pos_qty * price) - (pos_qty * getattr(self, 'entry_price', price)),
+                    "drawdown_limit": getattr(self.risk_manager, 'max_drawdown_pct', 5.0) if hasattr(self, 'risk_manager') else 5.0,
+                    "max_allocation_pct": getattr(self.risk_manager, 'max_position_pct', 2.0) if hasattr(self, 'risk_manager') else 2.0
+                }
+                
+                res = await run_adk_validation(self.symbol, self.agent_keys, account_profile)
+                
+                status = res.get("status", "REJECTED")
+                rationale = res.get("risk_assessment", "")
+                
+                # Append raw tool thoughts (Senpi/Hyperliquid actions) to the Alpha Brief
+                thoughts = res.get("thoughts", [])
+                if thoughts:
+                    thoughts_str = "\n".join(f"- {t}" for t in thoughts if t.strip())
+                    rationale = f"{rationale}\n\n**Agent Actions (Senpi/Hyperliquid):**\n{thoughts_str}"
+                
+                self.last_alpha_status = status
+                self.last_alpha_rationale = rationale
+
+                self.log(f"[Agentic] Alpha Brief Evaluation Status: {status}")
+                self.log(f"[Agentic] Rationale: {rationale}")
+                
+                order = res.get("validated_order")
+                if status == "APPROVED" and order:
+                    direction = order.get("direction", "")
+                    if direction == "BUY" and pos_qty <= 0:
+                        qty = (port_val * (account_profile["max_allocation_pct"]/100)) / price if price > 0 else 0.1
+                        self.log(f"[Agentic->BUY] Executing autonomously based on Alpha Brief. Qty: {qty:.4f}")
+                        self.place_market_order("BUY", qty)
+                    elif direction == "SELL" and pos_qty > 0:
+                        exit_pct = getattr(self.risk_manager, 'profile', {}).get("exit_size_pct", 100.0)
+                        if order.get("exit_size_pct"):
+                            exit_pct = float(order["exit_size_pct"])
+                            
+                        qty_to_sell = pos_qty * (exit_pct / 100.0)
+                        self.log(f"[Agentic->SELL] Executing autonomously based on Alpha Brief. Qty: {qty_to_sell:.4f} ({exit_pct}% exit)")
+                        self.place_market_order("SELL", qty_to_sell)
+                    else:
+                        self.log(f"[Agentic] Signal '{direction}' ignored: already in desired state (pos={pos_qty}).")
+                        
+            except Exception as e:
+                self.log(f"[Agentic Error] Failed to run ADK evaluation: {e}")
 
 # ======================================================================
 # LiveSessionManager
@@ -1292,23 +1606,42 @@ class LiveSessionManager:
     # ------------------------------------------------------------------
     def start_bot(self, bot_id, name, symbol, strategy_code, timeframe,
                   starting_cash=10000.0, feed_source="binance",
-                  alpaca_key_id="", alpaca_secret_key="", risk_profile=None) -> bool:
+                  alpaca_key_id="", alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None,
+                  agentic_mode=False, gemini_api_key="", tech_agent_key="",
+                  sentiment_agent_key="", tradingview_agent_key="",
+                  hyperliquid_agent_key="", firecrawl_agent_key="") -> bool:
         with self._lock:
             if bot_id in self.bots:
                 self.bots[bot_id].stop()
             profile_to_use = risk_profile or self.global_risk_profile
-            bot = TradingBot(bot_id, name, symbol, strategy_code, timeframe,
-                             starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
-                             risk_profile=profile_to_use)
+            
+            if agentic_mode:
+                agent_keys = {
+                    "gemini": gemini_api_key,
+                    "tech": tech_agent_key,
+                    "sentiment": sentiment_agent_key,
+                    "tradingview": tradingview_agent_key,
+                    "hyperliquid": hyperliquid_agent_key,
+                    "firecrawl": firecrawl_agent_key
+                }
+                bot = AgenticLiveBot(bot_id, name, symbol, strategy_code, timeframe,
+                                     starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
+                                     hyperliquid_private_key=hyperliquid_private_key,
+                                     risk_profile=profile_to_use, agent_keys=agent_keys)
+            else:
+                bot = TradingBot(bot_id, name, symbol, strategy_code, timeframe,
+                                 starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
+                                 hyperliquid_private_key=hyperliquid_private_key,
+                                 risk_profile=profile_to_use)
             self.bots[bot_id] = bot
         bot.start()
         return True
 
-    def stop_bot(self, bot_id: str):
+    def stop_bot(self, bot_id: str, close_pct: float = 1.0):
         with self._lock:
             bot = self.bots.pop(bot_id, None)
         if bot:
-            bot.stop()
+            bot.stop(close_pct=close_pct)
 
     def get_bot(self, bot_id: str):
         with self._lock:
@@ -1324,6 +1657,12 @@ class LiveSessionManager:
         if bot:
             return bot.place_market_order(action, qty)
         return False
+
+    def update_keys_for_all_bots(self, new_keys: dict):
+        with self._lock:
+            for bot in self.bots.values():
+                if isinstance(bot, AgenticLiveBot):
+                    bot.update_agent_keys(new_keys)
 
     # ------------------------------------------------------------------
     # WebSocket push helper (called from the FastAPI event loop)
@@ -1347,10 +1686,7 @@ class LiveSessionManager:
     # ------------------------------------------------------------------
     # Backwards-compatibility shims for legacy endpoints
     # ------------------------------------------------------------------
-    def _ensure_default(self):
-        if "default" not in self.bots:
-            self.start_bot("default", "Manual Trading Bot", "BTCUSDT", "", "10s",
-                           10000.0, "mock")
+
 
     @property
     def is_active(self):
@@ -1358,7 +1694,32 @@ class LiveSessionManager:
         return bot.is_active if bot else False
 
     def get_state(self):
-        self._ensure_default()
+        if "default" not in self.bots:
+            return {
+                "bot_id": "default",
+                "name": "Manual Trading Bot",
+                "is_active": False,
+                "symbol": "BTCUSDT",
+                "timeframe": "10s",
+                "feed_source": "mock",
+                "starting_cash": 10000.0,
+                "cash": 10000.0,
+                "portfolio_value": 10000.0,
+                "positions": {},
+                "avg_cost": 0.0,
+                "realized_pnl": 0.0,
+                "unrealized_pnl": 0.0,
+                "total_pnl": 0.0,
+                "pnl_pct": 0.0,
+                "win_rate": 0.0,
+                "running_time": "00:00:00",
+                "trade_count": 0,
+                "trades": [],
+                "limit_orders": [],
+                "candles": [],
+                "active_candle": None,
+                "logs": []
+            }
         return self.bots["default"].get_state()
 
     def reset_account(self, starting_cash: float = 10000.0):
@@ -1368,9 +1729,12 @@ class LiveSessionManager:
         self.start_bot("default", "Manual Trading Bot", "BTCUSDT", "", "10s",
                        starting_cash, "mock")
 
-    def start_session(self, symbol="BTCUSDT", strategy_code="", timeframe="10s", risk_profile=None) -> bool:
+    def start_session(self, symbol="BTCUSDT", strategy_code="", timeframe="10s", feed_source="mock",
+                      alpaca_key_id="", alpaca_secret_key="", risk_profile=None) -> bool:
         return self.start_bot("default", "Default Bot", symbol, strategy_code, timeframe,
-                              feed_source="mock", risk_profile=risk_profile)
+                              starting_cash=10000.0, feed_source=feed_source,
+                              alpaca_key_id=alpaca_key_id, alpaca_secret_key=alpaca_secret_key,
+                              risk_profile=risk_profile)
 
     def stop_session(self):
         self.stop_bot("default")

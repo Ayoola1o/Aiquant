@@ -75,9 +75,93 @@ def init_db():
         )
     """)
 
+    # 5. Tracked X handles
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS x_handles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            handle TEXT UNIQUE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Seed default handles if empty
+    cursor.execute("SELECT COUNT(*) FROM x_handles")
+    if cursor.fetchone()[0] == 0:
+        default_handles = ["@Nairametrics", "@StatiSense", "@wealthcoachomi"]
+        for h in default_handles:
+            cursor.execute("INSERT INTO x_handles (handle) VALUES (?)", (h,))
+
+    # 6. Bot Sessions History
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bot_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bot_id TEXT NOT NULL,
+            strategy_name TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            start_cash REAL NOT NULL,
+            end_cash REAL NOT NULL,
+            pnl REAL NOT NULL,
+            total_trades INTEGER NOT NULL,
+            wins INTEGER NOT NULL,
+            losses INTEGER NOT NULL,
+            trades_json TEXT NOT NULL,
+            last_alpha_rationale TEXT DEFAULT ''
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("Local database initialized successfully.")
+
+def save_bot_session(bot_id: str, strategy_name: str, symbol: str, start_time: str, end_time: str, 
+                     start_cash: float, end_cash: float, pnl: float, total_trades: int, 
+                     wins: int, losses: int, trades_json: str, last_alpha_rationale: str = ""):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO bot_sessions (
+                bot_id, strategy_name, symbol, start_time, end_time, 
+                start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            bot_id, strategy_name, symbol, start_time, end_time, 
+            start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale
+        ))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_bot_sessions():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM bot_sessions ORDER BY id DESC")
+        rows = cursor.fetchall()
+        
+        sessions = []
+        import json
+        for r in rows:
+            sessions.append({
+                "id": r["id"],
+                "bot_id": r["bot_id"],
+                "strategy_name": r["strategy_name"],
+                "symbol": r["symbol"],
+                "start_time": r["start_time"],
+                "end_time": r["end_time"],
+                "start_cash": r["start_cash"],
+                "end_cash": r["end_cash"],
+                "pnl": r["pnl"],
+                "total_trades": r["total_trades"],
+                "wins": r["wins"],
+                "losses": r["losses"],
+                "trades_json": json.loads(r["trades_json"]),
+                "last_alpha_rationale": r["last_alpha_rationale"]
+            })
+        return sessions
+    finally:
+        conn.close()
 
 def save_account_snapshot(equity: float, cash: float, buying_power: float):
     """
@@ -224,3 +308,40 @@ def get_matched_trades(limit: int = 100):
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def get_x_handles():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT handle FROM x_handles ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [row["handle"] for row in rows]
+
+def add_x_handle(handle: str) -> bool:
+    handle = handle.strip()
+    if not handle:
+        return False
+    if not handle.startswith("@"):
+        handle = "@" + handle
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO x_handles (handle) VALUES (?)", (handle,))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+def delete_x_handle(handle: str) -> bool:
+    handle = handle.strip()
+    if not handle.startswith("@"):
+        handle = "@" + handle
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM x_handles WHERE handle = ?", (handle,))
+    rowcount = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return rowcount > 0

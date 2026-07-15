@@ -1,0 +1,8824 @@
+1
+00:00:00,000 --> 00:00:04,080
+Right now, while you're watching this,
+
+2
+00:00:01,720 --> 00:00:06,120
+an invisible war is happening inside the
+
+3
+00:00:04,080 --> 00:00:08,000
+order books of every major exchange.
+
+4
+00:00:06,120 --> 00:00:10,040
+Millions of decisions are being made in
+
+5
+00:00:08,000 --> 00:00:12,080
+milliseconds.
+
+6
+00:00:10,040 --> 00:00:14,320
+Positions are being hedged, stops are
+
+7
+00:00:12,080 --> 00:00:17,320
+being hunted, and whales are moving size
+
+8
+00:00:14,320 --> 00:00:18,720
+without leaving a footprint.
+
+9
+00:00:17,320 --> 00:00:20,480
+Most people think they're trading
+
+10
+00:00:18,720 --> 00:00:22,320
+against other people. They aren't. You
+
+11
+00:00:20,480 --> 00:00:24,480
+are trading against silicon. You are
+
+12
+00:00:22,320 --> 00:00:26,480
+trading against algorithms that don't
+
+13
+00:00:24,480 --> 00:00:28,360
+sleep, don't feel fear, and don't make
+
+14
+00:00:26,480 --> 00:00:30,120
+mistakes. In this course, we aren't just
+
+15
+00:00:28,360 --> 00:00:31,640
+going to learn about these systems, we
+
+16
+00:00:30,120 --> 00:00:33,880
+are going to build one. We are going to
+
+17
+00:00:31,640 --> 00:00:35,880
+move through the complete stack. First
+
+18
+00:00:33,880 --> 00:00:37,520
+is the brain. We're going to be wiring
+
+19
+00:00:35,880 --> 00:00:39,680
+Claude to Open Router for
+
+20
+00:00:37,520 --> 00:00:41,840
+institutional-grade model access.
+
+21
+00:00:39,680 --> 00:00:43,800
+Second, the eyes. We will be installing
+
+22
+00:00:41,840 --> 00:00:45,440
+the Hyperliquid whale tracker to see
+
+23
+00:00:43,800 --> 00:00:48,000
+smart money in real time and the
+
+24
+00:00:45,440 --> 00:00:50,200
+TradingView MCP to let Claude read your
+
+25
+00:00:48,000 --> 00:00:52,920
+charts directly. Third, the hands, where
+
+26
+00:00:50,200 --> 00:00:54,880
+we will be connecting Weeks, Alpaca, and
+
+27
+00:00:52,920 --> 00:00:57,200
+Interactive Brokers for multi-market
+
+28
+00:00:54,880 --> 00:00:59,480
+execution. Fourth, the workforce, where
+
+29
+00:00:57,200 --> 00:01:02,120
+we will be deploying agent frameworks
+
+30
+00:00:59,480 --> 00:01:03,960
+like Sim Pi, Hermes, and Open Claude.
+
+31
+00:01:02,120 --> 00:01:06,160
+Specialists that hunt for alpha while
+
+32
+00:01:03,960 --> 00:01:07,760
+you sleep. Fifth is the command center,
+
+33
+00:01:06,160 --> 00:01:11,160
+where we will be shipping a custom
+
+34
+00:01:07,760 --> 00:01:13,560
+Python bot to a 24/7 VPS and unifying
+
+35
+00:01:11,160 --> 00:01:14,960
+everything into a live ops dashboard. By
+
+36
+00:01:13,560 --> 00:01:16,840
+the time we're done, you won't be
+
+37
+00:01:14,960 --> 00:01:18,600
+staring at 12 browser tabs and
+
+38
+00:01:16,840 --> 00:01:20,440
+second-guessing your entries. You'll be
+
+39
+00:01:18,600 --> 00:01:22,720
+an operator. You'll wake up to a daily
+
+40
+00:01:20,440 --> 00:01:24,760
+alpha brief waiting in your inbox, a bot
+
+41
+00:01:22,720 --> 00:01:26,800
+managing your risk, and a system that
+
+42
+00:01:24,760 --> 00:01:28,920
+finally puts you on the right side of
+
+43
+00:01:26,800 --> 00:01:31,440
+the silicon war.
+
+44
+00:01:28,920 --> 00:01:33,640
+Let's get into it. AI is already a big
+
+45
+00:01:31,440 --> 00:01:36,720
+part of trading cryptocurrency. Not in
+
+46
+00:01:33,640 --> 00:01:39,200
+theory, not in some lab somewhere. Live,
+
+47
+00:01:36,720 --> 00:01:41,040
+on chain, and verifiable. There's a bot
+
+48
+00:01:39,200 --> 00:01:43,840
+on Polymarket with a wallet address
+
+49
+00:01:41,040 --> 00:01:46,920
+named sovereign2013
+
+50
+00:01:43,840 --> 00:01:49,400
+that turned $1 into $3.3 million using
+
+51
+00:01:46,920 --> 00:01:51,280
+AI. That's not a headline I made up. You
+
+52
+00:01:49,400 --> 00:01:52,880
+can look it up on chain right now. This
+
+53
+00:01:51,280 --> 00:01:54,600
+course is built on the blueprint
+
+54
+00:01:52,880 --> 00:01:57,080
+established by pioneers like Jake
+
+55
+00:01:54,600 --> 00:01:59,440
+Nesler, who let Claude code run a live
+
+56
+00:01:57,080 --> 00:02:02,200
+trading stack with $100,000 of real
+
+57
+00:01:59,440 --> 00:02:04,479
+capital. Every prompt, every drawdown,
+
+58
+00:02:02,200 --> 00:02:06,479
+and every winning trade was documented.
+
+59
+00:02:04,479 --> 00:02:08,440
+It proved a vital point. When you give
+
+60
+00:02:06,479 --> 00:02:10,880
+an agent a wheel, it doesn't just help
+
+61
+00:02:08,440 --> 00:02:13,360
+you trade, it is the trader. We are
+
+62
+00:02:10,880 --> 00:02:16,080
+generalizing that exact stack here, add
+
+63
+00:02:13,360 --> 00:02:17,920
+in three specific skills, five agent
+
+64
+00:02:16,080 --> 00:02:19,680
+frameworks, and Claude routines to
+
+65
+00:02:17,920 --> 00:02:22,600
+create a system that doesn't just
+
+66
+00:02:19,680 --> 00:02:24,560
+survive the market, but masters it. And
+
+67
+00:02:22,600 --> 00:02:27,320
+on Hyperliquid, an experiment called the
+
+68
+00:02:24,560 --> 00:02:30,120
+Alpha Arena, took the biggest AI models
+
+69
+00:02:27,320 --> 00:02:33,360
+in the world, Quinn, DeepSeek, Claude,
+
+70
+00:02:30,120 --> 00:02:34,920
+GPT, Grok, and Gemini, gave each of them
+
+71
+00:02:33,360 --> 00:02:36,840
+$10,000,
+
+72
+00:02:34,920 --> 00:02:39,040
+and let them trade live perpetuals
+
+73
+00:02:36,840 --> 00:02:41,440
+against each other. The results were not
+
+74
+00:02:39,040 --> 00:02:43,160
+even close. Some of these models, models
+
+75
+00:02:41,440 --> 00:02:45,360
+that millions of people are using right
+
+76
+00:02:43,160 --> 00:02:48,280
+now to make trading decisions, lost the
+
+77
+00:02:45,360 --> 00:02:50,360
+majority of their account in 4 days. And
+
+78
+00:02:48,280 --> 00:02:52,600
+one of them did the complete opposite.
+
+79
+00:02:50,360 --> 00:02:56,240
+AI-powered bots now account for roughly
+
+80
+00:02:52,600 --> 00:02:58,160
+70 to 80% of all crypto volume. If you
+
+81
+00:02:56,240 --> 00:03:00,200
+are still trading manually, you are not
+
+82
+00:02:58,160 --> 00:03:02,840
+competing with other retail traders
+
+83
+00:03:00,200 --> 00:03:04,800
+anymore. You are the liquidity. You are
+
+84
+00:03:02,840 --> 00:03:06,800
+the other side of the trade that the AI
+
+85
+00:03:04,800 --> 00:03:08,400
+is taking. That is not me trying to
+
+86
+00:03:06,800 --> 00:03:10,160
+scare you. That is just what is
+
+87
+00:03:08,400 --> 00:03:12,680
+happening right now. And here's the
+
+88
+00:03:10,160 --> 00:03:15,320
+thing, the tools that are creating this
+
+89
+00:03:12,680 --> 00:03:17,120
+gap are not locked behind a hedge fund.
+
+90
+00:03:15,320 --> 00:03:19,959
+They are not expensive. They are not
+
+91
+00:03:17,120 --> 00:03:22,400
+complicated. Claude costs $20 a month.
+
+92
+00:03:19,959 --> 00:03:25,000
+The Hyperliquid API is completely free
+
+93
+00:03:22,400 --> 00:03:27,239
+and public. TradingView, you probably
+
+94
+00:03:25,000 --> 00:03:29,280
+already have. Telegram, you already have
+
+95
+00:03:27,239 --> 00:03:31,640
+on your phone. The gap is not about
+
+96
+00:03:29,280 --> 00:03:33,600
+access. The gap is about knowing how to
+
+97
+00:03:31,640 --> 00:03:36,360
+put it together. This is the complete
+
+98
+00:03:33,600 --> 00:03:38,080
+zero-to-hero course for AI trading with
+
+99
+00:03:36,360 --> 00:03:40,360
+Claude. I am not going to give you
+
+100
+00:03:38,080 --> 00:03:42,560
+theory. I'm not going to show you a demo
+
+101
+00:03:40,360 --> 00:03:44,440
+that looks impressive, but falls apart
+
+102
+00:03:42,560 --> 00:03:46,519
+the moment you try to replicate it.
+
+103
+00:03:44,440 --> 00:03:48,959
+Everything I show you today, I have
+
+104
+00:03:46,519 --> 00:03:50,800
+built and run myself. This is what you
+
+105
+00:03:48,959 --> 00:03:53,720
+should expect, the exact contract for
+
+106
+00:03:50,800 --> 00:03:56,160
+the next 2.5 hours. Real money, every
+
+107
+00:03:53,720 --> 00:03:58,520
+tool. Claude plus open router, which
+
+108
+00:03:56,160 --> 00:04:00,920
+gives you the key for every model.
+
+109
+00:03:58,520 --> 00:04:03,720
+Three skills live. Wickstrader, Whale
+
+110
+00:04:00,920 --> 00:04:06,480
+Tracker, and TradingView MCP. Three
+
+111
+00:04:03,720 --> 00:04:08,040
+brokers connected. Wix, Alpaca, and
+
+112
+00:04:06,480 --> 00:04:09,880
+Interactive Brokers.
+
+113
+00:04:08,040 --> 00:04:12,200
+Polymarket plus Kalshi prediction
+
+114
+00:04:09,880 --> 00:04:15,959
+markets. Claude routines automating your
+
+115
+00:04:12,200 --> 00:04:19,280
+entire trading day. Agent PNL plus Sempy
+
+116
+00:04:15,959 --> 00:04:21,320
+plus Hermes plus open claw all deployed.
+
+117
+00:04:19,280 --> 00:04:24,040
+Custom Python bot on Hostinger running
+
+118
+00:04:21,320 --> 00:04:25,840
+24/7. Telegram bot in your pocket.
+
+119
+00:04:24,040 --> 00:04:27,640
+Custom dashboard tracking it all.
+
+120
+00:04:25,840 --> 00:04:30,080
+Nothing skipped. Every command on
+
+121
+00:04:27,640 --> 00:04:31,400
+screen. If you already code, skim. If
+
+122
+00:04:30,080 --> 00:04:33,560
+you don't, then we're going to open a
+
+123
+00:04:31,400 --> 00:04:35,120
+terminal together. Let's go. Before I
+
+124
+00:04:33,560 --> 00:04:37,080
+show you anything, I need to say
+
+125
+00:04:35,120 --> 00:04:39,280
+something that most AI trading videos
+
+126
+00:04:37,080 --> 00:04:41,400
+will never tell you. Because if you come
+
+127
+00:04:39,280 --> 00:04:43,400
+into this with the wrong expectation,
+
+128
+00:04:41,400 --> 00:04:46,120
+you're going to get hurt. Here is what
+
+129
+00:04:43,400 --> 00:04:47,720
+AI is genuinely good at. Writing code,
+
+130
+00:04:46,120 --> 00:04:49,560
+building backtest scaffolding,
+
+131
+00:04:47,720 --> 00:04:51,919
+synthesizing news from 10 different
+
+132
+00:04:49,560 --> 00:04:54,280
+sources into one clean summary,
+
+133
+00:04:51,919 --> 00:04:56,000
+sentiment analysis, reading a chart
+
+134
+00:04:54,280 --> 00:04:58,000
+screenshot and giving you a structured
+
+135
+00:04:56,000 --> 00:04:59,960
+technical breakdown, journaling your
+
+136
+00:04:58,000 --> 00:05:02,560
+trades and finding patterns in your own
+
+137
+00:04:59,960 --> 00:05:05,120
+data, risk logic, and turning a plain
+
+138
+00:05:02,560 --> 00:05:07,680
+English strategy ideas into working Pine
+
+139
+00:05:05,120 --> 00:05:09,160
+Script in under a minute. All of that
+
+140
+00:05:07,680 --> 00:05:10,880
+Claude does better than any human
+
+141
+00:05:09,160 --> 00:05:13,040
+working alone, faster, more
+
+142
+00:05:10,880 --> 00:05:15,120
+consistently, and without getting tired
+
+143
+00:05:13,040 --> 00:05:18,840
+at 2:00 in the morning. Here is what AI
+
+144
+00:05:15,120 --> 00:05:20,360
+is bad at. Price prediction, full stop.
+
+145
+00:05:18,840 --> 00:05:23,280
+Claude cannot tell you where Bitcoin is
+
+146
+00:05:20,360 --> 00:05:25,600
+going tomorrow. Nobody can. And any tool
+
+147
+00:05:23,280 --> 00:05:27,880
+that claims it can is lying to you,
+
+148
+00:05:25,600 --> 00:05:30,000
+replacing your judgment. The market will
+
+149
+00:05:27,880 --> 00:05:32,360
+always throw situations that no model
+
+150
+00:05:30,000 --> 00:05:35,240
+has seen before. Black swan events,
+
+151
+00:05:32,360 --> 00:05:37,840
+coordinated manipulation, macro shocks.
+
+152
+00:05:35,240 --> 00:05:39,800
+AI has no edge in those moments. You do.
+
+153
+00:05:37,840 --> 00:05:41,680
+And hallucinations. Claude will
+
+154
+00:05:39,800 --> 00:05:44,120
+occasionally state something confidently
+
+155
+00:05:41,680 --> 00:05:46,600
+that is completely wrong. A price that
+
+156
+00:05:44,120 --> 00:05:49,560
+does not exist. A ticker that is not
+
+157
+00:05:46,600 --> 00:05:52,080
+real. a statistic it invented. It does
+
+158
+00:05:49,560 --> 00:05:53,800
+not happen constantly, but it happens.
+
+159
+00:05:52,080 --> 00:05:55,840
+You always verify the critical data
+
+160
+00:05:53,800 --> 00:05:57,600
+point yourself. So, here's the one rule
+
+161
+00:05:55,840 --> 00:06:00,040
+I want you to carry through this entire
+
+162
+00:05:57,600 --> 00:06:03,000
+course. Claude is a research assistant
+
+163
+00:06:00,040 --> 00:06:05,240
+with execution hands, not an oracle. It
+
+164
+00:06:03,000 --> 00:06:07,760
+does the work faster than you can. It
+
+165
+00:06:05,240 --> 00:06:09,960
+catches things you would miss. It runs
+
+166
+00:06:07,760 --> 00:06:12,360
+while you sleep, but it does not replace
+
+167
+00:06:09,960 --> 00:06:14,240
+your judgment. It extends it. Keep that
+
+168
+00:06:12,360 --> 00:06:16,680
+in your head and everything I show you
+
+169
+00:06:14,240 --> 00:06:18,840
+today will make sense. Forget it and you
+
+170
+00:06:16,680 --> 00:06:20,880
+will eventually hand an AI your account
+
+171
+00:06:18,840 --> 00:06:23,280
+and wonder what happened. This course
+
+172
+00:06:20,880 --> 00:06:25,880
+makes you capable of executing faster,
+
+173
+00:06:23,280 --> 00:06:27,919
+not capable of predicting markets. Trade
+
+174
+00:06:25,880 --> 00:06:29,360
+small until your own P&L proves
+
+175
+00:06:27,919 --> 00:06:31,040
+otherwise.
+
+176
+00:06:29,360 --> 00:06:32,919
+Now, before we get a deep dive into the
+
+177
+00:06:31,040 --> 00:06:35,320
+course, here's what you need on your
+
+178
+00:06:32,919 --> 00:06:38,160
+desk before you start. First, a laptop
+
+179
+00:06:35,320 --> 00:06:41,400
+or a computer, Mac, Windows 11, or any
+
+180
+00:06:38,160 --> 00:06:44,320
+modern Linux distro with at least 8 GB
+
+181
+00:06:41,400 --> 00:06:47,120
+RAM minimum, but a 16 GB is recommended.
+
+182
+00:06:44,320 --> 00:06:49,080
+Any CPU from the last 5 years is fine.
+
+183
+00:06:47,120 --> 00:06:51,040
+Second is any reasonable internet
+
+184
+00:06:49,080 --> 00:06:54,200
+connection. You're not streaming, you're
+
+185
+00:06:51,040 --> 00:06:56,680
+making API calls. A cafe hotspot works.
+
+186
+00:06:54,200 --> 00:06:58,760
+Third is at least 2.5 hours of your
+
+187
+00:06:56,680 --> 00:07:01,160
+time. You can do it in chunks, but the
+
+188
+00:06:58,760 --> 00:07:03,480
+install spine that covers from modules 3
+
+189
+00:07:01,160 --> 00:07:06,160
+to 11 will benefit you from one
+
+190
+00:07:03,480 --> 00:07:08,400
+continuous block. Fourth, a credit card
+
+191
+00:07:06,160 --> 00:07:11,000
+for a few optional charges. Some tools
+
+192
+00:07:08,400 --> 00:07:14,360
+needs to be paid like $5 for OpenRouter
+
+193
+00:07:11,000 --> 00:07:16,720
+credit, $5 for Firecrawl hosting or VPS,
+
+194
+00:07:14,360 --> 00:07:19,040
+which is around $5 to $8 per month.
+
+195
+00:07:16,720 --> 00:07:21,480
+Railway for Send API, which is $5 per
+
+196
+00:07:19,040 --> 00:07:23,680
+month after 30-day trial. Everything
+
+197
+00:07:21,480 --> 00:07:25,440
+else is free tier. Before we dive into
+
+198
+00:07:23,680 --> 00:07:27,640
+the modules, let's get your digital
+
+199
+00:07:25,440 --> 00:07:29,720
+workspace organized. You'll want these
+
+200
+00:07:27,640 --> 00:07:33,160
+apps open, signed in, and ready on your
+
+201
+00:07:29,720 --> 00:07:34,680
+desktop. First, terminal. Any modern
+
+202
+00:07:33,160 --> 00:07:37,000
+terminal will do.
+
+203
+00:07:34,680 --> 00:07:38,960
+iTerm for Mac, Windows Terminal,
+
+204
+00:07:37,000 --> 00:07:40,880
+PowerShell, or your default Linux
+
+205
+00:07:38,960 --> 00:07:43,360
+Terminal. You'll be pasting commands
+
+206
+00:07:40,880 --> 00:07:45,720
+here starting from module three. Second,
+
+207
+00:07:43,360 --> 00:07:48,440
+browser. You'll use this to sign in to
+
+208
+00:07:45,720 --> 00:07:50,280
+Claude, Open Router, Polymarket, and
+
+209
+00:07:48,440 --> 00:07:52,800
+other essential platforms.
+
+210
+00:07:50,280 --> 00:07:55,080
+Third, Cursor. You'll need this code
+
+211
+00:07:52,800 --> 00:07:58,760
+editor to view and edit markdown {dot}
+
+212
+00:07:55,080 --> 00:08:01,880
+md files, Python {dot} py files, and
+
+213
+00:07:58,760 --> 00:08:04,160
+dashboard HTML as the course progresses.
+
+214
+00:08:01,880 --> 00:08:05,960
+Fourth, phone. Keep your phone handy for
+
+215
+00:08:04,160 --> 00:08:07,880
+Telegram. You'll need it for the
+
+216
+00:08:05,960 --> 00:08:09,480
+integration steps once we start working
+
+217
+00:08:07,880 --> 00:08:11,040
+with BotFather.
+
+218
+00:08:09,480 --> 00:08:12,840
+Now, for the first module, we will talk
+
+219
+00:08:11,040 --> 00:08:15,120
+about foundation. Before we open the
+
+220
+00:08:12,840 --> 00:08:17,720
+terminal, we need to align on the mental
+
+221
+00:08:15,120 --> 00:08:20,160
+model. Most retail traders fail with AI
+
+222
+00:08:17,720 --> 00:08:22,919
+because they only use it for one thing,
+
+223
+00:08:20,160 --> 00:08:26,120
+asking for a strategy. That's 5% of the
+
+224
+00:08:22,919 --> 00:08:28,600
+capability. To win, we install AI into
+
+225
+00:08:26,120 --> 00:08:30,520
+all three layers of the trading system.
+
+226
+00:08:28,600 --> 00:08:32,520
+First is research. This is finding the
+
+227
+00:08:30,520 --> 00:08:35,159
+edge. We're talking about tracking
+
+228
+00:08:32,520 --> 00:08:37,280
+hyperliquid whales using Firecrawl to
+
+229
+00:08:35,159 --> 00:08:39,240
+scrape the open web for sentiment and
+
+230
+00:08:37,280 --> 00:08:41,360
+generating a daily alpha brief that
+
+231
+00:08:39,240 --> 00:08:43,440
+compresses thousands of data points into
+
+232
+00:08:41,360 --> 00:08:45,800
+the three things that actually matter.
+
+233
+00:08:43,440 --> 00:08:48,360
+Second is strategy. This is turning that
+
+234
+00:08:45,800 --> 00:08:51,160
+edge into rules. We use the TradingView
+
+235
+00:08:48,360 --> 00:08:53,920
+MCP, which gives Claude 78 specific
+
+236
+00:08:51,160 --> 00:08:55,920
+tools to auto-build Pine Script, run
+
+237
+00:08:53,920 --> 00:08:57,200
+backtests, and look for multi-timeframe
+
+238
+00:08:55,920 --> 00:08:59,040
+confluence.
+
+239
+00:08:57,200 --> 00:09:00,160
+Third is execution. This is moving
+
+240
+00:08:59,040 --> 00:09:01,640
+capital.
+
+241
+00:09:00,160 --> 00:09:04,360
+We use the Wick's Trading Assistant
+
+242
+00:09:01,640 --> 00:09:06,880
+skill to execute orders, use TradingView
+
+243
+00:09:04,360 --> 00:09:08,839
+to send commands via webhook, set
+
+244
+00:09:06,880 --> 00:09:10,680
+agentic risk management, and deploy
+
+245
+00:09:08,839 --> 00:09:13,560
+custom bots on Hostinger that stay
+
+246
+00:09:10,680 --> 00:09:15,760
+online 24/7. The edge isn't just one of
+
+247
+00:09:13,560 --> 00:09:17,880
+these, it's the connection between them.
+
+248
+00:09:15,760 --> 00:09:20,120
+Now, AI isn't magic, it's a force
+
+249
+00:09:17,880 --> 00:09:22,200
+multiplier. It gives you four specific
+
+250
+00:09:20,120 --> 00:09:23,800
+advantages that any retail trader can
+
+251
+00:09:22,200 --> 00:09:26,000
+now rent for pennies.
+
+252
+00:09:23,800 --> 00:09:27,960
+Reading speed. It reads 100 filings
+
+253
+00:09:26,000 --> 00:09:30,040
+while you read one. You can give a model
+
+254
+00:09:27,960 --> 00:09:32,600
+300 documents and it will return the
+
+255
+00:09:30,040 --> 00:09:34,880
+outliers in 30 seconds for about 25
+
+256
+00:09:32,600 --> 00:09:37,200
+cents. Production code. It writes
+
+257
+00:09:34,880 --> 00:09:40,360
+professional-grade Python. We're talking
+
+258
+00:09:37,200 --> 00:09:42,280
+CCXT wrappers and SQLite journals that
+
+259
+00:09:40,360 --> 00:09:44,720
+pass every check and run live on the
+
+260
+00:09:42,280 --> 00:09:47,600
+first try. Pattern recognition. Our
+
+261
+00:09:44,720 --> 00:09:49,000
+whale tracker can scan 33,000 wallets in
+
+262
+00:09:47,600 --> 00:09:52,240
+90 seconds.
+
+263
+00:09:49,000 --> 00:09:53,680
+It sorts every profitable trader by P&L
+
+264
+00:09:52,240 --> 00:09:56,760
+and sentiment while you're still
+
+265
+00:09:53,680 --> 00:09:59,040
+refreshing a tab. Uptime. You sleep, the
+
+266
+00:09:56,760 --> 00:10:01,680
+bot doesn't. Your system services and
+
+267
+00:09:59,040 --> 00:10:03,520
+Claude routines run forever. This is an
+
+268
+00:10:01,680 --> 00:10:05,680
+autonomous stack that earns while you're
+
+269
+00:10:03,520 --> 00:10:07,960
+offline. Now, before we get into the
+
+270
+00:10:05,680 --> 00:10:09,520
+tools, let me quickly demystify terms
+
+271
+00:10:07,960 --> 00:10:11,720
+you're going to hear constantly in this
+
+272
+00:10:09,520 --> 00:10:13,440
+space. Because if you do not know what
+
+273
+00:10:11,720 --> 00:10:15,400
+these mean, some of this is going to
+
+274
+00:10:13,440 --> 00:10:17,920
+feel more complicated than it actually
+
+275
+00:10:15,400 --> 00:10:21,160
+is. Let's define them now so we don't
+
+276
+00:10:17,920 --> 00:10:24,120
+slow down later. MCP, the model context
+
+277
+00:10:21,160 --> 00:10:26,080
+protocol. Think of it like a USB-C port
+
+278
+00:10:24,120 --> 00:10:28,480
+for Claude. It lets us plug in any
+
+279
+00:10:26,080 --> 00:10:30,560
+broker, chart, or data source. Open
+
+280
+00:10:28,480 --> 00:10:33,400
+router. This is our unified gateway. One
+
+281
+00:10:30,560 --> 00:10:36,160
+API key that gives us access to Claude,
+
+282
+00:10:33,400 --> 00:10:38,560
+GPT, Gemini, and DeepSeek with automatic
+
+283
+00:10:36,160 --> 00:10:40,800
+fallback. Claude has what Anthropic
+
+284
+00:10:38,560 --> 00:10:42,600
+calls skills. Think of them like apps
+
+285
+00:10:40,800 --> 00:10:44,480
+you install on your phone. Someone
+
+286
+00:10:42,600 --> 00:10:46,680
+builds a skill for hyper liquid whale
+
+287
+00:10:44,480 --> 00:10:48,120
+tracking. You install it. Now, Claude
+
+288
+00:10:46,680 --> 00:10:50,400
+can do that automatically without you
+
+289
+00:10:48,120 --> 00:10:51,920
+writing a single line of code. I'm going
+
+290
+00:10:50,400 --> 00:10:54,600
+to show you how to use these later in
+
+291
+00:10:51,920 --> 00:10:56,640
+the course. API, which means application
+
+292
+00:10:54,600 --> 00:10:58,480
+programming interface. This is the
+
+293
+00:10:56,640 --> 00:11:00,800
+machine readable door that connects
+
+294
+00:10:58,480 --> 00:11:02,800
+Claude directly to Weeks, Alpaca,
+
+295
+00:11:00,800 --> 00:11:03,880
+Interactive Brokers, TradingView,
+
+296
+00:11:02,800 --> 00:11:06,320
+everything.
+
+297
+00:11:03,880 --> 00:11:08,240
+VPS, your virtual private server. A
+
+298
+00:11:06,320 --> 00:11:10,280
+Linux box we rent for a few dollars a
+
+299
+00:11:08,240 --> 00:11:13,120
+month so your bot lives in the cloud,
+
+300
+00:11:10,280 --> 00:11:15,720
+not just on your laptop. Routines.
+
+301
+00:11:13,120 --> 00:11:17,440
+Anthropic's cloud-hosted tasks. You
+
+302
+00:11:15,720 --> 00:11:19,360
+schedule a prompt and it runs on their
+
+303
+00:11:17,440 --> 00:11:22,760
+infrastructure even when your laptop is
+
+304
+00:11:19,360 --> 00:11:25,400
+closed. Agents. Software that loops. It
+
+305
+00:11:22,760 --> 00:11:26,720
+plans, acts, observes, and replans.
+
+306
+00:11:25,400 --> 00:11:29,760
+We'll be deploying five different
+
+307
+00:11:26,720 --> 00:11:30,920
+frameworks including Senpai, Hermes, and
+
+308
+00:11:29,760 --> 00:11:32,520
+OpenClaude.
+
+309
+00:11:30,920 --> 00:11:35,680
+Prediction markets, places like
+
+310
+00:11:32,520 --> 00:11:37,280
+Polymarket and Kalshi. LLMs are
+
+311
+00:11:35,680 --> 00:11:39,520
+shockingly good here because they
+
+312
+00:11:37,280 --> 00:11:41,880
+compress massive amounts of context to
+
+313
+00:11:39,520 --> 00:11:44,360
+predict real-world outcomes. The skills
+
+314
+00:11:41,880 --> 00:11:45,800
+thesis and why this course leans heavily
+
+315
+00:11:44,360 --> 00:11:47,720
+on Claude skills.
+
+316
+00:11:45,800 --> 00:11:49,720
+Most people think prompt engineering is
+
+317
+00:11:47,720 --> 00:11:52,480
+the secret. It's not. A skill is a
+
+318
+00:11:49,720 --> 00:11:54,760
+folder. Inside is a specialized file
+
+319
+00:11:52,480 --> 00:11:56,960
+that teaches Claude a whole domain,
+
+320
+00:11:54,760 --> 00:11:59,520
+every command, every edge case, and
+
+321
+00:11:56,960 --> 00:12:01,880
+every safety fault. By dropping three
+
+322
+00:11:59,520 --> 00:12:04,080
+specific skills into the system, Claude
+
+323
+00:12:01,880 --> 00:12:06,480
+suddenly knows how to trade Wix perps,
+
+324
+00:12:04,080 --> 00:12:08,440
+track hyper liquid whales, and control
+
+325
+00:12:06,480 --> 00:12:10,560
+your TradingView desktop with 78
+
+326
+00:12:08,440 --> 00:12:12,840
+built-in tools. No manual coding
+
+327
+00:12:10,560 --> 00:12:14,760
+required, no prompt engineering, just
+
+328
+00:12:12,840 --> 00:12:16,400
+plug and play capability. These are the
+
+329
+00:12:14,760 --> 00:12:18,760
+LEGO bricks. Now, let's go build the
+
+330
+00:12:16,400 --> 00:12:21,360
+stack. Now, the second module covers the
+
+331
+00:12:18,760 --> 00:12:24,240
+complete AI trading stack. This is the
+
+332
+00:12:21,360 --> 00:12:27,200
+one-page map. Every tool, every broker,
+
+333
+00:12:24,240 --> 00:12:28,720
+every agent platform, and every skill.
+
+334
+00:12:27,200 --> 00:12:31,280
+If some name sounds unfamiliar right
+
+335
+00:12:28,720 --> 00:12:32,920
+now, don't worry. Every single box on
+
+336
+00:12:31,280 --> 00:12:35,400
+this map gets its own dedicated
+
+337
+00:12:32,920 --> 00:12:37,400
+installation module later. Right now, I
+
+338
+00:12:35,400 --> 00:12:41,200
+want you to see how the LEGO blocks fit
+
+339
+00:12:37,400 --> 00:12:43,120
+together. One, models plus OpenRouter.
+
+340
+00:12:41,200 --> 00:12:44,880
+Everything starts with a key. We use
+
+341
+00:12:43,120 --> 00:12:47,880
+OpenRouter because it gives us one
+
+342
+00:12:44,880 --> 00:12:50,720
+single API key to access over 300
+
+343
+00:12:47,880 --> 00:12:52,760
+models. No vendor lock-in. If Anthropic
+
+344
+00:12:50,720 --> 00:12:55,200
+goes down, we fall back to DeepSeek or
+
+345
+00:12:52,760 --> 00:12:56,760
+Quinn in 1 second. Now, Claude has three
+
+346
+00:12:55,200 --> 00:12:58,960
+different models, all with different
+
+347
+00:12:56,760 --> 00:13:02,000
+strengths for different output. First is
+
+348
+00:12:58,960 --> 00:13:03,800
+Claude Opus 4.7. This is the flagship of
+
+349
+00:13:02,000 --> 00:13:06,200
+Anthropic made for heavy strategy
+
+350
+00:13:03,800 --> 00:13:09,200
+design, code review, and Polymarket
+
+351
+00:13:06,200 --> 00:13:10,480
+analyzer reasoning. Second is Claude 4.6
+
+352
+00:13:09,200 --> 00:13:13,040
+Sonnet. This model will be our
+
+353
+00:13:10,480 --> 00:13:16,839
+workhorse. 90% of this course runs on
+
+354
+00:13:13,040 --> 00:13:19,160
+it. Third is Claude Haiku 4.5. This is
+
+355
+00:13:16,839 --> 00:13:22,080
+for the cheap labor. This is mostly used
+
+356
+00:13:19,160 --> 00:13:24,520
+for classifying news, triaging routines,
+
+357
+00:13:22,080 --> 00:13:27,680
+and classification of takes for pennies.
+
+358
+00:13:24,520 --> 00:13:29,960
+Other models include GPT, Gemini, and
+
+359
+00:13:27,680 --> 00:13:32,160
+DeepSeek. You can swap these into your
+
+360
+00:13:29,960 --> 00:13:33,800
+configuration at any time without
+
+361
+00:13:32,160 --> 00:13:36,160
+changing your routines.
+
+362
+00:13:33,800 --> 00:13:38,440
+This is incredibly useful for skeptic
+
+363
+00:13:36,160 --> 00:13:40,720
+panel reviews, where you have multiple
+
+364
+00:13:38,440 --> 00:13:42,480
+models critique a trade idea before you
+
+365
+00:13:40,720 --> 00:13:44,680
+pull the trigger. Next is Quinn and
+
+366
+00:13:42,480 --> 00:13:48,120
+Kimmy. These are your long context open
+
+367
+00:13:44,680 --> 00:13:50,840
+models. If you need to ingest a 100-page
+
+368
+00:13:48,120 --> 00:13:53,080
+10K filing or summarize massive log
+
+369
+00:13:50,840 --> 00:13:55,720
+files on a budget, these are your go-to
+
+370
+00:13:53,080 --> 00:13:57,480
+tools. Also, with Open Router,
+
+371
+00:13:55,720 --> 00:13:59,480
+you can even set your model to auto.
+
+372
+00:13:57,480 --> 00:14:01,600
+This tells the system to automatically
+
+373
+00:13:59,480 --> 00:14:03,560
+choose the cheapest, most capable model
+
+374
+00:14:01,600 --> 00:14:05,600
+available for the specific task you're
+
+375
+00:14:03,560 --> 00:14:07,480
+running. It's the ultimate way to
+
+376
+00:14:05,600 --> 00:14:10,120
+optimize your overhead while keeping
+
+377
+00:14:07,480 --> 00:14:12,320
+your Hermes and Open Claw agents running
+
+378
+00:14:10,120 --> 00:14:14,200
+24/7. All right, before we touch a
+
+379
+00:14:12,320 --> 00:14:16,000
+single terminal, you need to understand
+
+380
+00:14:14,200 --> 00:14:17,880
+what Claude actually is. There are three
+
+381
+00:14:16,000 --> 00:14:20,080
+versions you need to know about. The
+
+382
+00:14:17,880 --> 00:14:22,000
+first is claude.ai.
+
+383
+00:14:20,080 --> 00:14:24,440
+This is the browser version. Think of it
+
+384
+00:14:22,000 --> 00:14:27,080
+as a research assistant. You paste in a
+
+385
+00:14:24,440 --> 00:14:29,600
+chart screenshot, a news article, a
+
+386
+00:14:27,080 --> 00:14:32,360
+token contract. It reads it and gives
+
+387
+00:14:29,600 --> 00:14:35,600
+you a structured breakdown. No code, no
+
+388
+00:14:32,360 --> 00:14:37,480
+setup. Just open a tab and go.
+
+389
+00:14:35,600 --> 00:14:40,520
+The second is Claude Desktop with
+
+390
+00:14:37,480 --> 00:14:43,600
+Cowork. This is where it gets agentic.
+
+391
+00:14:40,520 --> 00:14:46,120
+Cowork does not just talk. It acts. It
+
+392
+00:14:43,600 --> 00:14:48,760
+can open apps on your computer, read and
+
+393
+00:14:46,120 --> 00:14:51,640
+edit files, run scheduled tasks, and
+
+394
+00:14:48,760 --> 00:14:53,720
+remember context across sessions.
+
+395
+00:14:51,640 --> 00:14:56,040
+So, it knows what you told it yesterday.
+
+396
+00:14:53,720 --> 00:14:57,320
+It knows your trading setup. It works in
+
+397
+00:14:56,040 --> 00:14:59,320
+the background while you are doing
+
+398
+00:14:57,320 --> 00:15:02,520
+something else. The third is Claude
+
+399
+00:14:59,320 --> 00:15:04,600
+Code. This is the most powerful version.
+
+400
+00:15:02,520 --> 00:15:08,000
+It is a command-line tool that writes,
+
+401
+00:15:04,600 --> 00:15:09,839
+runs, and iterates code autonomously.
+
+402
+00:15:08,000 --> 00:15:11,560
+This is what built the trading bots I'm
+
+403
+00:15:09,839 --> 00:15:13,800
+going to show you later. This is what
+
+404
+00:15:11,560 --> 00:15:15,960
+connects to your exchange and executes
+
+405
+00:15:13,800 --> 00:15:18,120
+real trades. Now, let's talk about where
+
+406
+00:15:15,960 --> 00:15:20,360
+the money actually moves. We connect to
+
+407
+00:15:18,120 --> 00:15:23,440
+three primary brokers, plus prediction
+
+408
+00:15:20,360 --> 00:15:26,360
+markets, plus the CCXT library for
+
+409
+00:15:23,440 --> 00:15:29,680
+everything else. First is Wex. This is
+
+410
+00:15:26,360 --> 00:15:32,040
+our primary crypto broker. It's no KYC,
+
+411
+00:15:29,680 --> 00:15:34,640
+offers a massive deposit bonus, and most
+
+412
+00:15:32,040 --> 00:15:37,040
+importantly, it has a V3 API built
+
+413
+00:15:34,640 --> 00:15:39,360
+specifically for AI integration. It
+
+414
+00:15:37,040 --> 00:15:41,920
+handles futures and spot in one account.
+
+415
+00:15:39,360 --> 00:15:43,760
+Second is Alpaca. This is your home for
+
+416
+00:15:41,920 --> 00:15:45,760
+US stocks and options. It's
+
+417
+00:15:43,760 --> 00:15:48,400
+commission-free and has the best Python
+
+418
+00:15:45,760 --> 00:15:51,400
+SDK in the game. It even has an official
+
+419
+00:15:48,400 --> 00:15:53,280
+MCP server for cloud desktop. Third is
+
+420
+00:15:51,400 --> 00:15:55,760
+Interactive Brokers. This is for the
+
+421
+00:15:53,280 --> 00:15:58,960
+pros. If you're trading global markets,
+
+422
+00:15:55,760 --> 00:16:01,120
+bonds, or CFDs, this is the requirement.
+
+423
+00:15:58,960 --> 00:16:03,840
+We use the IB Insync Python library for
+
+424
+00:16:01,120 --> 00:16:05,640
+pro-grade execution. We're also hitting
+
+425
+00:16:03,840 --> 00:16:07,760
+prediction markets, which is where that
+
+426
+00:16:05,640 --> 00:16:10,160
+$3 million bot lives I mentioned
+
+427
+00:16:07,760 --> 00:16:11,840
+earlier. The first one is Polymarket.
+
+428
+00:16:10,160 --> 00:16:14,680
+This is the global giant for
+
+429
+00:16:11,840 --> 00:16:17,240
+crypto-funded event betting. Kalshi,
+
+430
+00:16:14,680 --> 00:16:20,000
+which is the US regulated alternative
+
+431
+00:16:17,240 --> 00:16:22,560
+for Polymarket. PMXT.
+
+432
+00:16:20,000 --> 00:16:25,440
+This is a unified SDK that lets us
+
+433
+00:16:22,560 --> 00:16:27,280
+arbitrage between Polymarket and Kalshi.
+
+434
+00:16:25,440 --> 00:16:30,520
+If the same event has different prices
+
+435
+00:16:27,280 --> 00:16:32,920
+on Polymarket and Kalshi, the AI locks
+
+436
+00:16:30,520 --> 00:16:36,200
+in the profit automatically. And for
+
+437
+00:16:32,920 --> 00:16:38,280
+everything else, we have CCXT.
+
+438
+00:16:36,200 --> 00:16:41,240
+This is the universal translator for
+
+439
+00:16:38,280 --> 00:16:43,839
+over 100 exchanges. It's how we talk to
+
+440
+00:16:41,240 --> 00:16:46,160
+Binance for backtesting and BlowFin as a
+
+441
+00:16:43,839 --> 00:16:48,040
+low-latency backup and a Great Weeks
+
+442
+00:16:46,160 --> 00:16:50,600
+alternative. Finally, there's
+
+443
+00:16:48,040 --> 00:16:53,200
+HyperLiquid. It has a free public API
+
+444
+00:16:50,600 --> 00:16:55,040
+that requires no key for data reads.
+
+445
+00:16:53,200 --> 00:16:56,960
+This is where our whale tracker skill
+
+446
+00:16:55,040 --> 00:16:59,160
+pulls live data to see what the biggest
+
+447
+00:16:56,960 --> 00:17:01,160
+fish in the pond are doing. With this
+
+448
+00:16:59,160 --> 00:17:02,240
+course, you aren't just getting one bot,
+
+449
+00:17:01,160 --> 00:17:04,520
+you're getting five different
+
+450
+00:17:02,240 --> 00:17:06,959
+frameworks, where each does one thing
+
+451
+00:17:04,520 --> 00:17:08,640
+better than the others. Most power users
+
+452
+00:17:06,959 --> 00:17:10,880
+run a combination of these to cover
+
+453
+00:17:08,640 --> 00:17:13,319
+every corner of the market. First is
+
+454
+00:17:10,880 --> 00:17:15,480
+Agent P&L. This is the easiest entry
+
+455
+00:17:13,319 --> 00:17:17,920
+point. It's a plain English Wex
+
+456
+00:17:15,480 --> 00:17:20,560
+perpetuals agent. You can go from
+
+457
+00:17:17,920 --> 00:17:22,400
+copy-paste to live trading in under 2
+
+458
+00:17:20,560 --> 00:17:24,079
+minutes. It even has a public
+
+459
+00:17:22,400 --> 00:17:27,120
+leaderboard, so you can see how your
+
+460
+00:17:24,079 --> 00:17:29,200
+logic stacks up. Second is Sent by. This
+
+461
+00:17:27,120 --> 00:17:31,640
+is your personal trading powerhouse for
+
+462
+00:17:29,200 --> 00:17:34,440
+hyper liquid. It comes with 44
+
+463
+00:17:31,640 --> 00:17:37,480
+specialized MCP tools and is battle
+
+464
+00:17:34,440 --> 00:17:39,360
+tested with over $100 million in volume.
+
+465
+00:17:37,480 --> 00:17:42,560
+Under the hood, it's powered by Open
+
+466
+00:17:39,360 --> 00:17:45,040
+Claw. Third is Hermes. Developed by News
+
+467
+00:17:42,560 --> 00:17:48,120
+Research, this Python-based framework is
+
+468
+00:17:45,040 --> 00:17:49,960
+a beast with 95,000 stars on GitHub.
+
+469
+00:17:48,120 --> 00:17:52,200
+It's self-improving, meaning it
+
+470
+00:17:49,960 --> 00:17:54,680
+generates reusable skills from every
+
+471
+00:17:52,200 --> 00:17:57,560
+successful task. It's also your gateway
+
+472
+00:17:54,680 --> 00:17:59,480
+to Telegram, Discord, and Slack. Fourth
+
+473
+00:17:57,560 --> 00:18:02,800
+is Open Claw. This is the heavyweight of
+
+474
+00:17:59,480 --> 00:18:03,920
+the ecosystem with 345,000
+
+475
+00:18:02,800 --> 00:18:06,920
+stars.
+
+476
+00:18:03,920 --> 00:18:08,400
+Built on TypeScript and Node.js,
+
+477
+00:18:06,920 --> 00:18:11,320
+it has the broadest integration
+
+478
+00:18:08,400 --> 00:18:14,200
+possible, over 50 channels and 13,000
+
+479
+00:18:11,320 --> 00:18:16,520
+community skills via Claw Hub. Fifth is
+
+480
+00:18:14,200 --> 00:18:19,200
+Claude Routines. These are Anthropic's
+
+481
+00:18:16,520 --> 00:18:21,080
+cloud-hosted scheduled tasks. This is
+
+482
+00:18:19,200 --> 00:18:23,280
+how your logic stays alive and running
+
+483
+00:18:21,080 --> 00:18:25,000
+even when your laptop is closed. You
+
+484
+00:18:23,280 --> 00:18:26,560
+don't have to choose just one. We're
+
+485
+00:18:25,000 --> 00:18:28,160
+going to install all five and you'll
+
+486
+00:18:26,560 --> 00:18:30,840
+pick the combination that fits your
+
+487
+00:18:28,160 --> 00:18:32,800
+specific trading style. Finally, we drop
+
+488
+00:18:30,840 --> 00:18:34,600
+three super skills directly into your
+
+489
+00:18:32,800 --> 00:18:36,920
+Claude code. This is the unfair
+
+490
+00:18:34,600 --> 00:18:38,760
+advantage of this course. Whale Tracker,
+
+491
+00:18:36,920 --> 00:18:40,680
+real-time hyper liquid whale research
+
+492
+00:18:38,760 --> 00:18:43,680
+with zero API keys.
+
+493
+00:18:40,680 --> 00:18:44,960
+TradingView MCP, 78 tools that let
+
+494
+00:18:43,680 --> 00:18:47,080
+Claude literally control your
+
+495
+00:18:44,960 --> 00:18:48,880
+TradingView desktop, scanning charts and
+
+496
+00:18:47,080 --> 00:18:50,760
+writing Pine Script for you. We X
+
+497
+00:18:48,880 --> 00:18:52,880
+trading assistant that lets you execute
+
+498
+00:18:50,760 --> 00:18:55,360
+trades all in plain English.
+
+499
+00:18:52,880 --> 00:18:57,360
+Individually, these tools are powerful.
+
+500
+00:18:55,360 --> 00:18:59,920
+Combined, they create the daily alpha
+
+501
+00:18:57,360 --> 00:19:02,640
+brief, where your AI tracks the whales,
+
+502
+00:18:59,920 --> 00:19:04,320
+reads the charts, checks your portfolio,
+
+503
+00:19:02,640 --> 00:19:06,440
+and hands you the day's setups on a
+
+504
+00:19:04,320 --> 00:19:08,400
+silver platter. Study the map on this
+
+505
+00:19:06,440 --> 00:19:10,520
+page. Bookmark the labels you don't
+
+506
+00:19:08,400 --> 00:19:12,280
+know. Let's start plugging them in,
+
+507
+00:19:10,520 --> 00:19:14,640
+which is exactly what we're going to do
+
+508
+00:19:12,280 --> 00:19:16,680
+in the next module. In this module, we
+
+509
+00:19:14,640 --> 00:19:18,680
+are installing every essential tool
+
+510
+00:19:16,680 --> 00:19:21,280
+you'll need throughout the course. Five
+
+511
+00:19:18,680 --> 00:19:23,920
+installs. Five verify commands and one
+
+512
+00:19:21,280 --> 00:19:25,760
+project folder. This is the foundation.
+
+513
+00:19:23,920 --> 00:19:28,320
+Every module that follows assumes this
+
+514
+00:19:25,760 --> 00:19:31,080
+setup is perfectly in place. If you skip
+
+515
+00:19:28,320 --> 00:19:32,360
+a step here, the bots won't run, the API
+
+516
+00:19:31,080 --> 00:19:34,320
+won't connect, and you'll be
+
+517
+00:19:32,360 --> 00:19:36,680
+troubleshooting code instead of trading
+
+518
+00:19:34,320 --> 00:19:38,640
+markets. We're going to open five tabs
+
+519
+00:19:36,680 --> 00:19:42,600
+and install these in order. Let's get to
+
+520
+00:19:38,640 --> 00:19:45,040
+work. First is Python 3.12 or higher. Go
+
+521
+00:19:42,600 --> 00:19:46,760
+to python.org, click on on download
+
+522
+00:19:45,040 --> 00:19:49,240
+Python. Once the installer is
+
+523
+00:19:46,760 --> 00:19:51,400
+downloaded, a pop-up will appear. Click
+
+524
+00:19:49,240 --> 00:19:53,600
+on install Python and click yes to
+
+525
+00:19:51,400 --> 00:19:55,720
+accept the terms. If you're on Windows,
+
+526
+00:19:53,600 --> 00:19:58,240
+this is the most important part. Tick
+
+527
+00:19:55,720 --> 00:19:59,840
+the box that says add Python to path
+
+528
+00:19:58,240 --> 00:20:01,240
+during the install. If you miss that,
+
+529
+00:19:59,840 --> 00:20:03,080
+nothing else works.
+
+530
+00:20:01,240 --> 00:20:04,600
+If you're on Mac and have Homebrew, you
+
+531
+00:20:03,080 --> 00:20:08,480
+can type the install command from the
+
+532
+00:20:04,600 --> 00:20:12,240
+notes below instead. Second is node.js.
+
+533
+00:20:08,480 --> 00:20:14,800
+Get the LTS version from nodejs.org.
+
+534
+00:20:12,240 --> 00:20:17,000
+This is the engine for our MCP servers
+
+535
+00:20:14,800 --> 00:20:19,280
+and the Open Claw framework we'll deploy
+
+536
+00:20:17,000 --> 00:20:21,240
+later. Choose your operating system.
+
+537
+00:20:19,280 --> 00:20:23,080
+Since I'm using Windows, I'll select the
+
+538
+00:20:21,240 --> 00:20:25,320
+Windows installer. Accept the license
+
+539
+00:20:23,080 --> 00:20:27,840
+agreement, then click next until the
+
+540
+00:20:25,320 --> 00:20:31,360
+installation is complete. Third is Git.
+
+541
+00:20:27,840 --> 00:20:34,080
+Download it from git-scm.com.
+
+542
+00:20:31,360 --> 00:20:36,040
+We'll be using this to clone or copy the
+
+543
+00:20:34,080 --> 00:20:38,000
+trading skills and bot repositories
+
+544
+00:20:36,040 --> 00:20:40,160
+directly to your machine. Just accept
+
+545
+00:20:38,000 --> 00:20:42,040
+the default settings during the install.
+
+546
+00:20:40,160 --> 00:20:44,240
+Fourth is Cursor. This is our command
+
+547
+00:20:42,040 --> 00:20:46,000
+center. Go to cursor.com. It's an AI
+
+548
+00:20:44,240 --> 00:20:48,640
+native editor that allows Claude to
+
+549
+00:20:46,000 --> 00:20:50,680
+actually see your code files. Click on
+
+550
+00:20:48,640 --> 00:20:52,760
+download in the upper right corner.
+
+551
+00:20:50,680 --> 00:20:54,960
+Accept the agreement, then click next
+
+552
+00:20:52,760 --> 00:20:57,240
+until it installs. Fifth is your
+
+553
+00:20:54,960 --> 00:21:00,200
+terminal. If you're on Mac, use the
+
+554
+00:20:57,240 --> 00:21:02,080
+built-in terminal or iTerm2. On Windows,
+
+555
+00:21:00,200 --> 00:21:04,360
+use Windows Terminal from the Microsoft
+
+556
+00:21:02,080 --> 00:21:07,560
+Store, and always select the PowerShell
+
+557
+00:21:04,360 --> 00:21:10,200
+tab. Never use the old cmd.exe. Once you
+
+558
+00:21:07,560 --> 00:21:12,280
+can open PowerShell, you're done. Now,
+
+559
+00:21:10,200 --> 00:21:14,360
+let's create your trading AI folder.
+
+560
+00:21:12,280 --> 00:21:16,720
+This keeps the course clean and ensures
+
+561
+00:21:14,360 --> 00:21:18,360
+Claude knows exactly where to look. Open
+
+562
+00:21:16,720 --> 00:21:20,320
+your terminal and type the command on
+
+563
+00:21:18,360 --> 00:21:22,520
+the screen. Everything we build from
+
+564
+00:21:20,320 --> 00:21:25,400
+this point forward, every skill, every
+
+565
+00:21:22,520 --> 00:21:27,280
+config file, goes inside this folder.
+
+566
+00:21:25,400 --> 00:21:29,240
+Before we move to module four, we need
+
+567
+00:21:27,280 --> 00:21:31,880
+three green lights. Type these into your
+
+568
+00:21:29,240 --> 00:21:35,080
+terminal one by one. pi dash dash
+
+569
+00:21:31,880 --> 00:21:37,760
+version. This must be 3.12 or higher.
+
+570
+00:21:35,080 --> 00:21:41,480
+node dash version. You're looking for
+
+571
+00:21:37,760 --> 00:21:44,320
+V22 or higher. git dash dash version.
+
+572
+00:21:41,480 --> 00:21:46,680
+Anything in the 2.4 range is perfect. If
+
+573
+00:21:44,320 --> 00:21:48,720
+you get a command not found error for
+
+574
+00:21:46,680 --> 00:21:51,560
+Python on Windows, it's because you
+
+575
+00:21:48,720 --> 00:21:53,800
+didn't tick that add to path box. Don't
+
+576
+00:21:51,560 --> 00:21:55,440
+fight it, just rerun the installer. If
+
+577
+00:21:53,800 --> 00:21:57,760
+node isn't showing up, close your
+
+578
+00:21:55,440 --> 00:21:59,960
+terminal completely and reopen it to
+
+579
+00:21:57,760 --> 00:22:01,520
+refresh the system. If you see those
+
+580
+00:21:59,960 --> 00:22:03,840
+version numbers, you are officially
+
+581
+00:22:01,520 --> 00:22:05,640
+ready. Your computer is no longer just a
+
+582
+00:22:03,840 --> 00:22:07,600
+laptop. It's a high frequency
+
+583
+00:22:05,640 --> 00:22:10,160
+workstation. Take a breath, close your
+
+584
+00:22:07,600 --> 00:22:12,080
+browser tabs. In the next module, we are
+
+585
+00:22:10,160 --> 00:22:14,240
+installing Claude code and wiring up
+
+586
+00:22:12,080 --> 00:22:16,440
+your OpenRouter master key. Let's get
+
+587
+00:22:14,240 --> 00:22:18,520
+into it. In this module, we are
+
+588
+00:22:16,440 --> 00:22:21,760
+installing Claude desktop, the Claude
+
+589
+00:22:18,520 --> 00:22:23,600
+code CLI, and signing up for OpenRouter.
+
+590
+00:22:21,760 --> 00:22:25,960
+By the end of this module, you will have
+
+591
+00:22:23,600 --> 00:22:28,800
+one master key that points Claude at
+
+592
+00:22:25,960 --> 00:22:31,920
+over 300 different AI models. With
+
+593
+00:22:28,800 --> 00:22:35,080
+Sonnet 4.6 as your default workhorse and
+
+594
+00:22:31,920 --> 00:22:37,200
+Opus 4.7 for the heavy lifting. First,
+
+595
+00:22:35,080 --> 00:22:39,840
+go to claude.ai. I highly recommend the
+
+596
+00:22:37,200 --> 00:22:41,840
+pro plan for $20 a month. It unlocks
+
+597
+00:22:39,840 --> 00:22:43,800
+Claude code and gives you the usage caps
+
+598
+00:22:41,840 --> 00:22:45,520
+you need to actually trade. If you're
+
+599
+00:22:43,800 --> 00:22:47,920
+planning on running whale alerts and
+
+600
+00:22:45,520 --> 00:22:49,720
+risk checks 24/7, the max plan is the
+
+601
+00:22:47,920 --> 00:22:51,920
+move. Once you've picked a plan,
+
+602
+00:22:49,720 --> 00:22:53,880
+download Claude desktop. Keep it pinned
+
+603
+00:22:51,920 --> 00:22:56,000
+to your taskbar. Later in the course,
+
+604
+00:22:53,880 --> 00:22:58,440
+we're going to plug our MCP servers
+
+605
+00:22:56,000 --> 00:23:00,880
+directly into this app so Claude can see
+
+606
+00:22:58,440 --> 00:23:02,720
+your charts and files. Now, open that
+
+607
+00:23:00,880 --> 00:23:05,320
+terminal we set up in from the last
+
+608
+00:23:02,720 --> 00:23:07,280
+module. We are installing Claude code.
+
+609
+00:23:05,320 --> 00:23:10,360
+This is the command line interface where
+
+610
+00:23:07,280 --> 00:23:12,680
+70% of this course happens. Copy the
+
+611
+00:23:10,360 --> 00:23:15,800
+install command from the notes below. If
+
+612
+00:23:12,680 --> 00:23:17,160
+you see v2.x, you're live. Go ahead and
+
+613
+00:23:15,800 --> 00:23:18,920
+type Claude to run it for the first
+
+614
+00:23:17,160 --> 00:23:20,760
+time. It will give you a link to your
+
+615
+00:23:18,920 --> 00:23:22,720
+browser. Just sign in with your pro
+
+616
+00:23:20,760 --> 00:23:25,120
+account to authenticate. Next,
+
+617
+00:23:22,720 --> 00:23:28,000
+openrouter.ai. Sign up, then on the
+
+618
+00:23:25,120 --> 00:23:30,240
+dashboard, click on get API keys and
+
+619
+00:23:28,000 --> 00:23:32,520
+create a new key named trading AI
+
+620
+00:23:30,240 --> 00:23:35,600
+course. Copy that string starting with
+
+621
+00:23:32,520 --> 00:23:38,160
+SK or V1. Save it in a password manager
+
+622
+00:23:35,600 --> 00:23:40,920
+immediately. Never paste this key into a
+
+623
+00:23:38,160 --> 00:23:43,720
+public GitHub or chat room. This key is
+
+624
+00:23:40,920 --> 00:23:45,360
+essentially a credit card for AI models.
+
+625
+00:23:43,720 --> 00:23:47,680
+If you leak it, bots will drain your
+
+626
+00:23:45,360 --> 00:23:50,320
+credits in seconds. Go to credits and
+
+627
+00:23:47,680 --> 00:23:52,680
+add a minimum of $5. At our scale, that
+
+628
+00:23:50,320 --> 00:23:55,080
+will last you weeks of Sonnet usage.
+
+629
+00:23:52,680 --> 00:23:56,760
+Now, we have to tell Claude code to use
+
+630
+00:23:55,080 --> 00:23:59,040
+open router instead of talking to
+
+631
+00:23:56,760 --> 00:24:01,120
+Anthropic directly. This gives us the
+
+632
+00:23:59,040 --> 00:24:03,840
+fallback protection if one provider goes
+
+633
+00:24:01,120 --> 00:24:05,480
+down. We need to create a settings file.
+
+634
+00:24:03,840 --> 00:24:08,000
+In your terminal, you're going to create
+
+635
+00:24:05,480 --> 00:24:09,760
+a folder called .claud and a file called
+
+636
+00:24:08,000 --> 00:24:11,480
+settings.json.
+
+637
+00:24:09,760 --> 00:24:13,160
+Inside that file, you're going to paste
+
+638
+00:24:11,480 --> 00:24:15,480
+the configuration block from the course
+
+639
+00:24:13,160 --> 00:24:18,120
+notes. Replace the placeholder text with
+
+640
+00:24:15,480 --> 00:24:20,800
+your actual open router key. This tells
+
+641
+00:24:18,120 --> 00:24:24,880
+the system, use open router as the base
+
+642
+00:24:20,800 --> 00:24:27,320
+URL and use Sonnet 4.6 as my primary
+
+643
+00:24:24,880 --> 00:24:29,040
+model. Now, a quick alternative if you
+
+644
+00:24:27,320 --> 00:24:31,120
+want to keep things simple. If you
+
+645
+00:24:29,040 --> 00:24:32,880
+prefer to use direct Anthropic billing
+
+646
+00:24:31,120 --> 00:24:35,160
+and don't care about the multimodal
+
+647
+00:24:32,880 --> 00:24:37,480
+fallback, you can skip open router
+
+648
+00:24:35,160 --> 00:24:39,400
+entirely. It's a great fallback to keep
+
+649
+00:24:37,480 --> 00:24:41,240
+in your back pocket and you can always
+
+650
+00:24:39,400 --> 00:24:44,000
+switch between the two later as your
+
+651
+00:24:41,240 --> 00:24:45,480
+stack grows. Let's verify the wiring. Go
+
+652
+00:24:44,000 --> 00:24:47,920
+back to your terminal, enter your
+
+653
+00:24:45,480 --> 00:24:49,720
+trading folder and type Claude. Once
+
+654
+00:24:47,920 --> 00:24:51,680
+inside, ask it, "What model are you
+
+655
+00:24:49,720 --> 00:24:55,000
+running on?" Reply with the full model
+
+656
+00:24:51,680 --> 00:24:59,040
+ID. If it says Anthropic/Claude 3 Sonnet
+
+657
+00:24:55,000 --> 00:25:00,640
+4.6 or Opus 4.7 and via open router, you
+
+658
+00:24:59,040 --> 00:25:02,600
+have successfully built an AI
+
+659
+00:25:00,640 --> 00:25:04,520
+workstation that can think across any
+
+660
+00:25:02,600 --> 00:25:07,520
+model on the planet. Finally, we're
+
+661
+00:25:04,520 --> 00:25:09,680
+going to create a file called claude.md
+
+662
+00:25:07,520 --> 00:25:12,320
+in your project route. This is Claude's
+
+663
+00:25:09,680 --> 00:25:14,600
+persistent memory. Paste the house rules
+
+664
+00:25:12,320 --> 00:25:17,080
+from the notes into this file. This
+
+665
+00:25:14,600 --> 00:25:19,040
+ensures that every time you open Claude,
+
+666
+00:25:17,080 --> 00:25:21,560
+it remembers your brokers, your risk
+
+667
+00:25:19,040 --> 00:25:23,720
+limits, and your goal. And this is how
+
+668
+00:25:21,560 --> 00:25:26,000
+you execute faster and trade smarter
+
+669
+00:25:23,720 --> 00:25:28,120
+with Alex Carter. Now, the brain is
+
+670
+00:25:26,000 --> 00:25:30,400
+online. In the next module, we will
+
+671
+00:25:28,120 --> 00:25:32,000
+start connecting it to the exchanges.
+
+672
+00:25:30,400 --> 00:25:34,680
+Now, for this module, we will connect
+
+673
+00:25:32,000 --> 00:25:37,040
+Claude to WEX, which is our primary
+
+674
+00:25:34,680 --> 00:25:39,400
+crypto broker. We're using WEX because
+
+675
+00:25:37,040 --> 00:25:42,280
+it is built for this specific type of AI
+
+676
+00:25:39,400 --> 00:25:45,240
+automation. It has a V3 API that's
+
+677
+00:25:42,280 --> 00:25:47,560
+incredibly stable. It offers a $30,000
+
+678
+00:25:45,240 --> 00:25:49,680
+deposit bonus for new accounts, and it
+
+679
+00:25:47,560 --> 00:25:52,320
+allows you to get live in about 90
+
+680
+00:25:49,680 --> 00:25:53,360
+seconds with no KYC required for initial
+
+681
+00:25:52,320 --> 00:25:56,080
+trading.
+
+682
+00:25:53,360 --> 00:25:58,280
+Full transparency, we partner with WEX.
+
+683
+00:25:56,080 --> 00:26:00,760
+We chose them because their API doesn't
+
+684
+00:25:58,280 --> 00:26:02,680
+choke when an AI agent like Claude
+
+685
+00:26:00,760 --> 00:26:05,080
+starts firing multiple requests per
+
+686
+00:26:02,680 --> 00:26:07,400
+second. If for any reason WEX doesn't
+
+687
+00:26:05,080 --> 00:26:11,160
+work in your region, don't panic. This
+
+688
+00:26:07,400 --> 00:26:13,160
+entire course is CCXT compatible,
+
+689
+00:26:11,160 --> 00:26:15,360
+meaning you can swap WEX for Binance or
+
+690
+00:26:13,160 --> 00:26:16,560
+Kraken with a single line of code, and
+
+691
+00:26:15,360 --> 00:26:19,280
+which we will cover later on this
+
+692
+00:26:16,560 --> 00:26:21,720
+course. First, use the VIP link in the
+
+693
+00:26:19,280 --> 00:26:24,280
+notes below to sign up. Use a strong,
+
+694
+00:26:21,720 --> 00:26:26,800
+unique password. Verify your email and
+
+695
+00:26:24,280 --> 00:26:29,320
+make sure that VIP code is attached so
+
+696
+00:26:26,800 --> 00:26:31,320
+you qualify for the trading credits.
+
+697
+00:26:29,320 --> 00:26:33,560
+Before you touch the API, you must
+
+698
+00:26:31,320 --> 00:26:35,480
+enable two-factor authentication. Go to
+
+699
+00:26:33,560 --> 00:26:37,800
+account, then security, and turn on
+
+700
+00:26:35,480 --> 00:26:39,840
+Google Authenticator. WEX will not even
+
+701
+00:26:37,800 --> 00:26:42,720
+allow you to create API keys without
+
+702
+00:26:39,840 --> 00:26:44,320
+this. Save your backup codes offline. If
+
+703
+00:26:42,720 --> 00:26:47,320
+you lose your phone and your backup
+
+704
+00:26:44,320 --> 00:26:49,400
+codes, you'd lose the account, period.
+
+705
+00:26:47,320 --> 00:26:51,880
+Now, fund your wallet. Click on deposit.
+
+706
+00:26:49,400 --> 00:26:54,800
+I recommend using USDT via the Polygon
+
+707
+00:26:51,880 --> 00:26:57,400
+or TRC-20 networks. They have the lowest
+
+708
+00:26:54,800 --> 00:26:59,240
+fees. Once the funds land, transfer them
+
+709
+00:26:57,400 --> 00:27:01,640
+from your spot wallet to your futures
+
+710
+00:26:59,240 --> 00:27:04,160
+wallet. Our AI agents trade out of the
+
+711
+00:27:01,640 --> 00:27:06,200
+futures wallet by default. Never fund
+
+712
+00:27:04,160 --> 00:27:08,040
+more than you are comfortable losing.
+
+713
+00:27:06,200 --> 00:27:10,600
+Remember, most retail derivatives
+
+714
+00:27:08,040 --> 00:27:11,880
+accounts lose money. Start small.
+
+715
+00:27:10,600 --> 00:27:14,480
+Now, let's create the machine's
+
+716
+00:27:11,880 --> 00:27:17,400
+credentials. Go to API management and
+
+717
+00:27:14,480 --> 00:27:20,160
+create a new key. Label it AI trading
+
+718
+00:27:17,400 --> 00:27:23,320
+bot. You must tick these three boxes and
+
+719
+00:27:20,160 --> 00:27:25,920
+only these three. First is read, so the
+
+720
+00:27:23,320 --> 00:27:27,920
+AI can see your balance. Second is trade
+
+721
+00:27:25,920 --> 00:27:30,720
+via spot or futures,
+
+722
+00:27:27,920 --> 00:27:34,000
+so the AI can execute orders. Third is
+
+723
+00:27:30,720 --> 00:27:36,120
+IP whitelist. This is non-negotiable. If
+
+724
+00:27:34,000 --> 00:27:38,600
+you see a withdrawal box, never enable
+
+725
+00:27:36,120 --> 00:27:40,680
+it. If your API key ever leaks and
+
+726
+00:27:38,600 --> 00:27:43,360
+withdrawal is enabled, your funds are
+
+727
+00:27:40,680 --> 00:27:45,840
+gone. By whitelisting your current IP
+
+728
+00:27:43,360 --> 00:27:48,120
+address, you ensure that even if someone
+
+729
+00:27:45,840 --> 00:27:50,400
+steals your key, it physically won't
+
+730
+00:27:48,120 --> 00:27:52,400
+work from any other computer but yours.
+
+731
+00:27:50,400 --> 00:27:55,440
+Weex is going to give you three values:
+
+732
+00:27:52,400 --> 00:27:57,680
+an API key, an API secret, and a
+
+733
+00:27:55,440 --> 00:27:59,920
+passphrase. Weex shows that secret
+
+734
+00:27:57,680 --> 00:28:02,040
+exactly once. If you close the window
+
+735
+00:27:59,920 --> 00:28:04,480
+before saving it, you have to delete the
+
+736
+00:28:02,040 --> 00:28:06,320
+key and start over. Copy all three and
+
+737
+00:28:04,480 --> 00:28:09,000
+put them straight into your password
+
+738
+00:28:06,320 --> 00:28:11,280
+manager. Do not put them in a text file.
+
+739
+00:28:09,000 --> 00:28:13,760
+Do not email them to yourself. You now
+
+740
+00:28:11,280 --> 00:28:15,560
+have a funded account, 2FA's live, and
+
+741
+00:28:13,760 --> 00:28:18,120
+you have your three credentials tucked
+
+742
+00:28:15,560 --> 00:28:19,600
+away in a secure spot. In module eight,
+
+743
+00:28:18,120 --> 00:28:21,480
+we're going to drop these into Claude
+
+744
+00:28:19,600 --> 00:28:23,400
+and let the agent take its first look at
+
+745
+00:28:21,480 --> 00:28:25,480
+the markets. But first, we need to
+
+746
+00:28:23,400 --> 00:28:27,880
+handle your equity in global markets,
+
+747
+00:28:25,480 --> 00:28:29,480
+which we will cover in the next module.
+
+748
+00:28:27,880 --> 00:28:32,320
+Now, in this module, we're moving into
+
+749
+00:28:29,480 --> 00:28:35,080
+the heart of the US markets. We use
+
+750
+00:28:32,320 --> 00:28:36,880
+Alpaca because it is quite simply the
+
+751
+00:28:35,080 --> 00:28:39,760
+only broker that makes Claude-driven
+
+752
+00:28:36,880 --> 00:28:42,400
+trading trivial. Why Alpaca? First,
+
+753
+00:28:39,760 --> 00:28:45,360
+commission-free API trading. Zero fees
+
+754
+00:28:42,400 --> 00:28:47,520
+on US stocks and ETF. Second, the paper
+
+755
+00:28:45,360 --> 00:28:50,040
+trading is instant. You sign up and you
+
+756
+00:28:47,520 --> 00:28:53,280
+get a $100,000 fake money account with
+
+757
+00:28:50,040 --> 00:28:55,640
+zero KYC to start. Third, it supports
+
+758
+00:28:53,280 --> 00:28:58,400
+fractional shares. You can tell Claude
+
+759
+00:28:55,640 --> 00:29:00,800
+buy $50 of Apple and it handles the math
+
+760
+00:28:58,400 --> 00:29:03,800
+for the decimal shares. But the killer
+
+761
+00:29:00,800 --> 00:29:05,760
+feature is the official MCP server. This
+
+762
+00:29:03,800 --> 00:29:08,280
+drops straight into Claude desktop
+
+763
+00:29:05,760 --> 00:29:10,480
+giving Claude trading hands without you
+
+764
+00:29:08,280 --> 00:29:13,360
+writing a single line of Python. Go to
+
+765
+00:29:10,480 --> 00:29:15,120
+alpaca.markets and sign up. Once you
+
+766
+00:29:13,360 --> 00:29:17,840
+verify your email, head to your
+
+767
+00:29:15,120 --> 00:29:20,520
+dashboard. Look for API keys and make
+
+768
+00:29:17,840 --> 00:29:23,360
+sure you select paper first. Generate
+
+769
+00:29:20,520 --> 00:29:25,960
+your keys and copy both the key ID and
+
+770
+00:29:23,360 --> 00:29:28,200
+the secret key immediately. Label these
+
+771
+00:29:25,960 --> 00:29:31,400
+clearly in your password manager as
+
+772
+00:29:28,200 --> 00:29:33,360
+Alpaca paper. It is shockingly easy to
+
+773
+00:29:31,400 --> 00:29:35,320
+accidentally fire a live order when you
+
+774
+00:29:33,360 --> 00:29:37,480
+think you're on paper. Don't be that
+
+775
+00:29:35,320 --> 00:29:40,360
+guy. Now, we're going to give Claude
+
+776
+00:29:37,480 --> 00:29:43,880
+desktop its hands. We need to edit a
+
+777
+00:29:40,360 --> 00:29:46,760
+file called Claude desktop config.json.
+
+778
+00:29:43,880 --> 00:29:48,880
+In the course notes, find the Alpaca MCP
+
+779
+00:29:46,760 --> 00:29:50,720
+block. You're going to paste that into
+
+780
+00:29:48,880 --> 00:29:53,680
+your config file replacing the
+
+781
+00:29:50,720 --> 00:29:55,040
+placeholders with your paper API keys.
+
+782
+00:29:53,680 --> 00:29:56,720
+Make sure the line that says
+
+783
+00:29:55,040 --> 00:29:59,000
+Alpaca_paper
+
+784
+00:29:56,720 --> 00:30:01,600
+is set to true. Once you save that file,
+
+785
+00:29:59,000 --> 00:30:03,640
+restart Claude desktop completely. Quit
+
+786
+00:30:01,600 --> 00:30:05,320
+the app then reopen it. This is the
+
+787
+00:30:03,640 --> 00:30:07,480
+moment. We're going to give Claude a
+
+788
+00:30:05,320 --> 00:30:10,520
+plain English prompt. Claude, use Alpaca
+
+789
+00:30:07,480 --> 00:30:12,680
+to buy $200 of NVDA at market on the
+
+790
+00:30:10,520 --> 00:30:14,560
+paper account. Show me my balance first
+
+791
+00:30:12,680 --> 00:30:16,440
+to confirm we're on paper then place the
+
+792
+00:30:14,560 --> 00:30:18,240
+order. Watch what happens on your
+
+793
+00:30:16,440 --> 00:30:21,320
+screen. Claude will call the balance
+
+794
+00:30:18,240 --> 00:30:23,800
+tool, verify the Alpaca_paper flag is
+
+795
+00:30:21,320 --> 00:30:25,920
+true, then fire the order. If you have
+
+796
+00:30:23,800 --> 00:30:28,240
+your Alpaca dashboard open in a browser
+
+797
+00:30:25,920 --> 00:30:30,480
+tab, you'll see that order appear in
+
+798
+00:30:28,240 --> 00:30:33,640
+under a few seconds. From this, you can
+
+799
+00:30:30,480 --> 00:30:36,200
+give Claude prompts for stocks plus ETF,
+
+800
+00:30:33,640 --> 00:30:37,800
+fractional options, and more. You now
+
+801
+00:30:36,200 --> 00:30:41,040
+have a system where you can manage your
+
+802
+00:30:37,800 --> 00:30:43,800
+entire portfolio with natural language.
+
+803
+00:30:41,040 --> 00:30:46,040
+You can ask for your daily P&L, scan
+
+804
+00:30:43,800 --> 00:30:48,280
+options chains for next Friday, or add
+
+805
+00:30:46,040 --> 00:30:50,640
+Meta and Microsoft to a new AI watch
+
+806
+00:30:48,280 --> 00:30:52,440
+list. In module 12, we're going to take
+
+807
+00:30:50,640 --> 00:30:54,600
+this a step further by combining this
+
+808
+00:30:52,440 --> 00:30:57,000
+Alpaca data with your week's crypto
+
+809
+00:30:54,600 --> 00:30:59,440
+positions to create a unified daily
+
+810
+00:30:57,000 --> 00:31:01,600
+alpha brief. Your stock market engine is
+
+811
+00:30:59,440 --> 00:31:04,400
+officially online. Now, in this module
+
+812
+00:31:01,600 --> 00:31:06,760
+is for the more advanced traders. If you
+
+813
+00:31:04,400 --> 00:31:09,400
+plan on trading global markets, futures,
+
+814
+00:31:06,760 --> 00:31:11,000
+or forex at a professional scale, you
+
+815
+00:31:09,400 --> 00:31:13,440
+will eventually land at Interactive
+
+816
+00:31:11,000 --> 00:31:16,400
+Brokers. While retail apps are great for
+
+817
+00:31:13,440 --> 00:31:18,680
+getting started, IBKR is the end game
+
+818
+00:31:16,400 --> 00:31:20,440
+broker. It gives you one login to trade
+
+819
+00:31:18,680 --> 00:31:22,960
+nearly every major exchange on the
+
+820
+00:31:20,440 --> 00:31:26,360
+planet, from New York to Tokyo. A quick
+
+821
+00:31:22,960 --> 00:31:28,800
+warning, IBKR is a serious institution.
+
+822
+00:31:26,360 --> 00:31:30,960
+Their KYC process takes about two to
+
+823
+00:31:28,800 --> 00:31:32,480
+three business days for approval. If
+
+824
+00:31:30,960 --> 00:31:34,640
+you're watching this right now, go sign
+
+825
+00:31:32,480 --> 00:31:36,960
+up today. Everything else in this course
+
+826
+00:31:34,640 --> 00:31:38,960
+still works while you wait for approval,
+
+827
+00:31:36,960 --> 00:31:40,720
+and you can start on their paper trading
+
+828
+00:31:38,960 --> 00:31:43,080
+account immediately.
+
+829
+00:31:40,720 --> 00:31:46,040
+Go to interactivebrokers.com and open an
+
+830
+00:31:43,080 --> 00:31:48,800
+account. Choose individual. The light
+
+831
+00:31:46,040 --> 00:31:51,080
+version is for casual investors. Pro is
+
+832
+00:31:48,800 --> 00:31:53,440
+the one that gives us the API access we
+
+833
+00:31:51,080 --> 00:31:55,640
+need. Once you're approved and funded,
+
+834
+00:31:53,440 --> 00:31:59,760
+you're ready to connect the machines.
+
+835
+00:31:55,640 --> 00:32:01,520
+Unlike Wix or Alpaca, IBKR API requires
+
+836
+00:31:59,760 --> 00:32:03,560
+their desktop software to be open and
+
+837
+00:32:01,520 --> 00:32:06,400
+logged in on your machine. You can use
+
+838
+00:32:03,560 --> 00:32:08,560
+the newer IBKR desktop or the classic
+
+839
+00:32:06,400 --> 00:32:11,640
+Trader Workstation. For this course, I
+
+840
+00:32:08,560 --> 00:32:13,880
+recommend TWS. It is the battle-tested
+
+841
+00:32:11,640 --> 00:32:16,840
+gold standard for API. Once you're
+
+842
+00:32:13,880 --> 00:32:19,400
+logged into TWS, go to configuration,
+
+843
+00:32:16,840 --> 00:32:22,040
+then API, and then settings. Check the
+
+844
+00:32:19,400 --> 00:32:25,880
+box that says enable active X and socket
+
+845
+00:32:22,040 --> 00:32:28,600
+clients. Uncheck read-only API. We need
+
+846
+00:32:25,880 --> 00:32:31,200
+Claude to have trading hands. Take note
+
+847
+00:32:28,600 --> 00:32:34,200
+of your socket port. It should be 7497
+
+848
+00:32:31,200 --> 00:32:37,360
+for paper and 7496 for live. The
+
+849
+00:32:34,200 --> 00:32:39,680
+official IBKR API is notoriously
+
+850
+00:32:37,360 --> 00:32:42,680
+difficult to code from scratch. That's
+
+851
+00:32:39,680 --> 00:32:44,760
+why we use the IB InSync library. It's
+
+852
+00:32:42,680 --> 00:32:47,280
+the Python wrapper that every serious
+
+853
+00:32:44,760 --> 00:32:49,880
+retail algo trader actually uses. Go to
+
+854
+00:32:47,280 --> 00:32:52,080
+your terminal and run this. In the notes
+
+855
+00:32:49,880 --> 00:32:54,200
+below, you'll find a 25-line Python
+
+856
+00:32:52,080 --> 00:32:56,120
+script. This is the moment we bridge the
+
+857
+00:32:54,200 --> 00:32:58,520
+gap. We're going to run a script that
+
+858
+00:32:56,120 --> 00:33:00,720
+connects to your local TWS session,
+
+859
+00:32:58,520 --> 00:33:03,080
+identifies the Apple stock contract, and
+
+860
+00:33:00,720 --> 00:33:05,600
+fires a buy order for one share. Run the
+
+861
+00:33:03,080 --> 00:33:07,600
+script and in under 2 seconds, you'll
+
+862
+00:33:05,600 --> 00:33:10,040
+see the order fill inside your TWS
+
+863
+00:33:07,600 --> 00:33:11,920
+dashboard. What's powerful here isn't
+
+864
+00:33:10,040 --> 00:33:13,880
+just buying one share of Apple, it's
+
+865
+00:33:11,920 --> 00:33:17,480
+that with three words of code, you can
+
+866
+00:33:13,880 --> 00:33:19,800
+switch from stocks to S&P 500 futures or
+
+867
+00:33:17,480 --> 00:33:22,000
+forex pairs. You are now trading at the
+
+868
+00:33:19,800 --> 00:33:25,520
+same level as the hedge funds. Right
+
+869
+00:33:22,000 --> 00:33:27,960
+now, there isn't a native MCP for IBKR
+
+870
+00:33:25,520 --> 00:33:29,520
+as stable as Alpaca's, but we don't need
+
+871
+00:33:27,960 --> 00:33:32,360
+one. Because we've installed the
+
+872
+00:33:29,520 --> 00:33:34,160
+IB-InSync library, we can simply ask
+
+873
+00:33:32,360 --> 00:33:36,600
+Claude code to write our scripts for us
+
+874
+00:33:34,160 --> 00:33:38,800
+on demand. You can ask Claude, "Write a
+
+875
+00:33:36,600 --> 00:33:40,840
+Python script to check my open positions
+
+876
+00:33:38,800 --> 00:33:43,720
+and close any that have a loss of more
+
+877
+00:33:40,840 --> 00:33:45,840
+than 3%." Claude writes it, you run it,
+
+878
+00:33:43,720 --> 00:33:48,920
+and the job is done. One final rule for
+
+879
+00:33:45,840 --> 00:33:51,680
+your Claude.md file, always tell Claude
+
+880
+00:33:48,920 --> 00:33:53,440
+to default to port 7497.
+
+881
+00:33:51,680 --> 00:33:55,800
+Never assume you are on a live port
+
+882
+00:33:53,440 --> 00:33:57,600
+unless you explicitly say so. Your
+
+883
+00:33:55,800 --> 00:33:59,640
+professional bridge is built. You now
+
+884
+00:33:57,600 --> 00:34:02,000
+have the crypt engine, the stock market
+
+885
+00:33:59,640 --> 00:34:04,440
+engine, and the global pro tier engine
+
+886
+00:34:02,000 --> 00:34:06,400
+all ready to go. In this module, we are
+
+887
+00:34:04,440 --> 00:34:08,560
+officially moving into the execution
+
+888
+00:34:06,400 --> 00:34:10,560
+layer. Up until now, we've been building
+
+889
+00:34:08,560 --> 00:34:13,040
+the machine. Now, we're giving it its
+
+890
+00:34:10,560 --> 00:34:14,760
+first set of specialized skills. In this
+
+891
+00:34:13,040 --> 00:34:17,080
+part of the course, we are installing
+
+892
+00:34:14,760 --> 00:34:19,080
+the Wix trading assistant. This isn't
+
+893
+00:34:17,080 --> 00:34:21,360
+just a basic bot, this is a deep
+
+894
+00:34:19,080 --> 00:34:23,639
+integration that allows Claude to open
+
+895
+00:34:21,360 --> 00:34:26,159
+leveraged futures, calculate position
+
+896
+00:34:23,639 --> 00:34:28,560
+sizes based on risk math, and attach
+
+897
+00:34:26,159 --> 00:34:30,679
+stop-loss and take-profit orders, all
+
+898
+00:34:28,560 --> 00:34:32,600
+from a single sentence in plain English.
+
+899
+00:34:30,679 --> 00:34:34,560
+Open your terminal, navigate to your
+
+900
+00:34:32,600 --> 00:34:36,440
+trading AI folder, and launch Claude
+
+901
+00:34:34,560 --> 00:34:38,679
+code. We're going to give Claude its
+
+902
+00:34:36,440 --> 00:34:41,280
+first skill by pointing it to the
+
+903
+00:34:38,679 --> 00:34:43,040
+repository. Copy and paste the install
+
+904
+00:34:41,280 --> 00:34:45,000
+prompt from the notes. You'll watch
+
+905
+00:34:43,040 --> 00:34:47,240
+Claude perform a Git clone to pull the
+
+906
+00:34:45,000 --> 00:34:49,200
+skill into its specialized folder, read
+
+907
+00:34:47,240 --> 00:34:51,280
+the documentation, and summarize the
+
+908
+00:34:49,200 --> 00:34:53,560
+tools it just learned. Once it's done,
+
+909
+00:34:51,280 --> 00:34:55,399
+ask Claude, "Check if the Y Trader skill
+
+910
+00:34:53,560 --> 00:34:57,760
+is installed and list its tools by
+
+911
+00:34:55,399 --> 00:35:00,200
+category." You should see a menu of
+
+912
+00:34:57,760 --> 00:35:02,000
+tools covering everything from account
+
+913
+00:35:00,200 --> 00:35:04,960
+balance to market data and futures
+
+914
+00:35:02,000 --> 00:35:07,000
+execution. Now, we need to feed Claude
+
+915
+00:35:04,960 --> 00:35:09,560
+the Wix credentials you saved in module
+
+916
+00:35:07,000 --> 00:35:12,160
+5. The safest way to do this is through
+
+917
+00:35:09,560 --> 00:35:13,960
+your shell configuration. Tell Claude,
+
+918
+00:35:12,160 --> 00:35:15,760
+"Help me open my shell config file so I
+
+919
+00:35:13,960 --> 00:35:18,280
+can add environment variables for the
+
+920
+00:35:15,760 --> 00:35:20,960
+Wix skill." Claude will identify whether
+
+921
+00:35:18,280 --> 00:35:23,320
+you need to edit your Z S H R C on Mac
+
+922
+00:35:20,960 --> 00:35:26,480
+or your profile on Windows. You'll paste
+
+923
+00:35:23,320 --> 00:35:28,200
+in your API key, secret, and passphrase.
+
+924
+00:35:26,480 --> 00:35:30,800
+Once you save that file, reload your
+
+925
+00:35:28,200 --> 00:35:33,440
+shell, and relaunch Claude. Your machine
+
+926
+00:35:30,800 --> 00:35:35,240
+is now authenticated and ready to trade.
+
+927
+00:35:33,440 --> 00:35:37,400
+Let's test the connection. Give Claude
+
+928
+00:35:35,240 --> 00:35:39,640
+this prompt, "Use the Wix skill to check
+
+929
+00:35:37,400 --> 00:35:42,640
+my futures balance. Show equity,
+
+930
+00:35:39,640 --> 00:35:44,640
+available margin, and unrealized P&L."
+
+931
+00:35:42,640 --> 00:35:46,960
+Claude will reach out to the Wix servers
+
+932
+00:35:44,640 --> 00:35:49,080
+and return your real-time account data.
+
+933
+00:35:46,960 --> 00:35:51,840
+If you see an unauthorized error,
+
+934
+00:35:49,080 --> 00:35:54,200
+double-check your API secret and your IP
+
+935
+00:35:51,840 --> 00:35:56,680
+whitelist from module 5.
+
+936
+00:35:54,200 --> 00:35:58,760
+Now, the moment you've been waiting for.
+
+937
+00:35:56,680 --> 00:36:01,800
+We are going to execute a real
+
+938
+00:35:58,760 --> 00:36:03,920
+risk-managed trade with one prompt.
+
+939
+00:36:01,800 --> 00:36:06,840
+"Check the current Bitcoin price, then
+
+940
+00:36:03,920 --> 00:36:10,000
+calculate a position size for a long
+
+941
+00:36:06,840 --> 00:36:12,360
+where I risk exactly 2% of my portfolio
+
+942
+00:36:10,000 --> 00:36:16,200
+with a 3% stop loss and 10 times
+
+943
+00:36:12,360 --> 00:36:18,280
+leverage. Execute with SL and TP at 2.5
+
+944
+00:36:16,200 --> 00:36:20,520
+times my risk." Watch the terminal.
+
+945
+00:36:18,280 --> 00:36:22,600
+Claude doesn't just guess. It fetches
+
+946
+00:36:20,520 --> 00:36:24,440
+the price, checks your actual equity,
+
+947
+00:36:22,600 --> 00:36:27,040
+does the math to find the exact number
+
+948
+00:36:24,440 --> 00:36:29,240
+of contracts, fires the order, and then
+
+949
+00:36:27,040 --> 00:36:31,520
+attaches the stop loss and take profit
+
+950
+00:36:29,240 --> 00:36:33,480
+orders immediately. Keep in mind, this
+
+951
+00:36:31,520 --> 00:36:36,480
+is a real trade. If you just want to
+
+952
+00:36:33,480 --> 00:36:38,720
+watch tell Claude to do a dry run only.
+
+953
+00:36:36,480 --> 00:36:40,400
+The skill will show you the exact JSON
+
+954
+00:36:38,720 --> 00:36:42,320
+it would have sent without actually
+
+955
+00:36:40,400 --> 00:36:45,000
+spending a dollar. The Wick's trading
+
+956
+00:36:42,320 --> 00:36:48,760
+assistant is now your 24/7 execution
+
+957
+00:36:45,000 --> 00:36:51,160
+desk. It handles futures with up to 125
+
+958
+00:36:48,760 --> 00:36:53,480
+times leverage. It handles spot buying
+
+959
+00:36:51,160 --> 00:36:55,640
+and selling. It generates daily reports
+
+960
+00:36:53,480 --> 00:36:58,440
+and journals your trades. It can even
+
+961
+00:36:55,640 --> 00:36:59,840
+copy a setup from a screenshot. Tone,
+
+962
+00:36:58,440 --> 00:37:01,680
+finality.
+
+963
+00:36:59,840 --> 00:37:03,880
+You just went from a retail trader to an
+
+964
+00:37:01,680 --> 00:37:05,640
+AI augmented operator. I'll see you in
+
+965
+00:37:03,880 --> 00:37:07,960
+module nine where we install the whale
+
+966
+00:37:05,640 --> 00:37:10,120
+tracker and start hunting for alpha. In
+
+967
+00:37:07,960 --> 00:37:12,400
+this module, we will plug into what I
+
+968
+00:37:10,120 --> 00:37:14,760
+call the most valuable free data set in
+
+969
+00:37:12,400 --> 00:37:16,880
+all of crypto, on-chain whale activity
+
+970
+00:37:14,760 --> 00:37:19,840
+on hyper liquid. Here's the beauty of
+
+971
+00:37:16,880 --> 00:37:22,600
+this skill. No API keys, no sign-ups, no
+
+972
+00:37:19,840 --> 00:37:24,840
+monthly subscriptions. Just pure public
+
+973
+00:37:22,600 --> 00:37:26,920
+data piped directly into Claude code.
+
+974
+00:37:24,840 --> 00:37:28,680
+We're giving your AI the ability to look
+
+975
+00:37:26,920 --> 00:37:31,160
+at the smartest money in the world and
+
+976
+00:37:28,680 --> 00:37:33,760
+ask, "What are they holding right now?"
+
+977
+00:37:31,160 --> 00:37:36,200
+Hyper liquid is a decentralized exchange
+
+978
+00:37:33,760 --> 00:37:39,440
+where every single position is public.
+
+979
+00:37:36,200 --> 00:37:41,880
+Entry prices, sizes, liquidations, it's
+
+980
+00:37:39,440 --> 00:37:43,640
+all there. The whale tracker skill wraps
+
+981
+00:37:41,880 --> 00:37:45,960
+that data into functions Claude can
+
+982
+00:37:43,640 --> 00:37:48,040
+understand. Instead of spending hours
+
+983
+00:37:45,960 --> 00:37:50,320
+digging through block explorers, you
+
+984
+00:37:48,040 --> 00:37:52,400
+just ask in plain English, "Who is net
+
+985
+00:37:50,320 --> 00:37:54,360
+long Bitcoin right now?" and get an
+
+986
+00:37:52,400 --> 00:37:56,000
+answer in seconds. First, we need one
+
+987
+00:37:54,360 --> 00:37:58,560
+lightweight Python package called
+
+988
+00:37:56,000 --> 00:38:01,000
+requests. This is what allows the skill
+
+989
+00:37:58,560 --> 00:38:03,520
+to talk to the internet. Open your
+
+990
+00:38:01,000 --> 00:38:05,480
+terminal and run this prompt. Now, let's
+
+991
+00:38:03,520 --> 00:38:08,320
+install the skill. Go to this link and
+
+992
+00:38:05,480 --> 00:38:09,760
+click download skill. Unzip the folder.
+
+993
+00:38:08,320 --> 00:38:12,840
+We need to move it into your {dot}
+
+994
+00:38:09,760 --> 00:38:14,880
+Claude {slash} skills directory. Copy
+
+995
+00:38:12,840 --> 00:38:16,640
+the commands from the notes below.
+
+996
+00:38:14,880 --> 00:38:18,840
+There's one for Mac and a specific
+
+997
+00:38:16,640 --> 00:38:20,600
+PowerShell version for Windows. Once
+
+998
+00:38:18,840 --> 00:38:22,720
+that folder is moved, relaunch Claude
+
+999
+00:38:20,600 --> 00:38:25,160
+code. You've just given your assistant a
+
+1000
+00:38:22,720 --> 00:38:27,200
+set of on-chain eyes. Let's see it in
+
+1001
+00:38:25,160 --> 00:38:29,120
+action. This is the moment that usually
+
+1002
+00:38:27,200 --> 00:38:30,920
+goes viral. Drop these prompts into
+
+1003
+00:38:29,120 --> 00:38:33,200
+Claude. What are the top 20 whale
+
+1004
+00:38:30,920 --> 00:38:35,280
+traders doing on hyperliquid right now?
+
+1005
+00:38:33,200 --> 00:38:37,560
+Give me their aggregate net exposure,
+
+1006
+00:38:35,280 --> 00:38:39,240
+the three most crowded longs, and any
+
+1007
+00:38:37,560 --> 00:38:41,960
+wallet that flipped direction in the
+
+1008
+00:38:39,240 --> 00:38:43,840
+last 24 hours. Keep it tight. I want to
+
+1009
+00:38:41,960 --> 00:38:46,160
+read this in 60 seconds.
+
+1010
+00:38:43,840 --> 00:38:48,560
+Watch as Claude parses thousands of data
+
+1011
+00:38:46,160 --> 00:38:51,120
+points, groups them by asset, and spits
+
+1012
+00:38:48,560 --> 00:38:52,800
+out a high-signal report. You now know
+
+1013
+00:38:51,120 --> 00:38:54,480
+exactly where the smart money is
+
+1014
+00:38:52,800 --> 00:38:56,400
+positioned before you ever place a
+
+1015
+00:38:54,480 --> 00:38:59,160
+trade. In the notes, I've given you
+
+1016
+00:38:56,400 --> 00:39:00,920
+seven signature prompts to steal. These
+
+1017
+00:38:59,160 --> 00:39:03,680
+are the exact ones I run every morning.
+
+1018
+00:39:00,920 --> 00:39:05,040
+Use smart money versus wrecked money to
+
+1019
+00:39:03,680 --> 00:39:06,880
+see where the winners and losers
+
+1020
+00:39:05,040 --> 00:39:09,360
+disagree. That is often where the
+
+1021
+00:39:06,880 --> 00:39:10,920
+asymmetric setup lives. Use the morning
+
+1022
+00:39:09,360 --> 00:39:13,120
+alpha scan to see what happened
+
+1023
+00:39:10,920 --> 00:39:15,280
+overnight while you were sleeping. Copy
+
+1024
+00:39:13,120 --> 00:39:17,600
+these into your clawed.md
+
+1025
+00:39:15,280 --> 00:39:20,800
+file under a favorites heading. That
+
+1026
+00:39:17,600 --> 00:39:23,120
+way, they're always just one click away.
+
+1027
+00:39:20,800 --> 00:39:25,560
+Your workflow just changed forever. No
+
+1028
+00:39:23,120 --> 00:39:27,960
+more Twitter bias or guessing. You are
+
+1029
+00:39:25,560 --> 00:39:29,960
+building your trade ideas on hard data.
+
+1030
+00:39:27,960 --> 00:39:32,440
+You know what the whales hold before you
+
+1031
+00:39:29,960 --> 00:39:34,840
+decide your own direction. But research
+
+1032
+00:39:32,440 --> 00:39:36,480
+is only half the battle. You still need
+
+1033
+00:39:34,840 --> 00:39:38,720
+to see the charts. I'll see you in
+
+1034
+00:39:36,480 --> 00:39:40,640
+module 10, where we give Claude control
+
+1035
+00:39:38,720 --> 00:39:42,120
+over your TradingView.
+
+1036
+00:39:40,640 --> 00:39:45,000
+In this module, we will unlock the
+
+1037
+00:39:42,120 --> 00:39:48,000
+single best skill in the entire course.
+
+1038
+00:39:45,000 --> 00:39:49,880
+We are installing the TradingView MCP.
+
+1039
+00:39:48,000 --> 00:39:52,360
+Up until now, Claude has been smart, but
+
+1040
+00:39:49,880 --> 00:39:54,320
+it's been blind. It had to rely on you
+
+1041
+00:39:52,360 --> 00:39:56,600
+to tell it what the charts look like.
+
+1042
+00:39:54,320 --> 00:39:58,480
+With these 78 new tools, Claude stops
+
+1043
+00:39:56,600 --> 00:40:00,560
+guessing and starts engineering. It can
+
+1044
+00:39:58,480 --> 00:40:03,880
+now read candles directly, write and
+
+1045
+00:40:00,560 --> 00:40:06,120
+debug Pine Script V6, run backtests, and
+
+1046
+00:40:03,880 --> 00:40:07,680
+this is the game-changer, auto-optimize
+
+1047
+00:40:06,120 --> 00:40:10,360
+your strategies while you go get a
+
+1048
+00:40:07,680 --> 00:40:12,480
+coffee. What does 78 tools actually
+
+1049
+00:40:10,360 --> 00:40:14,600
+mean? It means Claude can switch symbols
+
+1050
+00:40:12,480 --> 00:40:16,440
+and time frames, add indicators, and
+
+1051
+00:40:14,600 --> 00:40:19,000
+pull the full report from the strategy
+
+1052
+00:40:16,440 --> 00:40:21,720
+tester. It doesn't just see a chart, it
+
+1053
+00:40:19,000 --> 00:40:24,160
+sees an editable canvas. If a strategy
+
+1054
+00:40:21,720 --> 00:40:26,440
+isn't working, Claude can iterate on the
+
+1055
+00:40:24,160 --> 00:40:28,760
+code and retest it until it finds a
+
+1056
+00:40:26,440 --> 00:40:30,720
+profit factor that meets your standards.
+
+1057
+00:40:28,760 --> 00:40:32,880
+Let's get the repo onto your machine.
+
+1058
+00:40:30,720 --> 00:40:34,560
+Open your terminal and run this prompt.
+
+1059
+00:40:32,880 --> 00:40:36,640
+During the install, you might see a play
+
+1060
+00:40:34,560 --> 00:40:38,640
+right prompt. Say yes and let it
+
+1061
+00:40:36,640 --> 00:40:41,440
+install. This is the automation engine
+
+1062
+00:40:38,640 --> 00:40:43,040
+that allows Claude to drive the browser.
+
+1063
+00:40:41,440 --> 00:40:45,600
+Now we have to tell Claude where the
+
+1064
+00:40:43,040 --> 00:40:47,440
+server lives. You're going to open your
+
+1065
+00:40:45,600 --> 00:40:49,920
+.mcp.json
+
+1066
+00:40:47,440 --> 00:40:51,880
+file in your .claude folder and merge
+
+1067
+00:40:49,920 --> 00:40:54,040
+the block from the course notes. Make
+
+1068
+00:40:51,880 --> 00:40:56,040
+sure you replace the absolute path with
+
+1069
+00:40:54,040 --> 00:40:58,920
+the real location of the folder on your
+
+1070
+00:40:56,040 --> 00:41:01,640
+computer. If you're on a Mac, just type
+
+1071
+00:40:58,920 --> 00:41:03,880
+pwd inside the folder to get the exact
+
+1072
+00:41:01,640 --> 00:41:06,000
+string. This tells Claude, "When I ask
+
+1073
+00:41:03,880 --> 00:41:08,200
+for a chart, use this specific engine to
+
+1074
+00:41:06,000 --> 00:41:10,000
+go get it." To let Claude control your
+
+1075
+00:41:08,200 --> 00:41:12,360
+charts, we have to launch a debug
+
+1076
+00:41:10,000 --> 00:41:14,320
+version of Chrome. The repo handles this
+
+1077
+00:41:12,360 --> 00:41:16,600
+for you with helper scripts. If you're
+
+1078
+00:41:14,320 --> 00:41:18,800
+on Mac, run this. If you're on Windows,
+
+1079
+00:41:16,600 --> 00:41:21,160
+use this. This will open a new Chrome
+
+1080
+00:41:18,800 --> 00:41:23,640
+window, log in to TradingView, and keep
+
+1081
+00:41:21,160 --> 00:41:26,080
+this tab open. This is the bridge Claude
+
+1082
+00:41:23,640 --> 00:41:27,880
+uses to reach into the chart. Let's see
+
+1083
+00:41:26,080 --> 00:41:29,800
+the real power. We are going to ask
+
+1084
+00:41:27,880 --> 00:41:33,200
+Claude to not only write a strategy, but
+
+1085
+00:41:29,800 --> 00:41:35,520
+to brute force the best settings for us.
+
+1086
+00:41:33,200 --> 00:41:37,400
+Claude will write a dual EMA crossover
+
+1087
+00:41:35,520 --> 00:41:39,600
+strategy, then it will systematically
+
+1088
+00:41:37,400 --> 00:41:43,520
+run dozens of variations, changing the
+
+1089
+00:41:39,600 --> 00:41:45,800
+fast EMA, the slow EMA, and the ATR
+
+1090
+00:41:43,520 --> 00:41:47,680
+multiplier. It will rank them by profit
+
+1091
+00:41:45,800 --> 00:41:49,280
+factor and hand it you the top five
+
+1092
+00:41:47,680 --> 00:41:51,320
+winning variants with their exact
+
+1093
+00:41:49,280 --> 00:41:53,880
+inputs. You just did a week's worth of
+
+1094
+00:41:51,320 --> 00:41:56,320
+manual backtesting in under 5 minutes.
+
+1095
+00:41:53,880 --> 00:41:58,360
+You now have 78 tools at your disposal.
+
+1096
+00:41:56,320 --> 00:42:00,480
+Your stack is complete. You have the
+
+1097
+00:41:58,360 --> 00:42:03,240
+reasoning core, the whale tracker for
+
+1098
+00:42:00,480 --> 00:42:05,400
+on-chain alpha, and the TradingView MCP
+
+1099
+00:42:03,240 --> 00:42:07,640
+for technical mastery. I'll see you in
+
+1100
+00:42:05,400 --> 00:42:10,000
+module 11, where we combine all three
+
+1101
+00:42:07,640 --> 00:42:12,120
+into your daily alpha brief. Your agent
+
+1102
+00:42:10,000 --> 00:42:13,720
+can now read charts and track whales,
+
+1103
+00:42:12,120 --> 00:42:16,680
+but it's still missing one thing, the
+
+1104
+00:42:13,720 --> 00:42:18,400
+news. To trade at a high level, your AI
+
+1105
+00:42:16,680 --> 00:42:20,840
+needs to see what's happening on the
+
+1106
+00:42:18,400 --> 00:42:23,880
+open web. From CoinGecko and earnings
+
+1107
+00:42:20,840 --> 00:42:25,680
+calls to FOMC minutes and exchange blog
+
+1108
+00:42:23,880 --> 00:42:27,920
+posts, we're using Firecrawl because it
+
+1109
+00:42:25,680 --> 00:42:30,680
+does something incredible. It takes any
+
+1110
+00:42:27,920 --> 00:42:33,200
+messy URL and turns it into clean,
+
+1111
+00:42:30,680 --> 00:42:34,960
+machine-readable markdown. It strips
+
+1112
+00:42:33,200 --> 00:42:37,240
+away the ads and the clutter, handing
+
+1113
+00:42:34,960 --> 00:42:39,240
+Claude exactly the data it needs to make
+
+1114
+00:42:37,240 --> 00:42:40,800
+a decision. First, head over to
+
+1115
+00:42:39,240 --> 00:42:42,680
+firecrawl.dev.
+
+1116
+00:42:40,800 --> 00:42:44,160
+Create a free account. The free tier is
+
+1117
+00:42:42,680 --> 00:42:46,840
+more than enough to follow along with
+
+1118
+00:42:44,160 --> 00:42:49,960
+this course. Grab your API key. It'll
+
+1119
+00:42:46,840 --> 00:42:52,080
+start with FC-. Copy that key and put it
+
+1120
+00:42:49,960 --> 00:42:53,920
+into your password manager. We are about
+
+1121
+00:42:52,080 --> 00:42:56,640
+to wire it directly into your Claude
+
+1122
+00:42:53,920 --> 00:42:57,840
+desktop. Open Claude desktop. Inside
+
+1123
+00:42:56,640 --> 00:43:00,240
+this, you're going to merge the
+
+1124
+00:42:57,840 --> 00:43:02,600
+Firecrawl block from the course notes.
+
+1125
+00:43:00,240 --> 00:43:05,080
+Paste in your API key, save the file,
+
+1126
+00:43:02,600 --> 00:43:06,960
+and fully quit Claude desktop. You
+
+1127
+00:43:05,080 --> 00:43:09,520
+should now see new superpowers like
+
+1128
+00:43:06,960 --> 00:43:11,320
+Firecrawl scrape, crawl, and search.
+
+1129
+00:43:09,520 --> 00:43:13,160
+Claude can now officially browse the
+
+1130
+00:43:11,320 --> 00:43:15,640
+internet. Let's prove the pipeline
+
+1131
+00:43:13,160 --> 00:43:17,640
+works. Give Claude this prompt. Use
+
+1132
+00:43:15,640 --> 00:43:19,400
+Firecrawl scrape on the CoinGecko
+
+1133
+00:43:17,640 --> 00:43:22,360
+Bitcoin page and return the current
+
+1134
+00:43:19,400 --> 00:43:25,040
+price, 24-hour volume, and the top three
+
+1135
+00:43:22,360 --> 00:43:26,840
+exchanges. Watch how it works.
+
+1136
+00:43:25,040 --> 00:43:28,800
+Claude doesn't just guess the price
+
+1137
+00:43:26,840 --> 00:43:30,720
+based on its training data. It reaches
+
+1138
+00:43:28,800 --> 00:43:32,960
+out to the live site, reads the current
+
+1139
+00:43:30,720 --> 00:43:34,080
+numbers, and summarizes them for you in
+
+1140
+00:43:32,960 --> 00:43:35,920
+seconds.
+
+1141
+00:43:34,080 --> 00:43:37,880
+Firecrawl's powerful, but you have to
+
+1142
+00:43:35,920 --> 00:43:39,680
+use it strategically.
+
+1143
+00:43:37,880 --> 00:43:41,640
+If you need on-chain data, stick with
+
+1144
+00:43:39,680 --> 00:43:44,680
+the whale tracker. If you need price
+
+1145
+00:43:41,640 --> 00:43:46,600
+action, use the TradingView MCP. But if
+
+1146
+00:43:44,680 --> 00:43:48,680
+you need news, earnings reports, or
+
+1147
+00:43:46,600 --> 00:43:51,080
+project documentation, that's where you
+
+1148
+00:43:48,680 --> 00:43:52,640
+call Firecrawl. Don't waste your credits
+
+1149
+00:43:51,080 --> 00:43:55,480
+scraping static information like
+
+1150
+00:43:52,640 --> 00:43:57,400
+Wikipedia that Claude already knows. Use
+
+1151
+00:43:55,480 --> 00:43:59,800
+Firecrawl for live data that moves
+
+1152
+00:43:57,400 --> 00:44:01,080
+markets. I've included three prompts in
+
+1153
+00:43:59,800 --> 00:44:03,680
+the notes that are absolute
+
+1154
+00:44:01,080 --> 00:44:05,280
+game-changers. Use the macro pulse to
+
+1155
+00:44:03,680 --> 00:44:07,320
+scrape the latest Federal Reserve
+
+1156
+00:44:05,280 --> 00:44:10,600
+statement and have Claude rate how
+
+1157
+00:44:07,320 --> 00:44:12,840
+hawkish it sounds on a scale of 1 to 10.
+
+1158
+00:44:10,600 --> 00:44:15,200
+Use the news digest to pull the last six
+
+1159
+00:44:12,840 --> 00:44:16,920
+articles from a major crypto news site
+
+1160
+00:44:15,200 --> 00:44:19,560
+and summarize only the ones that could
+
+1161
+00:44:16,920 --> 00:44:21,320
+move the market in the next 24 hours.
+
+1162
+00:44:19,560 --> 00:44:23,960
+Your intelligence stack is officially
+
+1163
+00:44:21,320 --> 00:44:26,240
+complete. You have the reasoning core,
+
+1164
+00:44:23,960 --> 00:44:29,080
+the whale tracker, the chart vision, and
+
+1165
+00:44:26,240 --> 00:44:31,080
+now web access. In the next module, we
+
+1166
+00:44:29,080 --> 00:44:34,000
+are going to combine all of these into
+
+1167
+00:44:31,080 --> 00:44:35,920
+the holy grail of this course, the daily
+
+1168
+00:44:34,000 --> 00:44:37,520
+alpha brief. This is the moment
+
+1169
+00:44:35,920 --> 00:44:39,560
+everything you've installed starts
+
+1170
+00:44:37,520 --> 00:44:41,840
+talking to each other. We are moving
+
+1171
+00:44:39,560 --> 00:44:44,840
+past tools and into a system of
+
+1172
+00:44:41,840 --> 00:44:47,400
+intelligence. The daily alpha brief is a
+
+1173
+00:44:44,840 --> 00:44:50,200
+single master prompt that chains weeks,
+
+1174
+00:44:47,400 --> 00:44:52,680
+the whale tracker, the TradingView MCP,
+
+1175
+00:44:50,200 --> 00:44:54,440
+and FireCrawl into one morning briefing.
+
+1176
+00:44:52,680 --> 00:44:56,920
+This isn't just a summary, it is the
+
+1177
+00:44:54,440 --> 00:44:59,640
+research loop that replaces your entire
+
+1178
+00:44:56,920 --> 00:45:01,600
+doom scroll routine. In under 2 minutes,
+
+1179
+00:44:59,640 --> 00:45:03,120
+it tells you exactly what to watch, why
+
+1180
+00:45:01,600 --> 00:45:05,160
+you're watching it, and what size you
+
+1181
+00:45:03,120 --> 00:45:07,600
+should trade. Up to this point, we
+
+1182
+00:45:05,160 --> 00:45:09,680
+focused on research. No trades fired.
+
+1183
+00:45:07,600 --> 00:45:11,160
+That's intentional. You want your agent
+
+1184
+00:45:09,680 --> 00:45:12,720
+to understand the market before it
+
+1185
+00:45:11,160 --> 00:45:14,520
+touches your money.
+
+1186
+00:45:12,720 --> 00:45:16,640
+The daily alpha brief provides four
+
+1187
+00:45:14,520 --> 00:45:19,120
+distinct layers of truth. The macro
+
+1188
+00:45:16,640 --> 00:45:20,480
+layer, Fed chatter and overnight news
+
+1189
+00:45:19,120 --> 00:45:21,960
+via FireCrawl.
+
+1190
+00:45:20,480 --> 00:45:24,120
+The on-chain layer, smart money
+
+1191
+00:45:21,960 --> 00:45:26,440
+positioning via the whale tracker. The
+
+1192
+00:45:24,120 --> 00:45:28,400
+technical layer, trend and support and
+
+1193
+00:45:26,440 --> 00:45:30,760
+resistance via TradingView. The
+
+1194
+00:45:28,400 --> 00:45:33,200
+portfolio layer, your current risk and
+
+1195
+00:45:30,760 --> 00:45:34,840
+available margin via the week scale.
+
+1196
+00:45:33,200 --> 00:45:37,480
+When these four talk to each other,
+
+1197
+00:45:34,840 --> 00:45:39,200
+hallucination liquidations disappear.
+
+1198
+00:45:37,480 --> 00:45:40,520
+I've provided the master prompt in the
+
+1199
+00:45:39,200 --> 00:45:42,440
+notes below.
+
+1200
+00:45:40,520 --> 00:45:44,120
+This is your daily ritual. When you
+
+1201
+00:45:42,440 --> 00:45:46,160
+paste this into Claude code, you're
+
+1202
+00:45:44,120 --> 00:45:48,000
+going to see a symphony of tool calling.
+
+1203
+00:45:46,160 --> 00:45:50,120
+Claude will scrape the headlines,
+
+1204
+00:45:48,000 --> 00:45:52,520
+aggregate whale exposure, read the
+
+1205
+00:45:50,120 --> 00:45:55,000
+4-hour charts for Bitcoin and Solana,
+
+1206
+00:45:52,520 --> 00:45:57,480
+and check your actual account balance.
+
+1207
+00:45:55,000 --> 00:45:59,840
+It then synthesizes all of that into a
+
+1208
+00:45:57,480 --> 00:46:02,440
+single trade plan. It picks the highest
+
+1209
+00:45:59,840 --> 00:46:04,800
+conviction setup, sizes it based on your
+
+1210
+00:46:02,440 --> 00:46:07,000
+account risk, and outputs the exact
+
+1211
+00:46:04,800 --> 00:46:08,880
+order you need to place. We don't want
+
+1212
+00:46:07,000 --> 00:46:11,360
+to copy-paste this every morning. We
+
+1213
+00:46:08,880 --> 00:46:14,360
+want efficiency. Take that prompt and
+
+1214
+00:46:11,360 --> 00:46:17,160
+drop it into your claude.md file under
+
+1215
+00:46:14,360 --> 00:46:19,440
+the heading {slash} daily alpha. Now,
+
+1216
+00:46:17,160 --> 00:46:21,200
+you can just type {slash} daily alpha in
+
+1217
+00:46:19,440 --> 00:46:23,400
+your terminal and Claude will execute
+
+1218
+00:46:21,200 --> 00:46:25,160
+the entire chain automatically. You've
+
+1219
+00:46:23,400 --> 00:46:27,560
+just turned a complex multi-tool
+
+1220
+00:46:25,160 --> 00:46:29,000
+workflow into a single keystroke. Once
+
+1221
+00:46:27,560 --> 00:46:31,200
+you've lived with this for a week, you
+
+1222
+00:46:29,000 --> 00:46:33,880
+can start upgrading the brief. You can
+
+1223
+00:46:31,200 --> 00:46:35,400
+pipe the text into 11 Labs so your AI
+
+1224
+00:46:33,880 --> 00:46:37,520
+reads the market to you while you're
+
+1225
+00:46:35,400 --> 00:46:39,600
+making coffee. You can ask Claude to
+
+1226
+00:46:37,520 --> 00:46:41,800
+assign a confidence score from 1 to 10
+
+1227
+00:46:39,600 --> 00:46:43,800
+and only show you setups that are seven
+
+1228
+00:46:41,800 --> 00:46:45,520
+or higher. You can even have Claude
+
+1229
+00:46:43,800 --> 00:46:47,480
+append every brief to a markdown
+
+1230
+00:46:45,520 --> 00:46:49,840
+journal, making your research fully
+
+1231
+00:46:47,480 --> 00:46:52,400
+auditable over time. You're no longer a
+
+1232
+00:46:49,840 --> 00:46:53,600
+retail trader guessing at the next move.
+
+1233
+00:46:52,400 --> 00:46:55,960
+You're an operator running a
+
+1234
+00:46:53,600 --> 00:46:58,280
+professional research desk. The stack is
+
+1235
+00:46:55,960 --> 00:47:00,120
+live. The brief is running. In the next
+
+1236
+00:46:58,280 --> 00:47:02,560
+section of the course, we move into
+
+1237
+00:47:00,120 --> 00:47:04,200
+autonomous operations. I'll see you in
+
+1238
+00:47:02,560 --> 00:47:05,560
+the next module.
+
+1239
+00:47:04,200 --> 00:47:07,880
+Up until now, you've been the one
+
+1240
+00:47:05,560 --> 00:47:09,960
+triggering the AI. You type the command,
+
+1241
+00:47:07,880 --> 00:47:11,800
+Claude does the work. But the goal of
+
+1242
+00:47:09,960 --> 00:47:14,200
+this course is to build a system of
+
+1243
+00:47:11,800 --> 00:47:16,560
+intelligence that works while you sleep.
+
+1244
+00:47:14,200 --> 00:47:18,280
+Enter Claude routines. This is
+
+1245
+00:47:16,560 --> 00:47:20,200
+Anthropic's native cloud-hosted
+
+1246
+00:47:18,280 --> 00:47:22,400
+environment. You set a cron-style
+
+1247
+00:47:20,200 --> 00:47:24,360
+schedule, pick your tools, and Claude
+
+1248
+00:47:22,400 --> 00:47:26,680
+runs your logic in the background. It
+
+1249
+00:47:24,360 --> 00:47:29,560
+can email you a summary, fire an alert
+
+1250
+00:47:26,680 --> 00:47:32,000
+to your phone, or trigger an MCP side
+
+1251
+00:47:29,560 --> 00:47:33,760
+effect. This is the easiest way to make
+
+1252
+00:47:32,000 --> 00:47:36,200
+your daily alpha brief completely
+
+1253
+00:47:33,760 --> 00:47:38,720
+self-driving. Head over to this site,
+
+1254
+00:47:36,200 --> 00:47:40,880
+log in with your pro or max account.
+
+1255
+00:47:38,720 --> 00:47:44,000
+Keep an eye on your plan limits. As of
+
+1256
+00:47:40,880 --> 00:47:47,000
+2026, pro users get five routine runs
+
+1257
+00:47:44,000 --> 00:47:48,960
+per day, while max users get up to 15.
+
+1258
+00:47:47,000 --> 00:47:51,360
+You want to budget these wisely. Don't
+
+1259
+00:47:48,960 --> 00:47:53,640
+run a research scan every 5 minutes if
+
+1260
+00:47:51,360 --> 00:47:55,720
+you're on a pro plan. Save them for the
+
+1261
+00:47:53,640 --> 00:47:58,680
+high-impact moments. Let's turn your
+
+1262
+00:47:55,720 --> 00:48:01,600
+module 12 research into a routine. We'll
+
+1263
+00:47:58,680 --> 00:48:03,760
+set this to run every weekday at 7:30
+
+1264
+00:48:01,600 --> 00:48:06,080
+a.m. so it hits your inbox before the
+
+1265
+00:48:03,760 --> 00:48:08,520
+market opens. Paste this routine
+
+1266
+00:48:06,080 --> 00:48:10,840
+setting. Paste the full master prompt
+
+1267
+00:48:08,520 --> 00:48:13,400
+from the previous module. Now, instead
+
+1268
+00:48:10,840 --> 00:48:16,320
+of you asking Claude for the news, the
+
+1269
+00:48:13,400 --> 00:48:19,360
+news finds you. This routine is your
+
+1270
+00:48:16,320 --> 00:48:22,720
+radar. We'll set it to run every 2 hours
+
+1271
+00:48:19,360 --> 00:48:25,920
+24/7. The prompt is simple. Check the
+
+1272
+00:48:22,720 --> 00:48:28,080
+top 20 hyperliquid wallets. Only reply
+
+1273
+00:48:25,920 --> 00:48:30,840
+if a top 10 wallet opens a position
+
+1274
+00:48:28,080 --> 00:48:33,760
+larger than $5 million or if a whale
+
+1275
+00:48:30,840 --> 00:48:35,640
+flips direction on Bitcoin. Tell Claude,
+
+1276
+00:48:33,760 --> 00:48:38,160
+if no criteria are met, reply with the
+
+1277
+00:48:35,640 --> 00:48:40,200
+word skip. This prevents your inbox from
+
+1278
+00:48:38,160 --> 00:48:42,520
+getting cluttered with nothing to report
+
+1279
+00:48:40,200 --> 00:48:45,080
+emails. You only get notified when there
+
+1280
+00:48:42,520 --> 00:48:46,920
+is actual blood in the water. This is
+
+1281
+00:48:45,080 --> 00:48:49,960
+the most important routine you'll ever
+
+1282
+00:48:46,920 --> 00:48:51,760
+set up. It's a safety net. Set this to
+
+1283
+00:48:49,960 --> 00:48:53,920
+run every hour during your active
+
+1284
+00:48:51,760 --> 00:48:56,480
+trading window. It pulls your open
+
+1285
+00:48:53,920 --> 00:48:58,800
+positions across Weeks, Alpaca, and
+
+1286
+00:48:56,480 --> 00:49:00,800
+Interactive Brokers. It calculates your
+
+1287
+00:48:58,800 --> 00:49:03,200
+total open risk and checks for any
+
+1288
+00:49:00,800 --> 00:49:05,800
+position missing a stop loss. If you've
+
+1289
+00:49:03,200 --> 00:49:08,280
+drifted past your 2% risk limit, Claude
+
+1290
+00:49:05,800 --> 00:49:10,880
+flags it immediately. It's the unsexy
+
+1291
+00:49:08,280 --> 00:49:13,040
+work that keeps you in the game. So,
+
+1292
+00:49:10,880 --> 00:49:15,520
+when do you use a routine versus a local
+
+1293
+00:49:13,040 --> 00:49:18,240
+script? Claude routines are perfect for
+
+1294
+00:49:15,520 --> 00:49:20,120
+read and report tasks. They require zero
+
+1295
+00:49:18,240 --> 00:49:22,320
+infrastructure and run even if your
+
+1296
+00:49:20,120 --> 00:49:24,640
+laptop is at the bottom of a lake.
+
+1297
+00:49:22,320 --> 00:49:27,800
+However, if you want to run arbitrary
+
+1298
+00:49:24,640 --> 00:49:30,000
+Python code or place complex automated
+
+1299
+00:49:27,800 --> 00:49:32,360
+orders without a human in the loop,
+
+1300
+00:49:30,000 --> 00:49:35,000
+you'll need a VPS. We're going to build
+
+1301
+00:49:32,360 --> 00:49:37,240
+that pro tier setup in module 24 using
+
+1302
+00:49:35,000 --> 00:49:39,680
+Hostinger. For now, set up your first
+
+1303
+00:49:37,240 --> 00:49:41,200
+three routines. Let the AI start doing
+
+1304
+00:49:39,680 --> 00:49:42,920
+the heavy lifting.
+
+1305
+00:49:41,200 --> 00:49:45,320
+In this module, you are going to ship a
+
+1306
+00:49:42,920 --> 00:49:47,240
+full Pine Script version 6 strategy from
+
+1307
+00:49:45,320 --> 00:49:49,720
+plain English. We're going to add
+
+1308
+00:49:47,240 --> 00:49:51,720
+confluence filters, draw support and
+
+1309
+00:49:49,720 --> 00:49:54,160
+resistance automatically, and debug
+
+1310
+00:49:51,720 --> 00:49:56,320
+those frustrating red squiggles just by
+
+1311
+00:49:54,160 --> 00:49:57,960
+describing them out loud to Claude. We
+
+1312
+00:49:56,320 --> 00:50:00,520
+start with a clean sheet, open your
+
+1313
+00:49:57,960 --> 00:50:02,320
+terminal, launch Claude code, and give
+
+1314
+00:50:00,520 --> 00:50:04,400
+it the rules for a classic trend
+
+1315
+00:50:02,320 --> 00:50:06,920
+following setup. Claude doesn't just
+
+1316
+00:50:04,400 --> 00:50:09,600
+write the code in a text box, it uses
+
+1317
+00:50:06,920 --> 00:50:12,480
+the MCP to open the Pine editor on your
+
+1318
+00:50:09,600 --> 00:50:14,160
+screen, paste the code, and compile it.
+
+1319
+00:50:12,480 --> 00:50:15,920
+If there's an error, Claude sees it and
+
+1320
+00:50:14,160 --> 00:50:18,480
+fixes it before it ever hands the
+
+1321
+00:50:15,920 --> 00:50:20,880
+strategy back to you. A basic strategy
+
+1322
+00:50:18,480 --> 00:50:23,480
+is often too noisy. We need to filter
+
+1323
+00:50:20,880 --> 00:50:25,520
+for high probability environments. Tell
+
+1324
+00:50:23,480 --> 00:50:28,080
+Claude to take that same strategy and
+
+1325
+00:50:25,520 --> 00:50:29,680
+add confluence filters. We'll restrict
+
+1326
+00:50:28,080 --> 00:50:32,480
+trades to the London and New York
+
+1327
+00:50:29,680 --> 00:50:35,040
+sessions, ensure the daily trend is in
+
+1328
+00:50:32,480 --> 00:50:37,480
+our favor, and crucially require a
+
+1329
+00:50:35,040 --> 00:50:39,040
+minimum amount of volatility. Claude
+
+1330
+00:50:37,480 --> 00:50:41,640
+will update the code and show you
+
+1331
+00:50:39,040 --> 00:50:43,800
+side-by-side stats. You'll see exactly
+
+1332
+00:50:41,640 --> 00:50:46,120
+how those filters affected your profit
+
+1333
+00:50:43,800 --> 00:50:48,280
+factor and your drawdown. We aren't just
+
+1334
+00:50:46,120 --> 00:50:50,480
+guessing that a filter works, we're
+
+1335
+00:50:48,280 --> 00:50:52,600
+proving it with data. Claude can also
+
+1336
+00:50:50,480 --> 00:50:54,560
+handle the visual side of the chart. We
+
+1337
+00:50:52,600 --> 00:50:56,880
+can ask it to write an indicator that
+
+1338
+00:50:54,560 --> 00:50:59,480
+auto detects the five strongest
+
+1339
+00:50:56,880 --> 00:51:02,840
+horizontal levels using pivots from the
+
+1340
+00:50:59,480 --> 00:51:05,280
+last 500 bars. Ask it to color support
+
+1341
+00:51:02,840 --> 00:51:07,040
+green and resistance red. In seconds,
+
+1342
+00:51:05,280 --> 00:51:09,200
+Claude writes the math, compiles the
+
+1343
+00:51:07,040 --> 00:51:11,000
+indicator, and publishes it directly to
+
+1344
+00:51:09,200 --> 00:51:13,520
+your live chart. You now have a
+
+1345
+00:51:11,000 --> 00:51:16,080
+custom-built technical analysis tool
+
+1346
+00:51:13,520 --> 00:51:18,240
+tailored to your specific style. When a
+
+1347
+00:51:16,080 --> 00:51:20,840
+script won't compile, stop Googling the
+
+1348
+00:51:18,240 --> 00:51:22,200
+error codes. Just copy the error message
+
+1349
+00:51:20,840 --> 00:51:25,280
+from the bottom of your TradingView
+
+1350
+00:51:22,200 --> 00:51:27,800
+screen and paste it into Claude. Claude
+
+1351
+00:51:25,280 --> 00:51:30,000
+uses the MCP to read the source code,
+
+1352
+00:51:27,800 --> 00:51:32,880
+identifies the root cause, whether it's
+
+1353
+00:51:30,000 --> 00:51:35,440
+a version mismatch or syntax error, and
+
+1354
+00:51:32,880 --> 00:51:37,240
+recompile the fix instantly. It's like
+
+1355
+00:51:35,440 --> 00:51:39,080
+having a senior Pine Script developer
+
+1356
+00:51:37,240 --> 00:51:40,960
+sitting right next to you. Before you
+
+1357
+00:51:39,080 --> 00:51:43,520
+get excited about a backtest, run it
+
+1358
+00:51:40,960 --> 00:51:45,440
+through the honesty filter. Sample size.
+
+1359
+00:51:43,520 --> 00:51:48,000
+If the strategy has fewer than 100
+
+1360
+00:51:45,440 --> 00:51:49,560
+trades, it's just noise. Cost, always
+
+1361
+00:51:48,000 --> 00:51:51,880
+tell Claude to include commission and
+
+1362
+00:51:49,560 --> 00:51:54,760
+slippage in the settings. Real trading
+
+1363
+00:51:51,880 --> 00:51:57,400
+isn't free. Repainting. Ask Claude to
+
+1364
+00:51:54,760 --> 00:52:00,120
+verify that no look-ahead indicators are
+
+1365
+00:51:57,400 --> 00:52:02,280
+used. A strategy that knows the future
+
+1366
+00:52:00,120 --> 00:52:04,400
+on a backtest will blow up your account
+
+1367
+00:52:02,280 --> 00:52:07,640
+in the real world. You now have the
+
+1368
+00:52:04,400 --> 00:52:09,360
+power to engineer an edge from scratch.
+
+1369
+00:52:07,640 --> 00:52:11,680
+In this module, we are building your
+
+1370
+00:52:09,360 --> 00:52:13,560
+mobile control plane. We're going to use
+
+1371
+00:52:11,680 --> 00:52:16,240
+Telegram's BotFather, install the
+
+1372
+00:52:13,560 --> 00:52:18,120
+official Telegram plugin for Claude, and
+
+1373
+00:52:16,240 --> 00:52:20,240
+pair your phone. By the end of this
+
+1374
+00:52:18,120 --> 00:52:22,680
+video, your entire trading stack, the
+
+1375
+00:52:20,240 --> 00:52:24,560
+whales, the charts, and the brokers,
+
+1376
+00:52:22,680 --> 00:52:26,640
+will be accessible from a single chat
+
+1377
+00:52:24,560 --> 00:52:29,520
+window in your pocket. First, open
+
+1378
+00:52:26,640 --> 00:52:32,280
+Telegram and search for @BotFather.
+
+1379
+00:52:29,520 --> 00:52:35,000
+This is the official way to create bots.
+
+1380
+00:52:32,280 --> 00:52:37,640
+Send the command {slash} newbot. Give it
+
+1381
+00:52:35,000 --> 00:52:39,680
+a name, something like TradingOps. Give
+
+1382
+00:52:37,640 --> 00:52:42,600
+it a unique username that ends in the
+
+1383
+00:52:39,680 --> 00:52:45,000
+word bot. BotFather will hand you an API
+
+1384
+00:52:42,600 --> 00:52:46,840
+token. Copy that immediately and put it
+
+1385
+00:52:45,000 --> 00:52:49,160
+in your password manager.
+
+1386
+00:52:46,840 --> 00:52:51,800
+This is the key that lets Claude log
+
+1387
+00:52:49,160 --> 00:52:54,360
+into your Telegram account. Now, go back
+
+1388
+00:52:51,800 --> 00:52:55,720
+to your terminal and launch Claude code.
+
+1389
+00:52:54,360 --> 00:52:58,320
+We're going to install the official
+
+1390
+00:52:55,720 --> 00:53:00,440
+plugin using {slash} commands. Type
+
+1391
+00:52:58,320 --> 00:53:02,760
+{slash} plugin install telegram and then
+
+1392
+00:53:00,440 --> 00:53:04,880
+{slash} reload-plugins.
+
+1393
+00:53:02,760 --> 00:53:07,040
+Finally, run the configuration command
+
+1394
+00:53:04,880 --> 00:53:09,400
+and paste in that token you just got
+
+1395
+00:53:07,040 --> 00:53:11,400
+from BotFather. You've just successfully
+
+1396
+00:53:09,400 --> 00:53:13,320
+linked the brain to the messenger. To
+
+1397
+00:53:11,400 --> 00:53:15,240
+make this work, we have to relaunch
+
+1398
+00:53:13,320 --> 00:53:17,560
+Claude with the Telegram channel
+
+1399
+00:53:15,240 --> 00:53:19,480
+attached. This allows messages to flow
+
+1400
+00:53:17,560 --> 00:53:21,160
+in both directions. Close your current
+
+1401
+00:53:19,480 --> 00:53:23,040
+Claude session and run the relaunch
+
+1402
+00:53:21,160 --> 00:53:24,520
+command from the notes. You'll see a
+
+1403
+00:53:23,040 --> 00:53:26,920
+message in your terminal saying the
+
+1404
+00:53:24,520 --> 00:53:29,160
+Telegram channel is active and waiting.
+
+1405
+00:53:26,920 --> 00:53:31,440
+Now, open Telegram on your phone. Find
+
+1406
+00:53:29,160 --> 00:53:33,160
+your new bot and hit start. Send it any
+
+1407
+00:53:31,440 --> 00:53:34,520
+message. Claude will print a
+
+1408
+00:53:33,160 --> 00:53:37,000
+six-character pair code in your
+
+1409
+00:53:34,520 --> 00:53:39,040
+terminal. Paste that back into Claude to
+
+1410
+00:53:37,000 --> 00:53:41,840
+lock the connection. Then, set the
+
+1411
+00:53:39,040 --> 00:53:43,680
+access policy to allow list. This is
+
+1412
+00:53:41,840 --> 00:53:45,960
+critical. It ensures that only your
+
+1413
+00:53:43,680 --> 00:53:47,680
+paired phone can drive the agent. If
+
+1414
+00:53:45,960 --> 00:53:49,280
+anyone else finds your bot and tries to
+
+1415
+00:53:47,680 --> 00:53:51,400
+issue a trade, they'll be denied
+
+1416
+00:53:49,280 --> 00:53:53,760
+instantly. Let's see what this actually
+
+1417
+00:53:51,400 --> 00:53:55,120
+looks like in the real world. Imagine
+
+1418
+00:53:53,760 --> 00:53:57,480
+you're out for dinner and you want a
+
+1419
+00:53:55,120 --> 00:54:00,400
+whale flash. You just text the bot, any
+
+1420
+00:53:57,480 --> 00:54:02,800
+top 20 wallet flips in the last 2 hours?
+
+1421
+00:54:00,400 --> 00:54:04,960
+Claude scans the chain and text you back
+
+1422
+00:54:02,800 --> 00:54:07,320
+in seconds. Want to check your book?
+
+1423
+00:54:04,960 --> 00:54:09,960
+Ask, what's open on Wix right now? And
+
+1424
+00:54:07,320 --> 00:54:12,600
+get your P&L delivered as a message. You
+
+1425
+00:54:09,960 --> 00:54:15,000
+can even execute trades. Tell Claude,
+
+1426
+00:54:12,600 --> 00:54:16,960
+propose a Bitcoin long. Claude will do
+
+1427
+00:54:15,000 --> 00:54:19,680
+the math and wait. It won't fire until
+
+1428
+00:54:16,960 --> 00:54:21,760
+you reply with the word go. This human
+
+1429
+00:54:19,680 --> 00:54:23,880
+in the loop safety rail is what keeps
+
+1430
+00:54:21,760 --> 00:54:25,960
+you from making accidental fat finger
+
+1431
+00:54:23,880 --> 00:54:28,280
+trades from your pocket. You are now a
+
+1432
+00:54:25,960 --> 00:54:30,200
+mobile first operator. You have the full
+
+1433
+00:54:28,280 --> 00:54:32,720
+power of a professional research and
+
+1434
+00:54:30,200 --> 00:54:34,600
+execution desk condensed into a chat
+
+1435
+00:54:32,720 --> 00:54:37,480
+app. In the next module, we're going to
+
+1436
+00:54:34,600 --> 00:54:39,000
+dive into advanced agentic workflows.
+
+1437
+00:54:37,480 --> 00:54:40,960
+This is the module where the thing
+
+1438
+00:54:39,000 --> 00:54:43,360
+actually trades. We are building the
+
+1439
+00:54:40,960 --> 00:54:45,480
+full automated pipeline. TradingView
+
+1440
+00:54:43,360 --> 00:54:47,680
+fires an alert, Engrock forwards it to
+
+1441
+00:54:45,480 --> 00:54:50,000
+your local server, and Claude acts as
+
+1442
+00:54:47,680 --> 00:54:52,720
+the final decision layer to place a risk
+
+1443
+00:54:50,000 --> 00:54:55,400
+size order on Wix. Fully automatic,
+
+1444
+00:54:52,720 --> 00:54:57,600
+fully auditable, no more manual entry.
+
+1445
+00:54:55,400 --> 00:54:59,360
+Think of this like a digital relay race.
+
+1446
+00:54:57,600 --> 00:55:02,440
+Your Pine Script fires an alert with a
+
+1447
+00:54:59,360 --> 00:55:05,360
+JSON payload. The TradingView webhook
+
+1448
+00:55:02,440 --> 00:55:07,400
+sends that data to your Engrock URL.
+
+1449
+00:55:05,360 --> 00:55:09,520
+Your Flask receiver, a tiny Python
+
+1450
+00:55:07,400 --> 00:55:12,120
+server, catches the alert and triggers
+
+1451
+00:55:09,520 --> 00:55:14,200
+Claude. Claude, using the Wix X skill,
+
+1452
+00:55:12,120 --> 00:55:16,800
+reads the data, applies your risk rules,
+
+1453
+00:55:14,200 --> 00:55:18,800
+and fires the order. Consistency is
+
+1454
+00:55:16,800 --> 00:55:21,120
+everything in automation.
+
+1455
+00:55:18,800 --> 00:55:23,120
+We use a standardized JSON schema. It
+
+1456
+00:55:21,120 --> 00:55:25,680
+includes the symbol, the side, the
+
+1457
+00:55:23,120 --> 00:55:28,160
+price, and your specific risk parameters
+
+1458
+00:55:25,680 --> 00:55:30,280
+like leverage and stop loss percentages.
+
+1459
+00:55:28,160 --> 00:55:32,000
+Copy the schema from the notes. This is
+
+1460
+00:55:30,280 --> 00:55:33,680
+the language your alert will speak to
+
+1461
+00:55:32,000 --> 00:55:35,520
+Claude. We aren't going to write this
+
+1462
+00:55:33,680 --> 00:55:37,760
+Flask server line by line. We're going
+
+1463
+00:55:35,520 --> 00:55:40,040
+to let Claude scaffold it. Paste the
+
+1464
+00:55:37,760 --> 00:55:41,880
+prompt from section 16.3 into your
+
+1465
+00:55:40,040 --> 00:55:44,440
+terminal. Claude will create
+
+1466
+00:55:41,880 --> 00:55:46,280
+tv_webhook.py.
+
+1467
+00:55:44,440 --> 00:55:48,480
+This script does three things. It
+
+1468
+00:55:46,280 --> 00:55:50,960
+validates the incoming alert, logs it to
+
+1469
+00:55:48,480 --> 00:55:53,560
+a file, and then shells out to the Wix
+
+1470
+00:55:50,960 --> 00:55:55,720
+skill to execute the trade. Notice that
+
+1471
+00:55:53,560 --> 00:55:58,240
+we aren't bypassing Claude. Claude
+
+1472
+00:55:55,720 --> 00:55:59,960
+remains the brain that decides exactly
+
+1473
+00:55:58,240 --> 00:56:02,400
+how to size the position before the
+
+1474
+00:55:59,960 --> 00:56:03,920
+order hits the exchange. TradingView
+
+1475
+00:56:02,400 --> 00:56:06,080
+lives in the cloud, but your Flask
+
+1476
+00:56:03,920 --> 00:56:08,040
+server lives on your laptop. To bridge
+
+1477
+00:56:06,080 --> 00:56:12,080
+that gap, we use ngrok. In your
+
+1478
+00:56:08,040 --> 00:56:13,880
+terminal, run ngrok http 5005.
+
+1479
+00:56:12,080 --> 00:56:16,680
+This creates a secure tunnel from the
+
+1480
+00:56:13,880 --> 00:56:19,360
+open web directly to your machine. Copy
+
+1481
+00:56:16,680 --> 00:56:20,920
+that ngrok-free-app
+
+1482
+00:56:19,360 --> 00:56:22,720
+URL.
+
+1483
+00:56:20,920 --> 00:56:24,760
+That is now your official webhook
+
+1484
+00:56:22,720 --> 00:56:26,760
+endpoint. Now, go to your TradingView
+
+1485
+00:56:24,760 --> 00:56:29,240
+chart, open the strategy we built in
+
+1486
+00:56:26,760 --> 00:56:31,560
+module 14, and click the alarm icon. In
+
+1487
+00:56:29,240 --> 00:56:35,400
+the message box, paste your JSON
+
+1488
+00:56:31,560 --> 00:56:38,640
+payload. In the webhook URL, paste your
+
+1489
+00:56:35,400 --> 00:56:41,280
+new ngrok address. Set the trigger to
+
+1490
+00:56:38,640 --> 00:56:43,160
+once per bar close. The first time your
+
+1491
+00:56:41,280 --> 00:56:45,280
+strategy conditions are met, the whole
+
+1492
+00:56:43,160 --> 00:56:47,600
+pipeline will fire. Do not scale this
+
+1493
+00:56:45,280 --> 00:56:50,480
+immediately. Run your first 10 alerts on
+
+1494
+00:56:47,600 --> 00:56:52,560
+a tiny $50 test account. Watch it place
+
+1495
+00:56:50,480 --> 00:56:54,440
+the entry, the stop loss, and the take
+
+1496
+00:56:52,560 --> 00:56:56,640
+profit correctly. Only once you've
+
+1497
+00:56:54,440 --> 00:56:58,920
+audited the logs and seen it work
+
+1498
+00:56:56,640 --> 00:57:01,120
+end-to-end, do you move to your main
+
+1499
+00:56:58,920 --> 00:57:03,600
+book. You have just closed the loop. You
+
+1500
+00:57:01,120 --> 00:57:05,760
+are no longer chatting with an AI. You
+
+1501
+00:57:03,600 --> 00:57:07,960
+have built an autonomous execution
+
+1502
+00:57:05,760 --> 00:57:10,040
+engine that responds to market data in
+
+1503
+00:57:07,960 --> 00:57:11,440
+real time. In the next module, we're
+
+1504
+00:57:10,040 --> 00:57:13,480
+going to look at one of the most
+
+1505
+00:57:11,440 --> 00:57:15,840
+profitable corners of the market,
+
+1506
+00:57:13,480 --> 00:57:17,720
+prediction markets. This is where things
+
+1507
+00:57:15,840 --> 00:57:19,800
+get truly interesting. We are moving
+
+1508
+00:57:17,720 --> 00:57:22,160
+beyond price action and into the world
+
+1509
+00:57:19,800 --> 00:57:24,560
+of prediction markets. This is the home
+
+1510
+00:57:22,160 --> 00:57:27,040
+of the legendary $3 million bot, and
+
+1511
+00:57:24,560 --> 00:57:28,880
+today, we're building our own.
+
+1512
+00:57:27,040 --> 00:57:31,720
+Prediction markets allow you to bet on
+
+1513
+00:57:28,880 --> 00:57:34,280
+real-world outcomes, politics, Fed
+
+1514
+00:57:31,720 --> 00:57:36,600
+decisions, even the weather. We're going
+
+1515
+00:57:34,280 --> 00:57:40,400
+to use Polymarket, which runs on Polygon
+
+1516
+00:57:36,600 --> 00:57:42,480
+using USDC and Kalshi, the US regulated
+
+1517
+00:57:40,400 --> 00:57:45,520
+venue. We're going to build a sovereign
+
+1518
+00:57:42,480 --> 00:57:48,360
+analyzer that uses Claude Opus 4.7 to
+
+1519
+00:57:45,520 --> 00:57:50,680
+research the news, calculate the odds,
+
+1520
+00:57:48,360 --> 00:57:52,760
+and stake real bets. Polymarket is the
+
+1521
+00:57:50,680 --> 00:57:54,600
+global giant. It handles billions in
+
+1522
+00:57:52,760 --> 00:57:56,960
+monthly volume. Because it's
+
+1523
+00:57:54,600 --> 00:57:59,360
+decentralized and uses a central limit
+
+1524
+00:57:56,960 --> 00:58:01,800
+order book, it has the deepest liquidity
+
+1525
+00:57:59,360 --> 00:58:05,320
+for crypto and pop culture events.
+
+1526
+00:58:01,800 --> 00:58:07,680
+Kalshi is the pro tier CFTC regulated
+
+1527
+00:58:05,320 --> 00:58:09,920
+venue. It's funded in US dollars and is
+
+1528
+00:58:07,680 --> 00:58:12,840
+the gold standard for macro events like
+
+1529
+00:58:09,920 --> 00:58:15,440
+CPI prints and Federal Reserve meetings.
+
+1530
+00:58:12,840 --> 00:58:17,400
+Both offer open APIs, which means Claude
+
+1531
+00:58:15,440 --> 00:58:19,600
+can price shop between them to find the
+
+1532
+00:58:17,400 --> 00:58:21,600
+best edge. Let's get your credentials
+
+1533
+00:58:19,600 --> 00:58:23,720
+ready. For Polymarket, connect your
+
+1534
+00:58:21,600 --> 00:58:26,760
+MetaMask or Coinbase wallet and fund it
+
+1535
+00:58:23,720 --> 00:58:28,760
+with USDC on the Polygon network. You'll
+
+1536
+00:58:26,760 --> 00:58:31,400
+need to copy your private key and your
+
+1537
+00:58:28,760 --> 00:58:33,240
+wallet address into your .env file.
+
+1538
+00:58:31,400 --> 00:58:35,440
+Then, install the client by running pip
+
+1539
+00:58:33,240 --> 00:58:38,280
+install prompt. For Kalshi, complete
+
+1540
+00:58:35,440 --> 00:58:40,680
+your KYC and fund it with USD. You'll
+
+1541
+00:58:38,280 --> 00:58:43,600
+need to generate an RSA key pair in
+
+1542
+00:58:40,680 --> 00:58:46,160
+their API settings. Install their SDK
+
+1543
+00:58:43,600 --> 00:58:47,560
+with pip install prompt as well. Now,
+
+1544
+00:58:46,160 --> 00:58:49,600
+the main event. We are going to live
+
+1545
+00:58:47,560 --> 00:58:51,800
+build analyzer.py
+
+1546
+00:58:49,600 --> 00:58:53,040
+using Claude code. We're telling Claude
+
+1547
+00:58:51,800 --> 00:58:56,200
+to build a script that takes a
+
+1548
+00:58:53,040 --> 00:58:58,160
+Polymarket URL as an input. It will
+
+1549
+00:58:56,200 --> 00:59:00,840
+fetch the current odds, then use Claude
+
+1550
+00:58:58,160 --> 00:59:03,160
+Opus 4.7 with the web search enabled to
+
+1551
+00:59:00,840 --> 00:59:07,160
+find the latest news. Claude will then
+
+1552
+00:59:03,160 --> 00:59:09,920
+return a JSON response with a yes or no
+
+1553
+00:59:07,160 --> 00:59:12,400
+decision and a confidence score. Notice
+
+1554
+00:59:09,920 --> 00:59:15,360
+the confidence gate. We tell the bot if
+
+1555
+00:59:12,400 --> 00:59:17,960
+confidence is high, bet $5. If it's
+
+1556
+00:59:15,360 --> 00:59:20,240
+medium, bet two. If it's low, skip it
+
+1557
+00:59:17,960 --> 00:59:22,680
+entirely. This gate is what prevents
+
+1558
+00:59:20,240 --> 00:59:25,880
+your bot from overtrading on noise. The
+
+1559
+00:59:22,680 --> 00:59:27,840
+real alpha lives in the gaps. Polymarket
+
+1560
+00:59:25,880 --> 00:59:30,480
+and Kalshi often list the same event,
+
+1561
+00:59:27,840 --> 00:59:33,200
+like will the Fed cut rates in June, at
+
+1562
+00:59:30,480 --> 00:59:35,680
+different prices. We use the PMXT
+
+1563
+00:59:33,200 --> 00:59:37,680
+library to unify both markets. This
+
+1564
+00:59:35,680 --> 00:59:40,480
+allows Claude to see both order books at
+
+1565
+00:59:37,680 --> 00:59:43,200
+once. If one market is at 60 cents and
+
+1566
+00:59:40,480 --> 00:59:44,880
+the other is at 65, your bot can buy the
+
+1567
+00:59:43,200 --> 00:59:47,720
+cheap side and lock in a nearly
+
+1568
+00:59:44,880 --> 00:59:50,200
+risk-free profit. Before you go live,
+
+1569
+00:59:47,720 --> 00:59:52,520
+keep your dry run flag set to true.
+
+1570
+00:59:50,200 --> 00:59:55,080
+Watch the logs for a few days. Arbitrage
+
+1571
+00:59:52,520 --> 00:59:57,200
+looks pristine in a screenshot, but in
+
+1572
+00:59:55,080 --> 00:59:59,280
+the real world, gas fees and slippage
+
+1573
+00:59:57,200 --> 01:00:01,200
+eat your margin. You now have an agent
+
+1574
+00:59:59,280 --> 01:00:03,560
+that understands the world as well as it
+
+1575
+01:00:01,200 --> 01:00:05,840
+understands the charts. We have spent
+
+1576
+01:00:03,560 --> 01:00:08,360
+this course building a deep custom
+
+1577
+01:00:05,840 --> 01:00:10,240
+infrastructure. But sometimes you just
+
+1578
+01:00:08,360 --> 01:00:12,640
+want to test a theory now. You want to
+
+1579
+01:00:10,240 --> 01:00:15,560
+go from an idea in your head to a live
+
+1580
+01:00:12,640 --> 01:00:18,880
+order on the exchange in under 120
+
+1581
+01:00:15,560 --> 01:00:21,160
+seconds. That is what Agent PNL is for.
+
+1582
+01:00:18,880 --> 01:00:23,320
+It is the absolute easiest way to get a
+
+1583
+01:00:21,160 --> 01:00:24,960
+Weeks trading agent running. You write
+
+1584
+01:00:23,320 --> 01:00:27,040
+your strategy in plain English, pick
+
+1585
+01:00:24,960 --> 01:00:29,120
+your model, and hit start. Your bot
+
+1586
+01:00:27,040 --> 01:00:30,800
+trades Weeks perpetuals on its own, and
+
+1587
+01:00:29,120 --> 01:00:32,920
+its performance shows up live on a
+
+1588
+01:00:30,800 --> 01:00:34,600
+public leaderboard. The best part? You
+
+1589
+01:00:32,920 --> 01:00:37,240
+don't have to take anyone's word for it.
+
+1590
+01:00:34,600 --> 01:00:39,120
+Every bot on the Agent PNL leaderboard
+
+1591
+01:00:37,240 --> 01:00:41,000
+is verifiable directly on the WX
+
+1592
+01:00:39,120 --> 01:00:43,520
+exchange. You aren't looking at a
+
+1593
+01:00:41,000 --> 01:00:45,880
+photoshopped screenshot. You can click
+
+1594
+01:00:43,520 --> 01:00:47,920
+through to the actual trade logs. It's a
+
+1595
+01:00:45,880 --> 01:00:50,080
+level of transparency that is rare in
+
+1596
+01:00:47,920 --> 01:00:53,920
+the world of crypto bots. Let's do a
+
+1597
+01:00:50,080 --> 01:00:55,640
+live run. Head over to agentpnl.io,
+
+1598
+01:00:53,920 --> 01:00:57,880
+connect your Weeks account using those
+
+1599
+01:00:55,640 --> 01:01:00,240
+API keys we generated back in module
+
+1600
+01:00:57,880 --> 01:01:02,680
+five. Now for the strategy, you don't
+
+1601
+01:01:00,240 --> 01:01:05,040
+need to code, just paste your logic in
+
+1602
+01:01:02,680 --> 01:01:08,160
+plain English. Pick your model, Claude
+
+1603
+01:01:05,040 --> 01:01:10,880
+3.5, Sonnet is the gold standard here.
+
+1604
+01:01:08,160 --> 01:01:12,480
+Hit start. That's it. Your bot is now
+
+1605
+01:01:10,880 --> 01:01:14,680
+live. It's scanning the markets,
+
+1606
+01:01:12,480 --> 01:01:16,360
+managing your risk, and its PNL is
+
+1607
+01:01:14,680 --> 01:01:18,600
+streaming to the leaderboard in real
+
+1608
+01:01:16,360 --> 01:01:22,200
+time. Even if you prefer building your
+
+1609
+01:01:18,600 --> 01:01:24,640
+own custom Python bots, Agent PNL is a
+
+1610
+01:01:22,200 --> 01:01:26,640
+massive asset for three reasons. The
+
+1611
+01:01:24,640 --> 01:01:28,880
+benchmark, you can compare your custom
+
+1612
+01:01:26,640 --> 01:01:31,480
+strategies against public bots running
+
+1613
+01:01:28,880 --> 01:01:34,600
+on the same venue. The sandbox, it's the
+
+1614
+01:01:31,480 --> 01:01:36,240
+perfect place to paper test a new idea
+
+1615
+01:01:34,600 --> 01:01:38,920
+without setting up any of your own
+
+1616
+01:01:36,240 --> 01:01:41,240
+servers. Social alpha, the leaderboard
+
+1617
+01:01:38,920 --> 01:01:43,200
+is a live read on what's actually
+
+1618
+01:01:41,240 --> 01:01:45,120
+working in the current market. If a
+
+1619
+01:01:43,200 --> 01:01:47,880
+specific bot is crushing it, you can
+
+1620
+01:01:45,120 --> 01:01:50,560
+study its logic and even copy trade it.
+
+1621
+01:01:47,880 --> 01:01:53,120
+Now, let's be real about the tradeoffs.
+
+1622
+01:01:50,560 --> 01:01:55,080
+Because this is a no-code platform, it's
+
+1623
+01:01:53,120 --> 01:01:57,200
+less flexible than the custom Python
+
+1624
+01:01:55,080 --> 01:01:59,240
+agents we build later in the course. If
+
+1625
+01:01:57,200 --> 01:02:02,360
+you need 10 different data sources and a
+
+1626
+01:01:59,240 --> 01:02:04,480
+complex MCP stack, you'll outgrow this.
+
+1627
+01:02:02,360 --> 01:02:06,600
+Also, remember your strategy is running
+
+1628
+01:02:04,480 --> 01:02:08,480
+on their servers, not yours. Now that
+
+1629
+01:02:06,600 --> 01:02:10,680
+you've seen the easiest way to trade
+
+1630
+01:02:08,480 --> 01:02:12,400
+Weeks, let's look at the powerhouse for
+
+1631
+01:02:10,680 --> 01:02:14,760
+Hyperliquid.
+
+1632
+01:02:12,400 --> 01:02:17,160
+If Weeks is our primary crypto home,
+
+1633
+01:02:14,760 --> 01:02:19,440
+Hyperliquid is our primary on-chain
+
+1634
+01:02:17,160 --> 01:02:22,400
+home. To dominate that ecosystem, you
+
+1635
+01:02:19,440 --> 01:02:24,360
+need a specialist. Enter Senpai. Senpai
+
+1636
+01:02:22,400 --> 01:02:26,840
+is a turnkey personal trading agent
+
+1637
+01:02:24,360 --> 01:02:29,800
+built specifically for Hyperliquid. It
+
+1638
+01:02:26,840 --> 01:02:31,920
+packs 44 specialized MCP tools,
+
+1639
+01:02:29,800 --> 01:02:34,240
+persistent memory, and built-in Telegram
+
+1640
+01:02:31,920 --> 01:02:37,600
+alerts. This system has already
+
+1641
+01:02:34,240 --> 01:02:39,200
+processed over $100 million in volume.
+
+1642
+01:02:37,600 --> 01:02:41,360
+Under the hood, it's powered by
+
+1643
+01:02:39,200 --> 01:02:43,720
+OpenClaw, but today we're going to focus
+
+1644
+01:02:41,360 --> 01:02:46,640
+on getting it live in minutes. The
+
+1645
+01:02:43,720 --> 01:02:50,280
+easiest way to keep Senpai running 24/7
+
+1646
+01:02:46,640 --> 01:02:53,520
+is via Railway. One, go to senpai.ai and
+
+1647
+01:02:50,280 --> 01:02:55,480
+generate an authorization token. Two,
+
+1648
+01:02:53,520 --> 01:02:58,280
+head over to railway.app and use the
+
+1649
+01:02:55,480 --> 01:03:00,360
+Senpai template. Three, you'll need to
+
+1650
+01:02:58,280 --> 01:03:02,720
+fill in six environment variables,
+
+1651
+01:03:00,360 --> 01:03:04,840
+including your OpenRouter key and your
+
+1652
+01:03:02,720 --> 01:03:07,520
+Hyperliquid private key. Set your
+
+1653
+01:03:04,840 --> 01:03:09,320
+strategy parameters to a conservative 1%
+
+1654
+01:03:07,520 --> 01:03:11,480
+risk and five times leverage while
+
+1655
+01:03:09,320 --> 01:03:13,760
+you're testing. Once you hit deploy,
+
+1656
+01:03:11,480 --> 01:03:15,760
+Railway builds the agent in the cloud.
+
+1657
+01:03:13,760 --> 01:03:17,840
+You can close your laptop and Senpai
+
+1658
+01:03:15,760 --> 01:03:20,400
+will stay on the hunt. If you prefer to
+
+1659
+01:03:17,840 --> 01:03:22,280
+keep your keys on your own machine, you
+
+1660
+01:03:20,400 --> 01:03:24,640
+can install the Senpai skill bundle
+
+1661
+01:03:22,280 --> 01:03:27,680
+directly into Claude Code. Open your
+
+1662
+01:03:24,640 --> 01:03:28,640
+terminal and clone the repository. Copy
+
+1663
+01:03:27,680 --> 01:03:30,440
+the skills into your
+
+1664
+01:03:28,640 --> 01:03:32,800
+specialized.claudskills
+
+1665
+01:03:30,440 --> 01:03:35,680
+directory and relaunch Claude. You now
+
+1666
+01:03:32,800 --> 01:03:37,880
+have the exact same 44 tools, from
+
+1667
+01:03:35,680 --> 01:03:40,160
+opportunity scanners to wallet trackers,
+
+1668
+01:03:37,880 --> 01:03:42,320
+available right in your local terminal.
+
+1669
+01:03:40,160 --> 01:03:44,960
+Let's see what 44 specialized tools can
+
+1670
+01:03:42,320 --> 01:03:47,760
+actually do. Ask Senpai to rank every
+
+1671
+01:03:44,960 --> 01:03:49,880
+trader by ROI and consistency. It
+
+1672
+01:03:47,760 --> 01:03:51,400
+doesn't just look at P&L, it looks at
+
+1673
+01:03:49,880 --> 01:03:53,520
+the quality of the trading. Run the
+
+1674
+01:03:51,400 --> 01:03:56,040
+opportunity scanner to see which assets
+
+1675
+01:03:53,520 --> 01:03:59,120
+have smart money accelerating up the
+
+1676
+01:03:56,040 --> 01:04:00,960
+ranks. Or go full alpha and ask Senpai
+
+1677
+01:03:59,120 --> 01:04:02,680
+to build a copy trading strategy that
+
+1678
+01:04:00,960 --> 01:04:05,440
+mirrors the top three traders on the
+
+1679
+01:04:02,680 --> 01:04:06,920
+leaderboard with a 5% safety stop. You
+
+1680
+01:04:05,440 --> 01:04:08,480
+aren't just trading against the market
+
+1681
+01:04:06,920 --> 01:04:10,760
+anymore. You are standing on the
+
+1682
+01:04:08,480 --> 01:04:13,560
+shoulders of the most profitable giants
+
+1683
+01:04:10,760 --> 01:04:16,040
+in the ecosystem. Senpai also features a
+
+1684
+01:04:13,560 --> 01:04:18,520
+weekly arena. This is where agents go
+
+1685
+01:04:16,040 --> 01:04:20,880
+head-to-head. Every trade you make earns
+
+1686
+01:04:18,520 --> 01:04:23,080
+you points. Two points for every dollar
+
+1687
+01:04:20,880 --> 01:04:26,000
+volume. Even if you don't care about the
+
+1688
+01:04:23,080 --> 01:04:28,560
+prizes, watch the arena replays. It is
+
+1689
+01:04:26,000 --> 01:04:30,800
+the best way to see how top-tier AI
+
+1690
+01:04:28,560 --> 01:04:33,000
+agents reason under extreme market
+
+1691
+01:04:30,800 --> 01:04:35,120
+pressure. It's a masterclass in agentic
+
+1692
+01:04:33,000 --> 01:04:37,280
+logic. You now have a dedicated
+
+1693
+01:04:35,120 --> 01:04:39,640
+hyperliquid specialist. Whether it's
+
+1694
+01:04:37,280 --> 01:04:41,240
+running in the cloud or on your desk,
+
+1695
+01:04:39,640 --> 01:04:43,360
+you have the most advanced tools
+
+1696
+01:04:41,240 --> 01:04:45,080
+available for on-chain trading. In the
+
+1697
+01:04:43,360 --> 01:04:47,600
+next module, we're going to look at
+
+1698
+01:04:45,080 --> 01:04:50,240
+Hermes, the framework that allows your
+
+1699
+01:04:47,600 --> 01:04:52,080
+agents to learn and grow on their own.
+
+1700
+01:04:50,240 --> 01:04:54,040
+We've built execution bots and research
+
+1701
+01:04:52,080 --> 01:04:56,560
+assistants, but now we're installing the
+
+1702
+01:04:54,040 --> 01:04:58,440
+professor of our stack. Hermes is an
+
+1703
+01:04:56,560 --> 01:05:01,360
+open-source Python framework from News
+
+1704
+01:04:58,440 --> 01:05:03,400
+Research. It has nearly 100,000 stars on
+
+1705
+01:05:01,360 --> 01:05:05,280
+GitHub and a massive community behind
+
+1706
+01:05:03,400 --> 01:05:07,600
+it. But for us, only one feature
+
+1707
+01:05:05,280 --> 01:05:09,440
+matters, persistent memory.
+
+1708
+01:05:07,600 --> 01:05:11,840
+While other agents might forget what you
+
+1709
+01:05:09,440 --> 01:05:13,760
+talked about yesterday, Hermes remembers
+
+1710
+01:05:11,840 --> 01:05:15,400
+your prompts, your trade history, and
+
+1711
+01:05:13,760 --> 01:05:17,840
+your journals across every single
+
+1712
+01:05:15,400 --> 01:05:20,400
+session. It is the most alive feeling
+
+1713
+01:05:17,840 --> 01:05:22,400
+agent in this entire course. Let's get
+
+1714
+01:05:20,400 --> 01:05:24,280
+Hermes onto your machine. We're going to
+
+1715
+01:05:22,400 --> 01:05:26,400
+use the official setup script because it
+
+1716
+01:05:24,280 --> 01:05:29,040
+handles the heavy lifting. It installs a
+
+1717
+01:05:26,400 --> 01:05:30,760
+tool called UV for speed, creates a
+
+1718
+01:05:29,040 --> 01:05:32,920
+virtual environment, and links their
+
+1719
+01:05:30,760 --> 01:05:35,280
+Hermes command line interface directly
+
+1720
+01:05:32,920 --> 01:05:37,960
+to your system. Open your terminal and
+
+1721
+01:05:35,280 --> 01:05:40,040
+clone the repo. Run this prompt. Once
+
+1722
+01:05:37,960 --> 01:05:42,360
+that's done, you can call Hermes from
+
+1723
+01:05:40,040 --> 01:05:45,640
+anywhere on your machine just by typing
+
+1724
+01:05:42,360 --> 01:05:47,920
+his name. Now, run Hermes setup. This is
+
+1725
+01:05:45,640 --> 01:05:49,840
+where we wire the brain. Select Open
+
+1726
+01:05:47,920 --> 01:05:52,800
+Router as your provider. Use the same
+
+1727
+01:05:49,840 --> 01:05:55,400
+master key we generated in module 4.
+
+1728
+01:05:52,800 --> 01:05:57,720
+Pick Claude Sonnet 4.6 as your default
+
+1729
+01:05:55,400 --> 01:06:00,120
+model. Finally, enable the Telegram
+
+1730
+01:05:57,720 --> 01:06:02,560
+gateway. One of Hermes' unique strengths
+
+1731
+01:06:00,120 --> 01:06:04,440
+is its flexibility. If you don't like
+
+1732
+01:06:02,560 --> 01:06:07,360
+Telegram, you can bridge Hermes into
+
+1733
+01:06:04,440 --> 01:06:09,600
+Discord, Slack, or even WhatsApp. It
+
+1734
+01:06:07,360 --> 01:06:10,840
+meets you wherever you do your work.
+
+1735
+01:06:09,600 --> 01:06:13,440
+There are four commands you need to
+
+1736
+01:06:10,840 --> 01:06:15,480
+know. Hermes. It drops you into a live
+
+1737
+01:06:13,440 --> 01:06:18,640
+conversation where memory is always
+
+1738
+01:06:15,480 --> 01:06:21,040
+active. Hermes tools. This is where you
+
+1739
+01:06:18,640 --> 01:06:23,280
+add or remove capabilities.
+
+1740
+01:06:21,040 --> 01:06:25,040
+Hermes gateway. This starts the bridge
+
+1741
+01:06:23,280 --> 01:06:27,320
+to your messaging apps.
+
+1742
+01:06:25,040 --> 01:06:29,480
+Hermes doctor. If an integration fails
+
+1743
+01:06:27,320 --> 01:06:31,080
+or a key goes missing, run the doctor.
+
+1744
+01:06:29,480 --> 01:06:33,720
+It's the fastest way to diagnose your
+
+1745
+01:06:31,080 --> 01:06:35,800
+system. By default, Hermes is a standard
+
+1746
+01:06:33,720 --> 01:06:38,000
+agent. To make it self-learning, we need
+
+1747
+01:06:35,800 --> 01:06:40,040
+to edit the config file. Open your
+
+1748
+01:06:38,000 --> 01:06:42,400
+config.toml
+
+1749
+01:06:40,040 --> 01:06:44,880
+and flip persistent memory and skill
+
+1750
+01:06:42,400 --> 01:06:47,080
+generation to true. Now, when Hermes
+
+1751
+01:06:44,880 --> 01:06:49,360
+successfully completes a complex task
+
+1752
+01:06:47,080 --> 01:06:52,400
+like writing a new arbitrage script, it
+
+1753
+01:06:49,360 --> 01:06:54,120
+saves that logic as a reusable skill. It
+
+1754
+01:06:52,400 --> 01:06:56,360
+literally gets smarter the more you use
+
+1755
+01:06:54,120 --> 01:06:59,200
+it. You might be wondering, if I have
+
+1756
+01:06:56,360 --> 01:07:01,880
+Claude code, why do I need Hermes? Two
+
+1757
+01:06:59,200 --> 01:07:04,080
+reasons. First, open runtime. If
+
+1758
+01:07:01,880 --> 01:07:06,720
+Anthropic ever hits you with rate limits
+
+1759
+01:07:04,080 --> 01:07:09,160
+on a high volatility day, Hermes keeps
+
+1760
+01:07:06,720 --> 01:07:12,000
+running through any of the 300 models on
+
+1761
+01:07:09,160 --> 01:07:13,600
+Open Router. Second, the journal. Hermes
+
+1762
+01:07:12,000 --> 01:07:15,880
+is built to store long-term trade
+
+1763
+01:07:13,600 --> 01:07:18,040
+journals. It can look back at 6 months
+
+1764
+01:07:15,880 --> 01:07:19,440
+of your trades and identify patterns in
+
+1765
+01:07:18,040 --> 01:07:21,240
+your behavior that you might have
+
+1766
+01:07:19,440 --> 01:07:23,880
+missed. You now have an agent that
+
+1767
+01:07:21,240 --> 01:07:25,520
+doesn't just trade, it studies.
+
+1768
+01:07:23,880 --> 01:07:28,280
+In the next module, we're going to look
+
+1769
+01:07:25,520 --> 01:07:30,120
+at the engine behind it all, Open Claw.
+
+1770
+01:07:28,280 --> 01:07:33,080
+We are now looking at the titan of the
+
+1771
+01:07:30,120 --> 01:07:35,600
+ecosystem. Open Claw is the largest
+
+1772
+01:07:33,080 --> 01:07:38,760
+open-source Claw compatible agent
+
+1773
+01:07:35,600 --> 01:07:41,440
+runtime on the planet. As of April 2026,
+
+1774
+01:07:38,760 --> 01:07:43,840
+it has over 360,000
+
+1775
+01:07:41,440 --> 01:07:46,040
+stars on GitHub, a massive plugin
+
+1776
+01:07:43,840 --> 01:07:48,360
+marketplace called ClawHub, and a
+
+1777
+01:07:46,040 --> 01:07:50,720
+high-performance TypeScript design. But
+
+1778
+01:07:48,360 --> 01:07:53,720
+with massive reach comes massive risk.
+
+1779
+01:07:50,720 --> 01:07:55,880
+In March of 2026 alone, nine major
+
+1780
+01:07:53,720 --> 01:07:58,360
+security vulnerabilities were disclosed,
+
+1781
+01:07:55,880 --> 01:08:00,160
+including remote code execution. Even
+
+1782
+01:07:58,360 --> 01:08:02,560
+worse, independent audits found that up
+
+1783
+01:08:00,160 --> 01:08:05,680
+to 20% of the plugins on ClawHub are
+
+1784
+01:08:02,560 --> 01:08:07,480
+shipping malware or credential stealers.
+
+1785
+01:08:05,680 --> 01:08:09,400
+In this module, we're going to benefit
+
+1786
+01:08:07,480 --> 01:08:11,920
+from this massive ecosystem while
+
+1787
+01:08:09,400 --> 01:08:15,640
+ensuring your trading keys never leave
+
+1788
+01:08:11,920 --> 01:08:18,000
+your machine. Open Claw is a node.js
+
+1789
+01:08:15,640 --> 01:08:19,799
+based system. Run the install command in
+
+1790
+01:08:18,000 --> 01:08:22,359
+your terminal, but pay attention to the
+
+1791
+01:08:19,799 --> 01:08:25,080
+versioning. Never track the latest
+
+1792
+01:08:22,359 --> 01:08:26,880
+version in a production environment.
+
+1793
+01:08:25,080 --> 01:08:27,680
+That is how supply chain attacks reach
+
+1794
+01:08:26,880 --> 01:08:30,240
+you.
+
+1795
+01:08:27,680 --> 01:08:32,160
+Pick a known good stable version like
+
+1796
+01:08:30,240 --> 01:08:34,640
+the one listed in the course notes and
+
+1797
+01:08:32,160 --> 01:08:36,120
+pin it. When you run Open Claw start,
+
+1798
+01:08:34,640 --> 01:08:38,240
+the onboarding wizard will walk you
+
+1799
+01:08:36,120 --> 01:08:40,600
+through your Open Router keys and
+
+1800
+01:08:38,240 --> 01:08:42,400
+messaging channels. Before you install a
+
+1801
+01:08:40,600 --> 01:08:44,759
+single plugin, you need to understand
+
+1802
+01:08:42,400 --> 01:08:47,160
+the threats. Threat class A is
+
+1803
+01:08:44,759 --> 01:08:50,279
+credential theft. Agents have to read
+
+1804
+01:08:47,160 --> 01:08:52,359
+your .env files and wallet keys to work.
+
+1805
+01:08:50,279 --> 01:08:54,080
+A malicious plugin can stream those keys
+
+1806
+01:08:52,359 --> 01:08:57,000
+to a remote server in milliseconds.
+
+1807
+01:08:54,080 --> 01:08:58,759
+Threat class B is unauthorized trades. A
+
+1808
+01:08:57,000 --> 01:09:00,440
+charting plugin that asks for exchange
+
+1809
+01:08:58,759 --> 01:09:02,480
+permissions could drain your entire
+
+1810
+01:09:00,440 --> 01:09:04,319
+week's account while you're asleep.
+
+1811
+01:09:02,480 --> 01:09:06,279
+Treat Claw Hub like a dark alley
+
+1812
+01:09:04,319 --> 01:09:08,520
+marketplace. Do not install anything
+
+1813
+01:09:06,279 --> 01:09:10,160
+blindly. From this point forward, you
+
+1814
+01:09:08,520 --> 01:09:13,359
+follow a strict checklist for every
+
+1815
+01:09:10,160 --> 01:09:15,520
+plugin. Verify publishers only. Only
+
+1816
+01:09:13,359 --> 01:09:18,000
+install plugins with the blue check
+
+1817
+01:09:15,520 --> 01:09:20,319
+badge. Permission scrutiny. If a news
+
+1818
+01:09:18,000 --> 01:09:23,880
+reading plugin asks for shell access, it
+
+1819
+01:09:20,319 --> 01:09:25,600
+is a virus. Deny it. Sandbox everything.
+
+1820
+01:09:23,880 --> 01:09:27,480
+Never run Open Claw on your main
+
+1821
+01:09:25,600 --> 01:09:29,640
+development account. Run it as a
+
+1822
+01:09:27,480 --> 01:09:32,160
+dedicated low privilege user on your
+
+1823
+01:09:29,640 --> 01:09:33,880
+machine. If managing security patches
+
+1824
+01:09:32,160 --> 01:09:36,000
+sounds like a full-time job you don't
+
+1825
+01:09:33,880 --> 01:09:38,560
+want, use One Claw.
+
+1826
+01:09:36,000 --> 01:09:40,839
+This is the managed our SaaS version of
+
+1827
+01:09:38,560 --> 01:09:43,319
+the platform. The core team handles the
+
+1828
+01:09:40,839 --> 01:09:45,600
+CVE patches and audits the plugin shelf
+
+1829
+01:09:43,319 --> 01:09:47,960
+for you. You lose some open source
+
+1830
+01:09:45,600 --> 01:09:50,160
+street cred, but you gain a dramatically
+
+1831
+01:09:47,960 --> 01:09:52,640
+smaller tax surface for your money. Here
+
+1832
+01:09:50,160 --> 01:09:55,080
+is the ultimate pro move. You don't have
+
+1833
+01:09:52,640 --> 01:09:57,360
+to choose between security and features.
+
+1834
+01:09:55,080 --> 01:10:00,080
+You can use Hermes, which is Python base
+
+1835
+01:09:57,360 --> 01:10:02,280
+and safe as your brain, and use Open
+
+1836
+01:10:00,080 --> 01:10:03,960
+Claw only as a specialist tool for
+
+1837
+01:10:02,280 --> 01:10:05,480
+specific plugins.
+
+1838
+01:10:03,960 --> 01:10:08,680
+By using the agent communication
+
+1839
+01:10:05,480 --> 01:10:10,880
+protocol or ACP, you can run them side
+
+1840
+01:10:08,680 --> 01:10:14,040
+by side. You simply allow list the
+
+1841
+01:10:10,880 --> 01:10:16,320
+specific verified Open Claw plugins that
+
+1842
+01:10:14,040 --> 01:10:18,600
+Hermes is allowed to talk to. This is
+
+1843
+01:10:16,320 --> 01:10:21,000
+defense in depth. Even if an Open Claw
+
+1844
+01:10:18,600 --> 01:10:22,840
+plugin goes rogue, it physically cannot
+
+1845
+01:10:21,000 --> 01:10:25,040
+touch the rest of your system.
+
+1846
+01:10:22,840 --> 01:10:27,360
+You now have the keys to the largest AI
+
+1847
+01:10:25,040 --> 01:10:29,480
+agent library in existence, and more
+
+1848
+01:10:27,360 --> 01:10:30,720
+importantly, you have the armor to
+
+1849
+01:10:29,480 --> 01:10:32,480
+survive it.
+
+1850
+01:10:30,720 --> 01:10:34,400
+In the next module, we're going to look
+
+1851
+01:10:32,480 --> 01:10:36,840
+at advanced prompt engineering to make
+
+1852
+01:10:34,400 --> 01:10:38,800
+these agents even sharper. Trying to get
+
+1853
+01:10:36,840 --> 01:10:41,240
+one giant prompt to handle research,
+
+1854
+01:10:38,800 --> 01:10:43,160
+risk, and execution is exactly how
+
+1855
+01:10:41,240 --> 01:10:44,840
+accounts get blown up. In a real
+
+1856
+01:10:43,160 --> 01:10:47,760
+production environment, you don't use a
+
+1857
+01:10:44,840 --> 01:10:49,800
+generalist, you use specialists. Today,
+
+1858
+01:10:47,760 --> 01:10:52,600
+we are separating the job into three
+
+1859
+01:10:49,800 --> 01:10:55,080
+distinct agents. We'll use Open Claw as
+
+1860
+01:10:52,600 --> 01:10:57,680
+the orchestrator to coordinate the plan,
+
+1861
+01:10:55,080 --> 01:10:59,760
+and Hermes as the executor to handle the
+
+1862
+01:10:57,680 --> 01:11:02,560
+repeatable loops. They'll talk to each
+
+1863
+01:10:59,760 --> 01:11:04,600
+other over the ACP protocol. Together,
+
+1864
+01:11:02,560 --> 01:11:06,680
+they form a risk guardian system that
+
+1865
+01:11:04,600 --> 01:11:08,840
+protects your capital while you hunt for
+
+1866
+01:11:06,680 --> 01:11:11,040
+alpha. We're building a three-person
+
+1867
+01:11:08,840 --> 01:11:13,080
+team inside your machine, the alpha
+
+1868
+01:11:11,040 --> 01:11:15,360
+scanner. This agent reads the chain
+
+1869
+01:11:13,080 --> 01:11:19,000
+data, the charts, and the news. It
+
+1870
+01:11:15,360 --> 01:11:21,200
+outputs ranked trade ideas as JSON, but
+
+1871
+01:11:19,000 --> 01:11:23,680
+crucially, it is physically incapable of
+
+1872
+01:11:21,200 --> 01:11:25,600
+placing an order. The risk guardian,
+
+1873
+01:11:23,680 --> 01:11:27,120
+this is a stateless veto layer. It
+
+1874
+01:11:25,600 --> 01:11:28,880
+checks your total risk and looks for
+
+1875
+01:11:27,120 --> 01:11:31,120
+news blackouts like an upcoming Fed
+
+1876
+01:11:28,880 --> 01:11:34,240
+meeting. It only has two words in its
+
+1877
+01:11:31,120 --> 01:11:36,640
+vocabulary, approve or reject. The
+
+1878
+01:11:34,240 --> 01:11:39,120
+execute weak signal, this agent only
+
+1879
+01:11:36,640 --> 01:11:41,200
+listens to the guardian. If and only if
+
+1880
+01:11:39,120 --> 01:11:43,360
+a signal is approved, it calls the weak
+
+1881
+01:11:41,200 --> 01:11:45,120
+skill to fire the trade. For these
+
+1882
+01:11:43,360 --> 01:11:47,120
+agents to work together, they need to
+
+1883
+01:11:45,120 --> 01:11:50,440
+speak the same language. We use a
+
+1884
+01:11:47,120 --> 01:11:52,240
+standardized signal JSON shape. It
+
+1885
+01:11:50,440 --> 01:11:54,400
+contains everything, the entry, the
+
+1886
+01:11:52,240 --> 01:11:56,560
+stop, the confidence score, and the
+
+1887
+01:11:54,400 --> 01:11:58,680
+rationale. Because both Claude and
+
+1888
+01:11:56,560 --> 01:12:01,160
+Hermes validate the schema before
+
+1889
+01:11:58,680 --> 01:12:03,400
+acting, hallucinated trades are filtered
+
+1890
+01:12:01,160 --> 01:12:05,720
+out at the door. If the data doesn't fit
+
+1891
+01:12:03,400 --> 01:12:07,760
+the shape, the machine doesn't move. In
+
+1892
+01:12:05,720 --> 01:12:09,800
+the course notes, I provided the system
+
+1893
+01:12:07,760 --> 01:12:11,640
+prompts for all three. Your alpha
+
+1894
+01:12:09,800 --> 01:12:13,920
+scanner is programmed to run every 30
+
+1895
+01:12:11,640 --> 01:12:16,640
+minutes. Your risk guardian is the
+
+1896
+01:12:13,920 --> 01:12:19,440
+enforcer. It rejects any trade if your
+
+1897
+01:12:16,640 --> 01:12:21,960
+total account risk is over 6% or if
+
+1898
+01:12:19,440 --> 01:12:24,400
+there's a major CPI report in the next
+
+1899
+01:12:21,960 --> 01:12:26,920
+90 minutes. Your executor is the
+
+1900
+01:12:24,400 --> 01:12:28,360
+soldier. It doesn't generate ideas, it
+
+1901
+01:12:26,920 --> 01:12:31,280
+just follows orders that have been
+
+1902
+01:12:28,360 --> 01:12:32,960
+stamped with a guardian approved status.
+
+1903
+01:12:31,280 --> 01:12:34,720
+Now, where do these agents live? Open
+
+1904
+01:12:32,960 --> 01:12:36,480
+Claude runs the alpha scanner and the
+
+1905
+01:12:34,720 --> 01:12:38,120
+risk guardian. It's the perfect
+
+1906
+01:12:36,480 --> 01:12:39,960
+orchestrator for pulling from Fire
+
+1907
+01:12:38,120 --> 01:12:41,520
+Claude and TradingView. For the
+
+1908
+01:12:39,960 --> 01:12:45,240
+guardian, we can even use a smaller
+
+1909
+01:12:41,520 --> 01:12:47,240
+model like Haiku 4.5. It's fast, cheap,
+
+1910
+01:12:45,240 --> 01:12:49,720
+and more than enough for logic checks.
+
+1911
+01:12:47,240 --> 01:12:51,440
+Hermes runs the execution agent. Because
+
+1912
+01:12:49,720 --> 01:12:53,440
+Hermes has a learning loop, it actually
+
+1913
+01:12:51,440 --> 01:12:55,480
+gets better at hitting your fills and
+
+1914
+01:12:53,440 --> 01:12:58,080
+managing the Weex scale the more it
+
+1915
+01:12:55,480 --> 01:13:01,400
+trades. All three communicate over the
+
+1916
+01:12:58,080 --> 01:13:03,280
+ACP bridge we built in module 21. This
+
+1917
+01:13:01,400 --> 01:13:05,640
+setup allows you to fan out your signals
+
+1918
+01:13:03,280 --> 01:13:08,080
+to multiple channels. You could have a
+
+1919
+01:13:05,640 --> 01:13:10,720
+private Telegram for your own trades and
+
+1920
+01:13:08,080 --> 01:13:12,760
+a public alpha feed for your community,
+
+1921
+01:13:10,720 --> 01:13:14,680
+all driven by the same brain. You have
+
+1922
+01:13:12,760 --> 01:13:17,040
+transitioned from a single bot to a
+
+1923
+01:13:14,680 --> 01:13:19,400
+sovereign trading desk. Your risk is
+
+1924
+01:13:17,040 --> 01:13:21,760
+managed, your execution is specialized,
+
+1925
+01:13:19,400 --> 01:13:23,560
+and your research is automated. In the
+
+1926
+01:13:21,760 --> 01:13:27,760
+next module, we're going to look at the
+
+1927
+01:13:23,560 --> 01:13:30,120
+custom code layer, the CCXT bridge.
+
+1928
+01:13:27,760 --> 01:13:32,520
+Agents are incredible for research and
+
+1929
+01:13:30,120 --> 01:13:34,560
+complex decision-making. But for the
+
+1930
+01:13:32,520 --> 01:13:36,840
+tight inner loop, the moment-to-moment
+
+1931
+01:13:34,560 --> 01:13:39,160
+check of price just ticked, should I
+
+1932
+01:13:36,840 --> 01:13:41,480
+move my stop? You want old-school
+
+1933
+01:13:39,160 --> 01:13:43,600
+optimized code. In this module, we're
+
+1934
+01:13:41,480 --> 01:13:46,000
+going to use Claude code to scaffold a
+
+1935
+01:13:43,600 --> 01:13:48,840
+professional-grade Python bot. It will
+
+1936
+01:13:46,000 --> 01:13:50,600
+be type tested and production ready. It
+
+1937
+01:13:48,840 --> 01:13:52,760
+uses the Weex scale for the heavy
+
+1938
+01:13:50,600 --> 01:13:55,280
+lifting and handles the logic gates
+
+1939
+01:13:52,760 --> 01:13:57,680
+itself. This is the bridge between AI
+
+1940
+01:13:55,280 --> 01:13:59,200
+creativity and software stability. Our
+
+1941
+01:13:57,680 --> 01:14:02,320
+shopping list is built for global
+
+1942
+01:13:59,200 --> 01:14:05,040
+access. We use CCXT, which allows you to
+
+1943
+01:14:02,320 --> 01:14:07,080
+swap between Weex, Binance, or Kraken
+
+1944
+01:14:05,040 --> 01:14:09,680
+with a single line of code. We include
+
+1945
+01:14:07,080 --> 01:14:12,280
+Pydantic for data validation and Loguru
+
+1946
+01:14:09,680 --> 01:14:14,320
+for structured logs. This ensures that
+
+1947
+01:14:12,280 --> 01:14:16,920
+if the bot does something unexpected,
+
+1948
+01:14:14,320 --> 01:14:19,360
+you have a clear, searchable trail of
+
+1949
+01:14:16,920 --> 01:14:21,560
+exactly why it happened. We aren't just
+
+1950
+01:14:19,360 --> 01:14:23,800
+creating a single file. We are building
+
+1951
+01:14:21,560 --> 01:14:25,760
+a professional directory structure.
+
+1952
+01:14:23,800 --> 01:14:27,760
+I provided a master prompt in the notes
+
+1953
+01:14:25,760 --> 01:14:30,320
+that tells Claude to scaffold the entire
+
+1954
+01:14:27,760 --> 01:14:33,000
+project. From the strategy layer to the
+
+1955
+01:14:30,320 --> 01:14:35,000
+risk guardian and the execution wrapper.
+
+1956
+01:14:33,000 --> 01:14:37,400
+Claude will generate the models, wire
+
+1957
+01:14:35,000 --> 01:14:38,800
+the data fetcher, and create a makefile.
+
+1958
+01:14:37,400 --> 01:14:41,000
+This means you don't have to remember
+
+1959
+01:14:38,800 --> 01:14:43,000
+complex commands. You just type make
+
+1960
+01:14:41,000 --> 01:14:44,800
+test or make run paper.
+
+1961
+01:14:43,000 --> 01:14:46,880
+Notice that we require the bot to pass
+
+1962
+01:14:44,800 --> 01:14:48,800
+its own unit test before we even attempt
+
+1963
+01:14:46,880 --> 01:14:50,240
+to run it. If the risk rules aren't
+
+1964
+01:14:48,800 --> 01:14:52,400
+working in the test, the bot won't
+
+1965
+01:14:50,240 --> 01:14:54,840
+launch. In professional trading, safety
+
+1966
+01:14:52,400 --> 01:14:56,960
+isn't a feature, it's the foundation.
+
+1967
+01:14:54,840 --> 01:14:59,760
+Default paper, your bot will default to
+
+1968
+01:14:56,960 --> 01:15:01,680
+live equals false. You have to manually
+
+1969
+01:14:59,760 --> 01:15:04,240
+flip a toggle and set an environment
+
+1970
+01:15:01,680 --> 01:15:06,200
+variable to risk a single dollar. The
+
+1971
+01:15:04,240 --> 01:15:08,720
+daily kill switch, if your total loss
+
+1972
+01:15:06,200 --> 01:15:10,680
+for the day hits 3%, the bot is
+
+1973
+01:15:08,720 --> 01:15:13,560
+programmed to flatten all positions and
+
+1974
+01:15:10,680 --> 01:15:15,920
+exit. It protects you from yourself. The
+
+1975
+01:15:13,560 --> 01:15:17,760
+heartbeat, every time the loop runs, the
+
+1976
+01:15:15,920 --> 01:15:20,240
+bot sends a one-line status to your
+
+1977
+01:15:17,760 --> 01:15:21,800
+Telegram. If your phone goes silent, you
+
+1978
+01:15:20,240 --> 01:15:23,720
+know immediately that something is
+
+1979
+01:15:21,800 --> 01:15:26,000
+wrong. Once Claude finishes the
+
+1980
+01:15:23,720 --> 01:15:27,800
+scaffold, it's time for the first run.
+
+1981
+01:15:26,000 --> 01:15:30,400
+Move into your bot directory and run
+
+1982
+01:15:27,800 --> 01:15:32,200
+make install, then make test. If you see
+
+1983
+01:15:30,400 --> 01:15:34,600
+all green, you are ready for make run
+
+1984
+01:15:32,200 --> 01:15:37,080
+paper. Let this run for at least 48
+
+1985
+01:15:34,600 --> 01:15:40,040
+hours in paper mode. Review every single
+
+1986
+01:15:37,080 --> 01:15:42,000
+log entry. Check every simulated fill.
+
+1987
+01:15:40,040 --> 01:15:44,400
+Make sure the risk guardian rejected the
+
+1988
+01:15:42,000 --> 01:15:46,600
+trades it was supposed to. Only once the
+
+1989
+01:15:44,400 --> 01:15:48,840
+logs are boring and the math is perfect
+
+1990
+01:15:46,600 --> 01:15:50,800
+do you even think about going live. You
+
+1991
+01:15:48,840 --> 01:15:53,040
+now have a professional Python trading
+
+1992
+01:15:50,800 --> 01:15:54,960
+engine. It's clean, it's fast, and it's
+
+1993
+01:15:53,040 --> 01:15:57,080
+built to be managed by you and Claude as
+
+1994
+01:15:54,960 --> 01:15:59,680
+a team. Now that your bot is built, we
+
+1995
+01:15:57,080 --> 01:16:01,480
+need a place for it to live 24/7. Your
+
+1996
+01:15:59,680 --> 01:16:03,320
+laptop is not a production environment.
+
+1997
+01:16:01,480 --> 01:16:05,720
+If your Wi-Fi drops or your battery
+
+1998
+01:16:03,320 --> 01:16:07,480
+dies, your bot dies with it. To trade
+
+1999
+01:16:05,720 --> 01:16:09,760
+like a professional, your code needs to
+
+2000
+01:16:07,480 --> 01:16:11,480
+live in a hardened data center with
+
+2001
+01:16:09,760 --> 01:16:12,520
+99.9%
+
+2002
+01:16:11,480 --> 01:16:14,240
+uptime.
+
+2003
+01:16:12,520 --> 01:16:17,000
+In this module, we are moving your bot
+
+2004
+01:16:14,240 --> 01:16:21,240
+to a Hostinger KVM
+
+2005
+01:16:17,000 --> 01:16:24,440
+2 VPS running Ubuntu 24.04.
+
+2006
+01:16:21,240 --> 01:16:26,200
+We are going to harden your SSH access,
+
+2007
+01:16:24,440 --> 01:16:28,760
+lock down the firewall, and wrap your
+
+2008
+01:16:26,200 --> 01:16:30,920
+bot in a system service so it auto
+
+2009
+01:16:28,760 --> 01:16:33,480
+restarts if it ever crashes. Head over
+
+2010
+01:16:30,920 --> 01:16:35,560
+to this link. I recommend the KVM 2
+
+2011
+01:16:33,480 --> 01:16:37,600
+plan. This is more than enough to run
+
+2012
+01:16:35,560 --> 01:16:38,720
+your bot plus multiple Claude code
+
+2013
+01:16:37,600 --> 01:16:40,440
+sessions.
+
+2014
+01:16:38,720 --> 01:16:42,960
+When choosing a data center, think about
+
+2015
+01:16:40,440 --> 01:16:44,560
+latency. Set a strong root password, but
+
+2016
+01:16:42,960 --> 01:16:46,840
+don't get too attached to it. We're
+
+2017
+01:16:44,560 --> 01:16:48,720
+going to disable it in the next step.
+
+2018
+01:16:46,840 --> 01:16:50,880
+The second your IP address hits the
+
+2019
+01:16:48,720 --> 01:16:52,880
+public internet, malicious bots will
+
+2020
+01:16:50,880 --> 01:16:54,640
+start knocking on your door. We are
+
+2021
+01:16:52,880 --> 01:16:57,680
+going to lock it down immediately.
+
+2022
+01:16:54,640 --> 01:17:00,320
+Create a dedicated user named trader.
+
+2023
+01:16:57,680 --> 01:17:03,520
+Upload your SSH public key from your
+
+2024
+01:17:00,320 --> 01:17:06,080
+laptop. Disable root login and password
+
+2025
+01:17:03,520 --> 01:17:07,760
+authentication. By doing this, even if
+
+2026
+01:17:06,080 --> 01:17:10,440
+someone guesses your password, they
+
+2027
+01:17:07,760 --> 01:17:12,960
+can't get in. Only your physical laptop
+
+2028
+01:17:10,440 --> 01:17:15,560
+carrying your unique key has the badge
+
+2029
+01:17:12,960 --> 01:17:18,400
+required to enter the server. Finally,
+
+2030
+01:17:15,560 --> 01:17:21,440
+enable the UFW firewall and only allow
+
+2031
+01:17:18,400 --> 01:17:23,480
+port 22 for your secure connection. Now,
+
+2032
+01:17:21,440 --> 01:17:26,440
+login as your new trader user, update
+
+2033
+01:17:23,480 --> 01:17:28,520
+the system, and install the Python 3.12
+
+2034
+01:17:26,440 --> 01:17:30,800
+runtime. You're going to get clone your
+
+2035
+01:17:28,520 --> 01:17:32,560
+trading repository, create a fresh
+
+2036
+01:17:30,800 --> 01:17:36,080
+virtual environment, and install your
+
+2037
+01:17:32,560 --> 01:17:38,280
+requirements. Copy your .env file from
+
+2038
+01:17:36,080 --> 01:17:40,760
+your laptop to the server. Now, take
+
+2039
+01:17:38,280 --> 01:17:43,640
+that VPS public IP address and go back
+
+2040
+01:17:40,760 --> 01:17:46,040
+to your Wix API settings. Whitelist this
+
+2041
+01:17:43,640 --> 01:17:48,600
+specific IP. This is your final layer of
+
+2042
+01:17:46,040 --> 01:17:50,960
+security. Your API keys will now refuse
+
+2043
+01:17:48,600 --> 01:17:53,400
+to work from any computer on Earth
+
+2044
+01:17:50,960 --> 01:17:54,960
+except this one specific server. We
+
+2045
+01:17:53,400 --> 01:17:57,040
+don't want to run the bot manually in a
+
+2046
+01:17:54,960 --> 01:17:59,120
+terminal window. We want it to be a
+
+2047
+01:17:57,040 --> 01:18:01,600
+system service. We're going to create a
+
+2048
+01:17:59,120 --> 01:18:03,720
+system unit file. This tells Ubuntu this
+
+2049
+01:18:01,600 --> 01:18:05,800
+bot is a priority. If the server
+
+2050
+01:18:03,720 --> 01:18:08,720
+reboots, start the bot. If the bot
+
+2051
+01:18:05,800 --> 01:18:10,160
+crashes, wait 5 seconds and restart it.
+
+2052
+01:18:08,720 --> 01:18:12,760
+Once you reload the daemon and hit
+
+2053
+01:18:10,160 --> 01:18:14,640
+start, your bot is officially a daemon,
+
+2054
+01:18:12,760 --> 01:18:17,280
+a background process that breathes on
+
+2055
+01:18:14,640 --> 01:18:19,120
+its own. Now that the bot is invisible
+
+2056
+01:18:17,280 --> 01:18:21,840
+in the background, how do you see what
+
+2057
+01:18:19,120 --> 01:18:23,840
+it's doing? You use journalctl.
+
+2058
+01:18:21,840 --> 01:18:26,920
+Type this. This gives you a live
+
+2059
+01:18:23,840 --> 01:18:29,560
+streaming view of your bot's heartbeat.
+
+2060
+01:18:26,920 --> 01:18:32,200
+Every trade, every risk check, and every
+
+2061
+01:18:29,560 --> 01:18:33,840
+API call shows up here in real time.
+
+2062
+01:18:32,200 --> 01:18:36,080
+Your laptop is now just a remote
+
+2063
+01:18:33,840 --> 01:18:38,120
+control. Your bot is live in a
+
+2064
+01:18:36,080 --> 01:18:39,560
+professional data center.
+
+2065
+01:18:38,120 --> 01:18:42,320
+In our final module, we're going to
+
+2066
+01:18:39,560 --> 01:18:44,520
+build the glass cockpit, the personal
+
+2067
+01:18:42,320 --> 01:18:46,320
+trading dashboard. You've done it.
+
+2068
+01:18:44,520 --> 01:18:48,760
+You've built the engine, the radar, the
+
+2069
+01:18:46,320 --> 01:18:50,600
+brain, and the safety net. But, looking
+
+2070
+01:18:48,760 --> 01:18:53,280
+at 12 different terminal windows and
+
+2071
+01:18:50,600 --> 01:18:55,440
+browser tabs is not how a professional
+
+2072
+01:18:53,280 --> 01:18:57,880
+operator works. You need one pane of
+
+2073
+01:18:55,440 --> 01:19:00,320
+glass. In this final module, we are
+
+2074
+01:18:57,880 --> 01:19:01,520
+building your live ops dashboard. We'll
+
+2075
+01:19:00,320 --> 01:19:04,000
+start by bootstrapping a
+
+2076
+01:19:01,520 --> 01:19:06,320
+high-performance HTML skeleton with the
+
+2077
+01:19:04,000 --> 01:19:08,360
+Wick scale. Then, we'll fold in every
+
+2078
+01:19:06,320 --> 01:19:11,080
+other piece of the stack from Alpaca
+
+2079
+01:19:08,360 --> 01:19:13,880
+stocks to your whale tracker data until
+
+2080
+01:19:11,080 --> 01:19:16,080
+you have a real-time glass cockpit for
+
+2081
+01:19:13,880 --> 01:19:18,120
+your entire trading empire. We're going
+
+2082
+01:19:16,080 --> 01:19:20,200
+to let Claude code do the heavy lifting
+
+2083
+01:19:18,120 --> 01:19:22,640
+here. Use the prompt in the notes to
+
+2084
+01:19:20,200 --> 01:19:24,760
+generate a single page dashboard. We
+
+2085
+01:19:22,640 --> 01:19:27,560
+aren't using heavy frameworks like React
+
+2086
+01:19:24,760 --> 01:19:29,640
+or Vue. We want speed. We're going with
+
+2087
+01:19:27,560 --> 01:19:31,360
+vanilla JavaScript, a dark theme to
+
+2088
+01:19:29,640 --> 01:19:33,440
+match our course aesthetic, and
+
+2089
+01:19:31,360 --> 01:19:36,080
+JetBrains Mono for the numbers because
+
+2090
+01:19:33,440 --> 01:19:38,840
+precision matters. This dashboard will
+
+2091
+01:19:36,080 --> 01:19:41,680
+auto-refresh every 30 seconds, showing
+
+2092
+01:19:38,840 --> 01:19:43,360
+your equity curve, your open positions,
+
+2093
+01:19:41,680 --> 01:19:46,200
+and your most recent signals from the
+
+2094
+01:19:43,360 --> 01:19:47,560
+log files. Once the skeleton is live, we
+
+2095
+01:19:46,200 --> 01:19:50,040
+start plugging in the rest of the
+
+2096
+01:19:47,560 --> 01:19:52,640
+course. One prompt at a time, you will
+
+2097
+01:19:50,040 --> 01:19:55,000
+ask Claude to add an Alpaca panel for
+
+2098
+01:19:52,640 --> 01:19:56,480
+your US stocks, add a whale pulse to see
+
+2099
+01:19:55,000 --> 01:19:58,840
+what the smart money is doing without
+
+2100
+01:19:56,480 --> 01:20:01,320
+leaving the page, add a heartbeat panel
+
+2101
+01:19:58,840 --> 01:20:02,760
+that monitors your VPS. If that dot
+
+2102
+01:20:01,320 --> 01:20:06,440
+turns red, you know your bot has
+
+2103
+01:20:02,760 --> 01:20:08,560
+stopped. Add your send P and agent P&L
+
+2104
+01:20:06,440 --> 01:20:10,640
+stats so you can see how your autonomous
+
+2105
+01:20:08,560 --> 01:20:12,320
+agents are performing. You're not just
+
+2106
+01:20:10,640 --> 01:20:14,600
+building a website, you're building a
+
+2107
+01:20:12,320 --> 01:20:16,560
+sovereign intelligence hub. Now, where
+
+2108
+01:20:14,600 --> 01:20:18,720
+does this live? If you want it for your
+
+2109
+01:20:16,560 --> 01:20:21,360
+eyes only, serve it from your hosting or
+
+2110
+01:20:18,720 --> 01:20:22,680
+VPS using Caddy and lock it behind your
+
+2111
+01:20:21,360 --> 01:20:25,520
+IP address.
+
+2112
+01:20:22,680 --> 01:20:27,880
+If you want a fast global URL, push it
+
+2113
+01:20:25,520 --> 01:20:29,800
+to Netlify. If you want to turn this
+
+2114
+01:20:27,880 --> 01:20:32,080
+into a business, you can anonymize the
+
+2115
+01:20:29,800 --> 01:20:35,320
+data and gate the dashboard behind a
+
+2116
+01:20:32,080 --> 01:20:37,840
+wall tier. Your proof room becomes a $29
+
+2117
+01:20:35,320 --> 01:20:39,240
+a month subscription that sells itself.
+
+2118
+01:20:37,840 --> 01:20:42,360
+Take a look at what has changed in your
+
+2119
+01:20:39,240 --> 01:20:44,760
+life. You went from 12 browser tabs and
+
+2120
+01:20:42,360 --> 01:20:47,600
+doom scrolling Twitter for entries to
+
+2121
+01:20:44,760 --> 01:20:49,600
+one single URL. Every morning the daily
+
+2122
+01:20:47,600 --> 01:20:51,960
+alpha brief hits your inbox while you're
+
+2123
+01:20:49,600 --> 01:20:54,200
+still in bed. Your custom bot handles
+
+2124
+01:20:51,960 --> 01:20:56,600
+the inner loop execution with a built-in
+
+2125
+01:20:54,200 --> 01:20:59,000
+risk guardian. And your dashboard shows
+
+2126
+01:20:56,600 --> 01:21:01,520
+you the results in real time. You are no
+
+2127
+01:20:59,000 --> 01:21:03,680
+longer playing the markets. You have
+
+2128
+01:21:01,520 --> 01:21:05,840
+engineered a professional advantage.
+
+2129
+01:21:03,680 --> 01:21:08,080
+Your computer is now a high-frequency
+
+2130
+01:21:05,840 --> 01:21:10,880
+workstation and your agents are your
+
+2131
+01:21:08,080 --> 01:21:13,800
+employees. The rest of the day, the rest
+
+2132
+01:21:10,880 --> 01:21:15,800
+of the day is yours. Congratulations.
+
+2133
+01:21:13,800 --> 01:21:18,840
+You have completed the trading AI full
+
+2134
+01:21:15,800 --> 01:21:21,040
+course. Now go out there and execute. A
+
+2135
+01:21:18,840 --> 01:21:23,040
+few hours ago this was a blank laptop.
+
+2136
+01:21:21,040 --> 01:21:25,080
+Now it is a professional grade AI
+
+2137
+01:21:23,040 --> 01:21:27,400
+trading stack. You have the research
+
+2138
+01:21:25,080 --> 01:21:29,640
+brain, the execution hands, the risk
+
+2139
+01:21:27,400 --> 01:21:31,800
+guardian, three brokers, and a custom
+
+2140
+01:21:29,640 --> 01:21:33,520
+bot running in the cloud. This is the
+
+2141
+01:21:31,800 --> 01:21:35,400
+shortest module in the course because
+
+2142
+01:21:33,520 --> 01:21:37,000
+the work is done. This is the one that
+
+2143
+01:21:35,400 --> 01:21:38,960
+tells you exactly what to do tomorrow
+
+2144
+01:21:37,000 --> 01:21:40,800
+morning. Let's look at the empire you
+
+2145
+01:21:38,960 --> 01:21:43,080
+just built. You have Claude code dialed
+
+2146
+01:21:40,800 --> 01:21:46,040
+in. Your Wix and Alpaca accounts are
+
+2147
+01:21:43,080 --> 01:21:47,720
+live. Interactive Brokers is bridged.
+
+2148
+01:21:46,040 --> 01:21:50,400
+You've installed the whale tracker, the
+
+2149
+01:21:47,720 --> 01:21:52,600
+TradingView MCP, and your daily alpha
+
+2150
+01:21:50,400 --> 01:21:54,920
+brief. You have cloud routines running
+
+2151
+01:21:52,600 --> 01:21:57,320
+your research, webhooks automating your
+
+2152
+01:21:54,920 --> 01:22:00,040
+trades, a custom bot hardened on a
+
+2153
+01:21:57,320 --> 01:22:02,520
+hosting or VPS, and a live ops dashboard
+
+2154
+01:22:00,040 --> 01:22:04,560
+that unifies everything. You didn't just
+
+2155
+01:22:02,520 --> 01:22:07,040
+watch a course, you shipped a production
+
+2156
+01:22:04,560 --> 01:22:08,960
+system. A quick moment of transparency.
+
+2157
+01:22:07,040 --> 01:22:11,120
+Every tool in this course from Wix to
+
+2158
+01:22:08,960 --> 01:22:13,240
+Hostinger pays me a referral when you
+
+2159
+01:22:11,120 --> 01:22:15,720
+use my links. That's how I'm able to
+
+2160
+01:22:13,240 --> 01:22:17,920
+keep this content high velocity and high
+
+2161
+01:22:15,720 --> 01:22:20,080
+production. When you start shipping your
+
+2162
+01:22:17,920 --> 01:22:22,160
+own strategies or building your own
+
+2163
+01:22:20,080 --> 01:22:24,160
+versions of this course, you should do
+
+2164
+01:22:22,160 --> 01:22:26,880
+the same. These are the tools we
+
+2165
+01:22:24,160 --> 01:22:29,120
+actually use. They are the backbone of
+
+2166
+01:22:26,880 --> 01:22:31,320
+the industry. This is the most important
+
+2167
+01:22:29,120 --> 01:22:33,400
+part of the course. This is how your
+
+2168
+01:22:31,320 --> 01:22:35,640
+life changes tomorrow morning. You've
+
+2169
+01:22:33,400 --> 01:22:37,880
+successfully delegated the grunt work of
+
+2170
+01:22:35,640 --> 01:22:40,080
+trading to the machines. If you want
+
+2171
+01:22:37,880 --> 01:22:42,760
+everything I showed you today, every
+
+2172
+01:22:40,080 --> 01:22:45,000
+prompt, every skill code, every setup
+
+2173
+01:22:42,760 --> 01:22:47,360
+guide, it is all inside my private
+
+2174
+01:22:45,000 --> 01:22:49,680
+group. Link is in the description, first
+
+2175
+01:22:47,360 --> 01:22:52,200
+link. Everything is in there. If you
+
+2176
+01:22:49,680 --> 01:22:53,760
+found this useful, leave a like. It
+
+2177
+01:22:52,200 --> 01:22:55,840
+genuinely does help the channel.
+
+2178
+01:22:53,760 --> 01:22:58,520
+Subscribe if you have not already.
+
+2179
+01:22:55,840 --> 01:23:00,240
+The system is live. The edge is yours.
+
+2180
+01:22:58,520 --> 01:23:02,360
+Now, go out there and execute. I'll see
+
+2181
+01:23:00,240 --> 01:23:04,880
+you at the top of the leaderboard.
+
+2182
+01:23:02,360 --> 01:23:06,920
+You're watching charts.
+
+2183
+01:23:04,880 --> 01:23:08,680
+Losing sleep.
+
+2184
+01:23:06,920 --> 01:23:10,520
+Missing setups.
+
+2185
+01:23:08,680 --> 01:23:13,040
+While bots with no emotions take the
+
+2186
+01:23:10,520 --> 01:23:15,200
+trades you should have taken.
+
+2187
+01:23:13,040 --> 01:23:17,440
+Trading is math. Humans feel. That's the
+
+2188
+01:23:15,200 --> 01:23:19,520
+whole problem. AI doesn't hesitate,
+
+2189
+01:23:17,440 --> 01:23:21,600
+doesn't revenge trade, doesn't freeze at
+
+2190
+01:23:19,520 --> 01:23:23,600
+the 2:00 a.m. liquidation candle. It
+
+2191
+01:23:21,600 --> 01:23:25,880
+just executes the plan every single
+
+2192
+01:23:23,600 --> 01:23:27,840
+time.
+
+2193
+01:23:25,880 --> 01:23:30,120
+Inside AI Trade Edge, I give you the
+
+2194
+01:23:27,840 --> 01:23:32,360
+full stack, autonomous trading agents,
+
+2195
+01:23:30,120 --> 01:23:35,360
+backtested strategies, plug-and-play
+
+2196
+01:23:32,360 --> 01:23:37,360
+templates, new tools every week. Not
+
+2197
+01:23:35,360 --> 01:23:39,040
+theory, real agents running while you
+
+2198
+01:23:37,360 --> 01:23:40,680
+sleep, while you're at the gym, while
+
+2199
+01:23:39,040 --> 01:23:43,320
+everyone else is still watching YouTube
+
+2200
+01:23:40,680 --> 01:23:45,040
+tutorials. Every week you wait, someone
+
+2201
+01:23:43,320 --> 01:23:48,880
+with worse charts and better systems
+
+2202
+01:23:45,040 --> 01:23:52,160
+profits. AI Trade Edge, first 100 spots,
+
+2203
+01:23:48,880 --> 01:23:54,480
+$79.99 a month, locked in forever. After
+
+2204
+01:23:52,160 --> 01:23:56,720
+that, the price goes up permanently.
+
+2205
+01:23:54,480 --> 01:24:01,160
+Stop watching, start executing, trade
+
+2206
+01:23:56,720 --> 01:24:01,160
+smarter with Alex Carter. Join now.
+

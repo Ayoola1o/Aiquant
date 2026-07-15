@@ -1,6 +1,16 @@
 import asyncio
+import os
 import json
-from typing import List, Optional
+import logging
+import traceback
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from collections import defaultdict
+from dotenv import load_dotenv
+
+# Load environment variables (e.g. GEMINI_API_KEY)
+load_dotenv()
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,6 +21,7 @@ from ai_assistant import generate_strategy_script, refine_strategy_script, get_n
 from backtest_engine import run_historical_backtest
 from trading_engine import live_session
 from social_scraper import scraper
+import database as db
 
 app = FastAPI(
     title="Aiquant API",
@@ -49,6 +60,7 @@ class BacktestRequest(BaseModel):
     commission_pct: float = 0.001
     alpaca_key_id: Optional[str] = ""
     alpaca_secret_key: Optional[str] = ""
+    exchange: Optional[str] = "yfinance"
 
 class OptimizeRequest(BaseModel):
     symbols: List[str]
@@ -103,6 +115,7 @@ class RiskProfileModel(BaseModel):
     max_drawdown_percent: float = 3.0
     heartbeat_check_enabled: bool = False
     max_heartbeat_stale_seconds: int = 30
+    exit_size_pct: float = 100.0
 
 class StartSessionRequest(BaseModel):
     symbol: str = "BTCUSDT"
@@ -120,7 +133,23 @@ class SpawnBotRequest(BaseModel):
     feed_source: Optional[str] = "binance"
     alpaca_key_id: Optional[str] = ""
     alpaca_secret_key: Optional[str] = ""
+    hyperliquid_private_key: Optional[str] = ""
     risk_profile: Optional[dict] = None
+    agentic_mode: Optional[bool] = False
+    gemini_api_key: Optional[str] = ""
+    tech_agent_key: Optional[str] = ""
+    sentiment_agent_key: Optional[str] = ""
+    tradingview_agent_key: Optional[str] = ""
+    hyperliquid_agent_key: Optional[str] = ""
+    firecrawl_agent_key: Optional[str] = ""
+
+class SyncKeysRequest(BaseModel):
+    gemini: Optional[str] = ""
+    tech: Optional[str] = ""
+    sentiment: Optional[str] = ""
+    tradingview: Optional[str] = ""
+    hyperliquid: Optional[str] = ""
+    firecrawl: Optional[str] = ""
 
 class AlpacaOrderRequest(BaseModel):
     alpaca_key_id: str
@@ -218,22 +247,49 @@ def run_backtest(req: BacktestRequest):
     """
     Compiles and executes a custom strategy script against historical data.
     """
+    warmup_days = 210
+    actual_period = req.period
+    warmup_candles = 0
+
+    if "_" in req.period:
+        start_str, end_str = req.period.split("_")
+        from datetime import datetime, timedelta
+        try:
+            start_dt = datetime.strptime(start_str, "%Y-%m-%d")
+            warmup_start_dt = start_dt - timedelta(days=warmup_days)
+            actual_period = f"{warmup_start_dt.strftime('%Y-%m-%d')}_{end_str}"
+        except Exception:
+            pass
+
     df = qe.fetch_historical_data(
         req.ticker,
-        period=req.period,
+        period=actual_period,
         interval=req.interval,
         alpaca_key_id=req.alpaca_key_id,
-        alpaca_secret_key=req.alpaca_secret_key
+        alpaca_secret_key=req.alpaca_secret_key,
+        exchange=req.exchange
     )
     if df.empty:
         raise HTTPException(status_code=400, detail=f"Failed to fetch historical data for {req.ticker}")
+        
+    # Calculate exact warmup_candles based on the original requested start date
+    if "_" in req.period:
+        start_str, _ = req.period.split("_")
+        try:
+            target_start = pd.to_datetime(start_str, utc=True)
+            # Compare with df timestamps
+            df_ts = pd.to_datetime(df["timestamp"], utc=True)
+            warmup_candles = (df_ts < target_start).sum()
+        except Exception:
+            pass
         
     df = qe.compute_indicators(df)
     res = run_historical_backtest(
         strategy_code=req.strategy_code,
         df=df,
         starting_capital=req.starting_capital,
-        commission_pct=req.commission_pct
+        commission_pct=req.commission_pct,
+        warmup_candles=warmup_candles
     )
     return res
 
@@ -344,7 +400,15 @@ def spawn_bot(req: SpawnBotRequest):
         req.feed_source,
         req.alpaca_key_id,
         req.alpaca_secret_key,
-        risk_profile=req.risk_profile
+        hyperliquid_private_key=req.hyperliquid_private_key,
+        risk_profile=req.risk_profile,
+        agentic_mode=req.agentic_mode,
+        gemini_api_key=req.gemini_api_key,
+        tech_agent_key=req.tech_agent_key,
+        sentiment_agent_key=req.sentiment_agent_key,
+        tradingview_agent_key=req.tradingview_agent_key,
+        hyperliquid_agent_key=req.hyperliquid_agent_key,
+        firecrawl_agent_key=req.firecrawl_agent_key
     )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to spawn bot.")
@@ -356,13 +420,37 @@ def update_live_risk_profile(req: RiskProfileModel):
     return {"status": "success", "risk_profile": live_session.global_risk_profile}
 
 @app.post("/api/live/bots/stop/{bot_id}")
-def stop_bot(bot_id: str):
-    live_session.stop_bot(bot_id)
+def stop_bot(bot_id: str, close_pct: float = 1.0):
+    live_session.stop_bot(bot_id, close_pct=close_pct)
     return {"status": "success", "bots": live_session.get_all_states()}
 
 @app.get("/api/live/bots")
 def get_all_bots():
     return {"status": "success", "bots": live_session.get_all_states()}
+
+@app.post("/api/live/bots/keys")
+def sync_live_keys(req: SyncKeysRequest):
+    new_keys = {
+        "gemini": req.gemini,
+        "tech": req.tech,
+        "sentiment": req.sentiment,
+        "tradingview": req.tradingview,
+        "hyperliquid": req.hyperliquid,
+        "firecrawl": req.firecrawl
+    }
+    # Filter out empty keys so we don't overwrite with blanks accidentally, though usually we pass all of them
+    new_keys = {k: v for k, v in new_keys.items() if v}
+    live_session.update_keys_for_all_bots(new_keys)
+    return {"status": "success", "message": "Keys hot-swapped for all Agentic bots."}
+
+@app.get("/api/history")
+def get_history():
+    from database import get_bot_sessions
+    try:
+        sessions = get_bot_sessions()
+        return {"status": "success", "sessions": sessions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class AlpacaCredentials(BaseModel):
@@ -1514,6 +1602,79 @@ def get_social_sentiment(ticker: str):
     """
     return scraper.get_aggregated_sentiment(ticker)
 
+@app.get("/api/social/news")
+def get_global_social_news(limit: int = 15):
+    """
+    Gathers and aggregates X/Twitter posts for multiple tracked assets to construct a global news feed.
+    """
+    tickers = ["MTNN", "NVDA", "TSLA", "DANGCEM", "AAPL", "MSFT", "SEPLAT", "GTCO"]
+    all_posts = []
+    for ticker in tickers:
+        posts = scraper.scrape_twitter_scaffold(ticker)
+        for post in posts:
+            all_posts.append({
+                **post,
+                "ticker": ticker
+            })
+    return {"posts": all_posts[:limit]}
+ 
+class HandleRequest(BaseModel):
+    handle: str
+
+@app.get("/api/social/x-handles")
+def get_x_handles_endpoint():
+    """
+    Returns the list of currently tracked X/Twitter handles from database.
+    """
+    return {"handles": db.get_x_handles()}
+
+@app.post("/api/social/x-handles")
+def add_x_handle_endpoint(req: HandleRequest):
+    """
+    Adds a new X/Twitter handle to the tracked list in the database.
+    """
+    success = db.add_x_handle(req.handle)
+    if not success:
+        raise HTTPException(status_code=400, detail="Handle is empty, invalid or already tracked.")
+    return {"success": True, "handles": db.get_x_handles()}
+
+@app.delete("/api/social/x-handles")
+def delete_x_handle_endpoint(handle: str):
+    """
+    Deletes an X/Twitter handle from the database.
+    """
+    success = db.delete_x_handle(handle)
+    if not success:
+        raise HTTPException(status_code=404, detail="Handle not found in tracked list.")
+    return {"success": True, "handles": db.get_x_handles()}
+
+class ADKEvaluationRequest(BaseModel):
+    ticker: str
+    gemini_api_key: Optional[str] = ""
+    balance: Optional[float] = 10000.0
+    drawdown_limit: Optional[float] = 5.0
+    max_allocation_pct: Optional[float] = 2.0
+
+@app.post("/api/adk/evaluate")
+async def evaluate_adk_pipeline(req: ADKEvaluationRequest):
+    """
+    Triggers the Google ADK sequential multi-agent evaluation pipeline for a symbol.
+    """
+    import adk_agent
+    
+    account_profile = {
+        "balance": req.balance,
+        "drawdown_limit": req.drawdown_limit,
+        "max_allocation_pct": req.max_allocation_pct
+    }
+    
+    result = await adk_agent.run_adk_validation(
+        ticker=req.ticker,
+        gemini_api_key=req.gemini_api_key,
+        account_profile=account_profile
+    )
+    return result
+
 @app.get("/api/profile")
 def get_user_profile():
     """
@@ -1569,6 +1730,187 @@ def get_user_profile():
         ]
     }
 
+class AlpacaChartDataRequest(BaseModel):
+    alpaca_key_id: str
+    alpaca_secret_key: str
+    symbol: Optional[str] = None        # filter fills by symbol; None = all
+    candle_period: Optional[str] = "1mo"
+    candle_interval: Optional[str] = "1h"
+
+@app.post("/api/alpaca/chart-data")
+def get_alpaca_chart_data(req: AlpacaChartDataRequest):
+    """
+    Returns:
+      - candles: list of OHLCV bars for the requested symbol+period
+      - fills:   list of BUY/SELL fill events from Alpaca account activities
+      - equity_curve: daily equity snapshots from portfolio history
+      - symbols: all unique symbols found in account activities
+    """
+    import requests as rq
+    import yfinance as yf
+    import numpy as np
+
+    headers = {
+        "APCA-API-KEY-ID": req.alpaca_key_id,
+        "APCA-API-SECRET-KEY": req.alpaca_secret_key,
+    }
+    paper_base = "https://paper-api.alpaca.markets/v2"
+
+    # 1. Fetch FILL activities (trade executions)
+    fills_raw = []
+    try:
+        r = rq.get(
+            f"{paper_base}/account/activities/FILL",
+            headers=headers,
+            params={"page_size": 500, "direction": "asc"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                fills_raw = data
+    except Exception as e:
+        print(f"[chart-data] fills fetch error: {e}")
+
+    # Collect unique symbols
+    all_symbols = list({f.get("symbol") for f in fills_raw if f.get("symbol")})
+
+    # Filter fills to requested symbol
+    # Fall back to first traded symbol, then AAPL as default so we always show candles
+    target_sym = req.symbol or (all_symbols[0] if all_symbols else "AAPL")
+    fills = []
+    if target_sym:
+        for f in fills_raw:
+            if f.get("symbol") != target_sym:
+                continue
+            fills.append({
+                "symbol": f.get("symbol"),
+                "side": f.get("side", "").upper(),          # "buy" | "sell"
+                "qty": float(f.get("qty") or 0),
+                "price": float(f.get("price") or 0),
+                "timestamp": f.get("transaction_time") or f.get("date", ""),
+                "order_id": f.get("order_id", ""),
+            })
+
+    # 2. Fetch OHLCV candles via yfinance (works for both stocks and crypto)
+    candles = []
+    if target_sym:
+        try:
+            # Map Alpaca symbol format → yfinance (e.g. BTCUSD → BTC-USD)
+            yf_sym = target_sym
+            crypto_map = {
+                "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD", "SOLUSD": "SOL-USD",
+                "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD",
+                "ADAUSD": "ADA-USD", "DOTUSD": "DOT-USD", "AVAXUSD": "AVAX-USD",
+                "LINKUSD": "LINK-USD", "MATICUSD": "MATIC-USD",
+            }
+            yf_sym = crypto_map.get(target_sym, target_sym)
+            ticker_obj = yf.Ticker(yf_sym)
+            
+            # Auto-adjust period for 1m interval to prevent yfinance errors (max 7d)
+            c_period = req.candle_period
+            if req.candle_interval == "1m":
+                c_period = "5d"
+
+            df = ticker_obj.history(period=c_period, interval=req.candle_interval)
+            if df is not None and len(df) > 0:
+                df = df.reset_index()
+                ts_col = "Datetime" if "Datetime" in df.columns else "Date"
+                for _, row in df.iterrows():
+                    ts = row[ts_col]
+                    # Ensure timestamp is UTC aware to match Alpaca's UTC fills
+                    if hasattr(ts, 'tz_convert'):
+                        try:
+                            ts = ts.tz_convert('UTC')
+                        except TypeError:
+                            ts = ts.tz_localize('UTC')
+                    
+                    if hasattr(ts, "isoformat"):
+                        ts_str = ts.isoformat()
+                        if not ts_str.endswith('Z') and '+' not in ts_str:
+                            ts_str += 'Z'
+                    else:
+                        ts_str = str(ts)
+                        
+                    candles.append({
+                        "time": ts_str,
+                        "open": round(float(row["Open"]), 4),
+                        "high": round(float(row["High"]), 4),
+                        "low": round(float(row["Low"]), 4),
+                        "close": round(float(row["Close"]), 4),
+                        "volume": round(float(row["Volume"]), 2),
+                    })
+        except Exception as e:
+            print(f"[chart-data] candle fetch error for {target_sym}: {e}")
+
+    # Compute simple SMA-20 and EMA-50 overlays on close prices
+    closes = [c["close"] for c in candles]
+    sma20, ema50 = [], []
+    for i, c in enumerate(candles):
+        if i >= 19:
+            sma20.append(round(float(np.mean(closes[i-19:i+1])), 4))
+        else:
+            sma20.append(None)
+        if i == 0:
+            ema50.append(closes[0])
+        else:
+            k = 2 / (50 + 1)
+            prev = ema50[-1] if ema50[-1] is not None else closes[i]
+            ema50.append(round(float(prev + k * (closes[i] - prev)), 4))
+
+    # RSI-14
+    rsi14 = [None] * len(closes)
+    if len(closes) > 14:
+        gains, losses = [], []
+        for i in range(1, len(closes)):
+            d = closes[i] - closes[i-1]
+            gains.append(max(d, 0))
+            losses.append(max(-d, 0))
+        avg_gain = float(np.mean(gains[:14]))
+        avg_loss = float(np.mean(losses[:14]))
+        for i in range(14, len(closes)):
+            avg_gain = (avg_gain * 13 + gains[i-1]) / 14
+            avg_loss = (avg_loss * 13 + losses[i-1]) / 14
+            rs = avg_gain / avg_loss if avg_loss > 0 else 100
+            rsi14[i] = round(100 - 100 / (1 + rs), 2)
+
+    for i, c in enumerate(candles):
+        c["sma20"] = sma20[i]
+        c["ema50"] = ema50[i]
+        c["rsi14"] = rsi14[i]
+
+    # 3. Equity curve from portfolio history
+    equity_curve = []
+    try:
+        r2 = rq.get(
+            f"{paper_base}/account/portfolio/history",
+            headers=headers,
+            params={"period": "1M", "timeframe": "1D"},
+            timeout=8,
+        )
+        if r2.status_code == 200:
+            h = r2.json()
+            timestamps = h.get("timestamp", [])
+            equities = h.get("equity", [])
+            for ts, eq in zip(timestamps, equities):
+                if eq is None:
+                    continue
+                from datetime import datetime, timezone
+                dt = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                equity_curve.append({"time": dt, "equity": round(float(eq), 2)})
+    except Exception as e:
+        print(f"[chart-data] equity history error: {e}")
+
+    return {
+        "status": "ok",
+        "symbol": target_sym,
+        "symbols": all_symbols,
+        "candles": candles,
+        "fills": fills,
+        "equity_curve": equity_curve,
+    }
+
+
 class AlpacaPerformanceRequest(BaseModel):
     alpaca_key_id: str
     alpaca_secret_key: str
@@ -1611,8 +1953,8 @@ def get_alpaca_performance(req: AlpacaPerformanceRequest):
             if not sym:
                 continue
             side = f.get("side", "").upper()
-            qty = float(f.get("qty", 0))
-            price = float(f.get("price", 0))
+            qty = float(f.get("qty") or 0)
+            price = float(f.get("price") or 0)
             date = f.get("transaction_time") or f.get("date")
             
             if sym not in positions:
@@ -1736,8 +2078,8 @@ def get_alpaca_performance(req: AlpacaPerformanceRequest):
             net_equity = float(acc_info.get("equity", 10000.0))
             last_equity = float(acc_info.get("last_equity", 10000.0))
 
-        # 5. Fetch history
-        hist_params = {"period": "1M", "timeframe": "1D"}
+        # 5. Fetch history (15Min to capture intraday volatility)
+        hist_params = {"period": "1M", "timeframe": "15Min"}
         hist_r = rq.get(f"{base}/account/portfolio/history", headers=headers, params=hist_params, timeout=8)
         
         weekly_pnl = 0.0
@@ -1822,6 +2164,10 @@ def get_alpaca_performance(req: AlpacaPerformanceRequest):
             "per_asset": per_asset
         }
     except Exception as e:
+        import traceback
+        print("--- /api/alpaca/performance Exception ---")
+        traceback.print_exc()
+        
         # Fallback to local SQLite database if there was a connection error or API issue
         try:
             import database as db
@@ -1927,7 +2273,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 sym = payload.get("symbol", "BTCUSDT")
                 code = payload.get("strategy_code", "")
                 tf = payload.get("timeframe", "10s")
-                live_session.start_session(sym, code, tf)
+                feed = payload.get("feed_source", "mock")
+                key = payload.get("alpaca_key_id", "")
+                sec = payload.get("alpaca_secret_key", "")
+                live_session.start_session(sym, code, tf, feed_source=feed, alpaca_key_id=key, alpaca_secret_key=sec)
             elif msg_type == "stop":
                 live_session.stop_session()
 

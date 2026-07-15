@@ -1,7 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
-import { Shield, TrendingUp, BarChart2, DollarSign, Activity, Key, RefreshCw, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, Tooltip,
+  ComposedChart, Bar, Line, ReferenceLine, Legend,
+} from 'recharts';
+import {
+  Shield, TrendingUp, BarChart2, DollarSign, Activity, Key,
+  RefreshCw, CheckCircle2, AlertTriangle, ExternalLink, TrendingDown, BarChart,
+} from 'lucide-react';
+
+// ─── Candlestick shape — receives y=top-of-wickRange, height=wickRange pixels ─
+const CandlestickBar = (props: any) => {
+  const { x, y, width, height, payload } = props;
+  if (!payload || !height || height <= 0 || width <= 0) return null;
+  const { open, high, low, close } = payload;
+  const priceRange = high - low;
+  if (priceRange <= 0) return null;
+  const isUp = close >= open;
+  const color = isUp ? '#10b981' : '#ef4444';
+  const cx = x + width / 2;
+  const bw = Math.max(2, width - 2);
+  // height spans low→high in pixels; y is the pixel position of high (top)
+  const pxPerPrice = height / priceRange;
+  const bodyTop    = y + (high - Math.max(open, close)) * pxPerPrice;
+  const bodyBottom = y + (high - Math.min(open, close)) * pxPerPrice;
+  const bodyH = Math.max(1, bodyBottom - bodyTop);
+  return (
+    <g>
+      {/* wick */}
+      <line x1={cx} y1={y} x2={cx} y2={y + height} stroke={color} strokeWidth={1} />
+      {/* body */}
+      <rect x={x + 1} y={bodyTop} width={bw} height={bodyH} fill={color} fillOpacity={0.85} />
+    </g>
+  );
+};
+
+// ─── Buy / Sell signal dot ────────────────────────────────────────────────────
+const TradeDot = (props: any) => {
+  const { cx, cy, payload } = props;
+  if (!payload?.signal) return null;
+  const isBuy = payload.signal === 'BUY';
+  const color = isBuy ? '#22c55e' : '#ef4444';
+  const arrow = isBuy ? '▲' : '▼';
+  const offsetY = isBuy ? 18 : -18;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={5} fill={color} stroke="#0f1115" strokeWidth={1.5} />
+      <text x={cx} y={cy - offsetY} textAnchor="middle" fontSize={9} fontWeight="bold" fill={color}>{arrow} {payload.signal}</text>
+    </g>
+  );
+};
 
 interface PortfolioProps {
   alpacaKeyId?: string;
@@ -28,6 +77,17 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
   const [performanceLoading, setPerformanceLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'performance'>('overview');
 
+  // ── Interactive chart state ──────────────────────────────────────────────
+  const [chartData, setChartData] = useState<any>(null);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartSymbol, setChartSymbol] = useState<string>('');
+  const [chartInterval, setChartInterval] = useState<string>('1h');
+  const [chartPeriod, setChartPeriod] = useState<string>('1mo');
+  const [showSMA, setShowSMA] = useState(true);
+  const [showEMA, setShowEMA] = useState(true);
+  const [showRSI, setShowRSI] = useState(true);
+  const [chartView, setChartView] = useState<'candlestick' | 'equity'>('candlestick');
+
   // Simulated bot portfolio fallback states
   const [cash, setCash] = useState(10000.0);
   const [portfolioValue, setPortfolioValue] = useState(10000.0);
@@ -53,6 +113,33 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
       setPerformanceLoading(false);
     }
   }, [alpacaKeyId, alpacaSecretKey, hasAlpacaKeys]);
+
+  const fetchChartData = useCallback(async (sym?: string) => {
+    if (!hasAlpacaKeys) return;
+    setChartLoading(true);
+    try {
+      const res = await fetch('/api/alpaca/chart-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alpaca_key_id: alpacaKeyId,
+          alpaca_secret_key: alpacaSecretKey,
+          symbol: sym || chartSymbol || null,
+          candle_period: chartPeriod,
+          candle_interval: chartInterval,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChartData(data);
+        if (!chartSymbol && data.symbol) setChartSymbol(data.symbol);
+      }
+    } catch (e) {
+      console.error('Chart data fetch error', e);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [alpacaKeyId, alpacaSecretKey, hasAlpacaKeys, chartSymbol, chartPeriod, chartInterval]);
 
   const fetchAlpacaAccount = useCallback(async () => {
     if (!hasAlpacaKeys) return;
@@ -157,9 +244,16 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
     fetchAlpacaAccount();
     fetchPerformanceData();
     fetchLiveStatus();
-    const interval = setInterval(fetchLiveStatus, 5000);
+    fetchChartData();
+    const interval = setInterval(() => {
+      fetchLiveStatus();
+      if (hasAlpacaKeys) {
+        fetchAlpacaAccount();
+        fetchPerformanceData();
+      }
+    }, 10000); // 10s poll to avoid Alpaca rate limits
     return () => clearInterval(interval);
-  }, [fetchAlpacaAccount, fetchPerformanceData, fetchLiveStatus]);
+  }, [fetchAlpacaAccount, fetchPerformanceData, fetchLiveStatus, fetchChartData, hasAlpacaKeys]);
 
   // Derived values from Alpaca if available, else bot fallback
   const displayCash = alpacaAccount ? parseFloat(alpacaAccount.cash) : cash;
@@ -454,6 +548,357 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
 
       {activeTab === 'overview' && (
         <>
+          {/* ══════════════════════════════════════════════════
+              Interactive Trade Execution Chart
+          ══════════════════════════════════════════════════ */}
+          <div className="glass-panel p-6 mt-6">
+            {/* Header row */}
+            <div className="flex flex-wrap items-center gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <BarChart className="w-4 h-4 text-indigo-400" />
+                <h3 className="font-bold text-sm text-white">Interactive Trade Execution Chart</h3>
+                {alpacaAccount && (
+                  <span className="text-[9px] text-emerald-400 font-mono font-semibold px-2 py-0.5 border border-emerald-500/20 rounded-full bg-emerald-500/5">
+                    ALPACA LIVE
+                  </span>
+                )}
+              </div>
+
+              {/* Symbol picker — auto-populated from Alpaca fills */}
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                {chartData?.symbols?.length > 0 && (
+                  <select
+                    value={chartSymbol}
+                    onChange={(e) => { setChartSymbol(e.target.value); fetchChartData(e.target.value); }}
+                    className="px-2 py-1.5 bg-[#0F1115] border border-white/10 rounded-lg text-[11px] font-mono text-white outline-none focus:border-indigo-500/50"
+                  >
+                    {chartData.symbols.map((s: string) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                )}
+                {/* Interval */}
+                <select
+                  value={chartInterval}
+                  onChange={(e) => setChartInterval(e.target.value)}
+                  className="px-2 py-1.5 bg-[#0F1115] border border-white/10 rounded-lg text-[11px] font-mono text-white outline-none focus:border-indigo-500/50"
+                >
+                  {['1m','5m','15m','30m','1h','4h','1d'].map(i => (
+                    <option key={i} value={i}>{i}</option>
+                  ))}
+                </select>
+                {/* Period */}
+                <select
+                  value={chartPeriod}
+                  onChange={(e) => setChartPeriod(e.target.value)}
+                  className="px-2 py-1.5 bg-[#0F1115] border border-white/10 rounded-lg text-[11px] font-mono text-white outline-none focus:border-indigo-500/50"
+                >
+                  {['5d','1mo','3mo','6mo'].map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                {/* View toggle */}
+                <div className="flex rounded-lg border border-white/10 overflow-hidden">
+                  {(['candlestick','equity'] as const).map(v => (
+                    <button key={v} onClick={() => setChartView(v)}
+                      className={`px-3 py-1.5 text-[10px] font-bold capitalize transition-all cursor-pointer ${
+                        chartView === v ? 'bg-indigo-600 text-white' : 'bg-[#0F1115] text-slate-400 hover:text-white'
+                      }`}
+                    >{v}</button>
+                  ))}
+                </div>
+                {/* Indicator toggles */}
+                {chartView === 'candlestick' && (
+                  <div className="flex gap-1.5">
+                    {[['SMA20', showSMA, setShowSMA, '#f59e0b'], ['EMA50', showEMA, setShowEMA, '#6366f1'], ['RSI', showRSI, setShowRSI, '#ec4899']] .map(([label, active, setter, color]: any) => (
+                      <button key={label} onClick={() => setter((p: boolean) => !p)}
+                        className={`px-2 py-1 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                          active ? 'opacity-100 text-white border-white/20' : 'opacity-40 text-slate-500 border-transparent'
+                        }`}
+                        style={{ backgroundColor: active ? `${color}22` : 'transparent', borderColor: active ? color : 'transparent' }}
+                      >{label}</button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => fetchChartData(chartSymbol || undefined)}
+                  disabled={chartLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 rounded-lg text-[10px] font-bold text-indigo-300 hover:bg-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${chartLoading ? 'animate-spin' : ''}`} />
+                  {chartLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+
+            {/* No keys banner */}
+            {!hasAlpacaKeys && (
+              <div className="h-48 flex flex-col items-center justify-center text-center gap-2">
+                <BarChart className="w-8 h-8 text-slate-700" />
+                <p className="text-xs text-slate-500">Connect your Alpaca Paper API keys to view live trade execution charts.</p>
+              </div>
+            )}
+
+            {/* Loading shimmer */}
+            {hasAlpacaKeys && chartLoading && (
+              <div className="h-72 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" />
+                  <p className="text-xs text-slate-500">Fetching trade executions and candle data…</p>
+                </div>
+              </div>
+            )}
+
+            {/* CANDLESTICK VIEW */}
+            {hasAlpacaKeys && !chartLoading && chartView === 'candlestick' && (() => {
+              const candles: any[] = chartData?.candles || [];
+              const fills: any[] = chartData?.fills || [];
+
+              if (candles.length === 0) return (
+                <div className="h-64 flex flex-col items-center justify-center gap-3">
+                  <BarChart className="w-8 h-8 text-slate-700" />
+                  <p className="text-xs text-slate-500">No candle data — select a symbol and click Refresh.</p>
+                </div>
+              );
+
+              // ── Merge fill timestamps onto nearest candle ──
+              const merged = candles.map((c: any, index: number) => {
+                const cTime = new Date(c.time).getTime();
+                let nextTime = index < candles.length - 1 ? new Date(candles[index + 1].time).getTime() : cTime + (cTime - new Date(candles[Math.max(0, index - 1)].time).getTime() || 3600000);
+                
+                let signal: string | null = null;
+                let signalPrice: number | null = null;
+                
+                for (const f of fills) {
+                  const fTime = new Date(f.timestamp).getTime();
+                  // Match if the fill time is within this candle's duration
+                  if (fTime >= cTime && fTime < nextTime) {
+                    signal = f.side === 'BUY' ? 'BUY' : 'SELL';
+                    signalPrice = f.price;
+                    break; // Just take the first fill in this candle for the marker
+                  }
+                }
+                return { ...c, signal, signalPrice };
+              });
+
+              // ── STACKED-BAR APPROACH: normalize relative to chart min ──
+              // Bar 1: transparent spacer  _base  = low - priceMin  (anchors the colored bar)
+              // Bar 2: colored wick range  _wick  = high - low
+              // Indicator lines also need to be shifted: _sma = sma20 - priceMin, etc.
+              const lows   = merged.map((c: any) => c.low);
+              const highs  = merged.map((c: any) => c.high);
+              const priceMin = Math.min(...lows);
+              const priceMax = Math.max(...highs);
+              const rangeTotal = priceMax - priceMin || 1;
+
+              const normalized = merged.map((c: any) => ({
+                ...c,
+                _base:  c.low  - priceMin,
+                _wick:  c.high - c.low,
+                _sma20: c.sma20  != null ? c.sma20  - priceMin : null,
+                _ema50: c.ema50  != null ? c.ema50  - priceMin : null,
+                _signal: c.signalPrice != null ? c.signalPrice - priceMin : null,
+              }));
+
+              const fmt = (v: number) => {
+                const real = v + priceMin;  // add back baseline for display
+                return real > 1000 ? `$${(real / 1000).toFixed(2)}k` : `$${real.toFixed(2)}`;
+              };
+              const fmtReal = (v: number) => v > 1000 ? `$${(v / 1000).toFixed(2)}k` : `$${v.toFixed(2)}`;
+
+              return (
+                <>
+                  {/* ── Main price chart ── */}
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={normalized} margin={{ top: 8, right: 68, left: 0, bottom: 0 }}>
+                        <XAxis
+                          dataKey="time" stroke="#2d3748"
+                          tick={{ fill: '#6b7280', fontSize: 8 }} tickLine={false}
+                          tickFormatter={(v: string) => {
+                            try { const d = new Date(v); return `${d.getMonth()+1}/${d.getDate()}`; } catch { return v; }
+                          }}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          domain={[0, rangeTotal * 1.002]}
+                          stroke="#2d3748"
+                          tick={{ fill: '#6b7280', fontSize: 9 }}
+                          tickLine={false}
+                          orientation="right"
+                          width={64}
+                          tickFormatter={(v: number) => fmtReal(v + priceMin)}
+                        />
+                        <Tooltip
+                          content={({ active, payload }: any) => {
+                            if (!active || !payload?.[0]) return null;
+                            const d = payload[0].payload;
+                            return (
+                              <div className="bg-[#0a101e] border border-white/10 rounded-xl p-3 text-[10px] font-mono shadow-2xl">
+                                <div className="text-slate-400 mb-1.5">{new Date(d.time).toLocaleString()}</div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                  <span className="text-slate-500">O</span><span className="text-white font-bold">{fmtReal(d.open)}</span>
+                                  <span className="text-slate-500">H</span><span className="text-emerald-400 font-bold">{fmtReal(d.high)}</span>
+                                  <span className="text-slate-500">L</span><span className="text-red-400 font-bold">{fmtReal(d.low)}</span>
+                                  <span className="text-slate-500">C</span><span className={`font-bold ${d.close >= d.open ? 'text-emerald-400' : 'text-red-400'}`}>{fmtReal(d.close)}</span>
+                                  {d.sma20 != null && <><span className="text-slate-500">SMA20</span><span className="text-amber-400">{fmtReal(d.sma20)}</span></>}
+                                  {d.ema50 != null && <><span className="text-slate-500">EMA50</span><span className="text-indigo-400">{fmtReal(d.ema50)}</span></>}
+                                </div>
+                                {d.signal && (
+                                  <div className={`mt-2 text-center font-bold px-2 py-0.5 rounded ${
+                                    d.signal === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {d.signal === 'BUY' ? '▲' : '▼'} {d.signal} @ {fmtReal(d.signalPrice || d.close)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }}
+                        />
+                        {/* Stacked candles: transparent base spacer + colored wick range */}
+                        <Bar dataKey="_base" stackId="c" fill="transparent" isAnimationActive={false} legendType="none" />
+                        <Bar dataKey="_wick" stackId="c" shape={<CandlestickBar />} isAnimationActive={false} legendType="none" />
+                        {/* SMA-20 overlay (normalized) */}
+                        {showSMA && <Line type="monotone" dataKey="_sma20" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls strokeDasharray="4 2" name="SMA20" />}
+                        {/* EMA-50 overlay (normalized) */}
+                        {showEMA && <Line type="monotone" dataKey="_ema50" stroke="#6366f1" strokeWidth={1.5} dot={false} connectNulls name="EMA50" />}
+                        {/* BUY/SELL signal markers (normalized) */}
+                        <Line
+                          type="monotone" dataKey="_signal"
+                          stroke="transparent"
+                          dot={(p: any) => {
+                            if (!p.payload?.signal) return <g key={p.key} />;
+                            const isBuy = p.payload.signal === 'BUY';
+                            const col = isBuy ? '#22c55e' : '#ef4444';
+                            return (
+                              <g key={p.key}>
+                                <circle cx={p.cx} cy={p.cy} r={6} fill={col} stroke="#0f1115" strokeWidth={1.5} />
+                                <text x={p.cx} y={isBuy ? p.cy + 18 : p.cy - 10} textAnchor="middle" fontSize={9} fontWeight="bold" fill={col}>
+                                  {isBuy ? '▲' : '▼'} {p.payload.signal}
+                                </text>
+                              </g>
+                            );
+                          }}
+                          isAnimationActive={false} legendType="none"
+                        />
+                        {/* BUY/SELL horizontal reference lines */}
+                        {fills.map((f: any, i: number) => (
+                          <ReferenceLine key={i}
+                            y={f.price - priceMin}
+                            stroke={f.side === 'BUY' ? '#22c55e' : '#ef4444'}
+                            strokeDasharray="3 3" strokeWidth={0.8} strokeOpacity={0.6}
+                            label={{ value: `${f.side === 'BUY' ? '▲' : '▼'} ${fmtReal(f.price)}`, fill: f.side === 'BUY' ? '#22c55e' : '#ef4444', fontSize: 8, position: 'insideRight' }}
+                          />
+                        ))}
+                        <Legend iconType="line" wrapperStyle={{ fontSize: 10, color: '#9ca3af' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* ── RSI sub-chart ── */}
+                  {showRSI && (
+                    <div className="h-20 w-full mt-1">
+                      <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-0.5 pl-1">RSI 14</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={normalized} margin={{ top: 0, right: 68, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="time" hide />
+                          <YAxis domain={[0, 100]} stroke="#2d3748" tick={{ fill: '#6b7280', fontSize: 8 }} tickLine={false} orientation="right" width={32} />
+                          <Tooltip content={() => null} />
+                          <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="4 2" strokeWidth={0.8} label={{ value: '70', fill: '#ef4444', fontSize: 8, position: 'right' }} />
+                          <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="4 2" strokeWidth={0.8} label={{ value: '30', fill: '#22c55e', fontSize: 8, position: 'right' }} />
+                          <Area type="monotone" dataKey="rsi14" stroke="#ec4899" strokeWidth={1.5} fill="#ec489922" connectNulls />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {/* ── Fill execution chips ── */}
+                  <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/5">
+                    {fills.length > 0 ? (
+                      <>
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider self-center">Trade Executions</span>
+                        {fills.map((f: any, i: number) => (
+                          <span key={i} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                            f.side === 'BUY' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          }`}>
+                            {f.side === 'BUY' ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                            {f.side} {f.qty} @ {fmtReal(f.price)}
+                            <span className="opacity-60 font-mono">{new Date(f.timestamp).toLocaleDateString()}</span>
+                          </span>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-slate-600">No fill activities for {chartData?.symbol || chartSymbol}. Place trades to see execution markers on the chart.</span>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* EQUITY CURVE VIEW */}
+            {hasAlpacaKeys && !chartLoading && chartView === 'equity' && (() => {
+              const eq: any[] = chartData?.equity_curve || [];
+              if (eq.length === 0) return (
+                <div className="h-64 flex items-center justify-center text-xs text-slate-600">No equity history available yet.</div>
+              );
+              const minE = Math.min(...eq.map((e: any) => e.equity)) * 0.998;
+              const maxE = Math.max(...eq.map((e: any) => e.equity)) * 1.002;
+              const start = eq[0]?.equity || 10000;
+              const end = eq[eq.length-1]?.equity || 10000;
+              const pct = ((end - start) / start * 100).toFixed(2);
+              const isPos = end >= start;
+              return (
+                <>
+                  <div className="flex items-baseline gap-4 mb-4">
+                    <span className="text-2xl font-bold font-mono text-white">${end.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    <span className={`text-sm font-bold ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {isPos ? '+' : ''}{pct}% (1M)
+                    </span>
+                  </div>
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={eq} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="eqGrad2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={isPos ? '#10b981' : '#ef4444'} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={isPos ? '#10b981' : '#ef4444'} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="time" stroke="#2d3748" tick={{ fill: '#6b7280', fontSize: 8 }}
+                          tickFormatter={(v: string) => { try { const d = new Date(v); return `${d.getMonth()+1}/${d.getDate()}`; } catch { return v; } }}
+                          interval="preserveStartEnd" tickLine={false} />
+                        <YAxis domain={[minE, maxE]} stroke="#2d3748" tick={{ fill: '#6b7280', fontSize: 9 }}
+                          tickFormatter={(v: number) => `$${(v/1000).toFixed(1)}k`}
+                          orientation="right" tickLine={false} width={50} />
+                        <Tooltip
+                          contentStyle={{ background: '#0a101e', borderColor: '#1e293b', fontSize: 10 }}
+                          formatter={(v: any) => [`$${parseFloat(v).toLocaleString(undefined, {minimumFractionDigits: 2})}`, 'Equity']}
+                          labelFormatter={(l: string) => new Date(l).toLocaleDateString()}
+                        />
+                        <Area type="monotone" dataKey="equity"
+                          stroke={isPos ? '#10b981' : '#ef4444'} strokeWidth={2}
+                          fill="url(#eqGrad2)" />
+                        <ReferenceLine y={start} stroke="#475569" strokeDasharray="4 2" strokeWidth={0.8}
+                          label={{ value: 'Start', fill: '#64748b', fontSize: 8, position: 'insideLeft' }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* Empty state */}
+            {hasAlpacaKeys && !chartLoading && !chartData && (
+              <div className="h-48 flex flex-col items-center justify-center gap-3">
+                <BarChart className="w-8 h-8 text-slate-700" />
+                <p className="text-xs text-slate-500">Click Refresh to load your trade execution chart.</p>
+                <button onClick={() => fetchChartData()} className="px-4 py-2 bg-indigo-600/20 border border-indigo-500/30 rounded-lg text-xs font-bold text-indigo-300 hover:bg-indigo-600/30 transition-all cursor-pointer">
+                  Load Chart
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Positions + Allocation + Risk */}
           <div className="grid md:grid-cols-3 gap-6 mt-6">
 

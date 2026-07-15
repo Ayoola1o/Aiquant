@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Send, Copy, FileCode, Terminal } from 'lucide-react';
+import { Sparkles, Send, Copy, FileCode, Terminal, MessageCircle, X } from 'lucide-react';
 
 interface AIStrategyLabProps {
   strategies: Array<{ id: string; name: string; code: string }>;
@@ -47,6 +47,7 @@ export default function AIStrategyLab({
   const [compileStatus, setCompileStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Naming & editing states
   const [strategyName, setStrategyName] = useState('New Strategy');
@@ -214,9 +215,9 @@ export default function AIStrategyLab({
   };
 
   return (
-    <div className="grid md:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
-      {/* Left Column: AI Console & Editor */}
-      <div className="flex flex-col gap-4 h-full min-h-0">
+    <div className="grid md:grid-cols-2 gap-6 h-[calc(100vh-140px)] relative">
+      {/* Left Column: AI Setup & Logs */}
+      <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
         
         {/* Strategy Selection & Naming Bar */}
         <div className="glass-panel p-4 flex flex-wrap gap-4 items-center justify-between shrink-0">
@@ -255,7 +256,7 @@ export default function AIStrategyLab({
           </div>
         </div>
 
-        {/* Prompt Input Box */}
+        {/* Prompt Input Box & Templates */}
         <div className="glass-panel p-5 shrink-0">
           <div className="flex justify-between items-center mb-2.5">
             <label className="block text-slate-300 text-xs font-semibold">
@@ -288,87 +289,32 @@ export default function AIStrategyLab({
               Generate
             </button>
           </div>
-        </div>
-
-        {/* Code Editor Panel */}
-        <div className="glass-panel p-5 flex-1 flex flex-col min-h-0">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-white text-xs uppercase flex items-center gap-2">
-              <FileCode className="w-4.5 h-4.5 text-indigo-400" />
-              Python Strategy Code Editor
-            </h3>
-            
-            {workingCode && (
-              <button
-                onClick={copyCode}
-                className="text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 bg-slate-950/40 border border-slate-800 px-3 py-1.5 rounded-lg hover:border-slate-700 transition-colors"
-              >
-                <Copy className="w-3 h-3" />
-                {copied ? 'Copied!' : 'Copy Code'}
-              </button>
-            )}
-          </div>
-
-          <textarea
-            value={workingCode}
-            onChange={(e) => setWorkingCode(e.target.value)}
-            className="w-full flex-1 code-editor border border-slate-800 bg-slate-950 p-4 text-xs font-mono text-slate-300 outline-none rounded-xl resize-none focus:border-slate-700"
-            placeholder={`# Your Python strategy script will appear here.\n# It must inherit from BaseStrategy and implement the on_candle method.\n# You can write it yourself or ask the AI to generate it.`}
-          />
-        </div>
-      </div>
-
-      {/* Right Column: AI Refiner Chat & Console Logs */}
-      <div className="flex flex-col gap-4 h-full min-h-0">
-        {/* Chat / Refinement Assistant */}
-        <div className="glass-panel p-5 flex-1 flex flex-col min-h-0">
-          <h3 className="font-bold text-white text-xs uppercase mb-3 flex items-center gap-2">
-            <Sparkles className="w-4.5 h-4.5 text-indigo-400" />
-            AI Strategy Assistant Chat
-          </h3>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1 mb-4">
-            {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl p-4 text-sm ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-none'
-                      : 'bg-slate-950/60 border border-slate-900 text-slate-200 rounded-bl-none font-light leading-relaxed'
-                  }`}
+          
+          {/* Quick Start Templates */}
+          <div className="mt-4 pt-3 border-t border-slate-800/50">
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Quick Start Templates</span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { title: "Senpi Whalehunter (Hyperliquid)", prompt: "Create a strategy based on the Senpi Whalehunter template that copies Hyperliquid top wallets. Use Senpi data tools." },
+                { title: "Hyperliquid Funding Arbitrage", prompt: "Create a Hyperliquid perpetuals funding rate arbitrage strategy, longing negative rates and shorting positive rates." },
+                { title: "Senpi Spider Market Maker", prompt: "Create a Senpi Spider market making strategy for Hyperliquid using an adaptive grid and orderbook liquidity." },
+                { title: "Classic Golden Cross", prompt: "Write a classic golden cross trend following strategy using 50/200 SMAs with a 2% stop-loss." }
+              ].map((template, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setPrompt(template.prompt)}
+                  className="p-2 border border-slate-800 bg-slate-900/40 hover:bg-indigo-500/10 hover:border-indigo-500/30 rounded-lg text-left transition-all group"
                 >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
+                  <div className="text-[10px] font-bold text-indigo-400 group-hover:text-indigo-300 mb-0.5">{template.title}</div>
+                  <div className="text-[9px] text-slate-500 leading-tight">{template.prompt}</div>
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* Chat input */}
-          <form onSubmit={handleRefine} className="flex gap-2 shrink-0">
-            <input
-              type="text"
-              value={chatInput}
-              disabled={!workingCode || loading}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={workingCode ? "Ask to refine (e.g. 'Add a 3% stop loss' or 'Change short window to 14')" : "Generate a strategy first to start refinement chat"}
-              className="flex-1 px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-sm outline-none disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!workingCode || loading}
-              className="p-3 bg-slate-900 border border-slate-800 hover:border-slate-600 text-indigo-400 rounded-xl disabled:opacity-50 transition-colors"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
         </div>
 
         {/* Compiler Console Logs */}
-        <div className="glass-panel p-5 h-40 flex flex-col min-h-0 shrink-0">
+        <div className="glass-panel p-5 flex-1 flex flex-col min-h-[250px] shrink-0">
           <div className="flex justify-between items-center mb-2.5">
             <h3 className="font-bold text-xs uppercase text-slate-300 flex items-center gap-1.5">
               <Terminal className="w-3.5 h-3.5 text-indigo-400" />
@@ -398,6 +344,91 @@ export default function AIStrategyLab({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Right Column: Code Editor */}
+      <div className="flex flex-col h-full min-h-0">
+        <div className="glass-panel p-5 flex-1 flex flex-col min-h-0">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-bold text-white text-xs uppercase flex items-center gap-2">
+              <FileCode className="w-4.5 h-4.5 text-indigo-400" />
+              Python Strategy Code Editor
+            </h3>
+            
+            {workingCode && (
+              <button
+                onClick={copyCode}
+                className="text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 bg-slate-950/40 border border-slate-800 px-3 py-1.5 rounded-lg hover:border-slate-700 transition-colors"
+              >
+                <Copy className="w-3 h-3" />
+                {copied ? 'Copied!' : 'Copy Code'}
+              </button>
+            )}
+          </div>
+
+          <textarea
+            value={workingCode}
+            onChange={(e) => setWorkingCode(e.target.value)}
+            className="w-full flex-1 code-editor border border-slate-800 bg-slate-950 p-4 text-xs font-mono text-slate-300 outline-none rounded-xl resize-none focus:border-slate-700"
+            placeholder={`# Your Python strategy script will appear here.\n# It must inherit from BaseStrategy and implement the on_candle method.\n# You can write it yourself or ask the AI to generate it.`}
+          />
+        </div>
+      </div>
+
+      {/* Floating Chat Widget */}
+      <div className="absolute bottom-4 right-4 z-50 flex flex-col items-end">
+        {isChatOpen && (
+          <div className="w-[400px] h-[500px] bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl flex flex-col overflow-hidden mb-4 animate-in slide-in-from-bottom-5 duration-200">
+            <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex justify-between items-center">
+              <h3 className="font-bold text-white text-xs uppercase flex items-center gap-2">
+                <Sparkles className="w-4.5 h-4.5 text-indigo-400" />
+                AI Strategy Refiner
+              </h3>
+              <button onClick={() => setIsChatOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${
+                    msg.sender === 'user'
+                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      : 'bg-slate-950/60 border border-slate-900 text-slate-200 rounded-bl-none font-light leading-relaxed'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleRefine} className="p-3 bg-slate-800 border-t border-slate-700 flex gap-2 shrink-0">
+              <input
+                type="text"
+                value={chatInput}
+                disabled={!workingCode || loading}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={workingCode ? "Ask to refine (e.g. 'Add a 3% stop loss')" : "Generate a strategy first..."}
+                className="flex-1 px-3 py-2 bg-slate-950/60 border border-slate-700 focus:border-indigo-500/50 rounded-lg text-xs outline-none disabled:opacity-50 text-white"
+              />
+              <button
+                type="submit"
+                disabled={!workingCode || loading}
+                className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        )}
+        
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="w-14 h-14 bg-indigo-600 hover:bg-indigo-500 shadow-xl rounded-full flex items-center justify-center text-white transition-all transform hover:scale-105"
+        >
+          {isChatOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+        </button>
       </div>
     </div>
   );

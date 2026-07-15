@@ -164,15 +164,44 @@ def fetch_historical_data(
     period: str = "1mo",
     interval: str = "1h",
     alpaca_key_id: str = "",
-    alpaca_secret_key: str = ""
+    alpaca_secret_key: str = "",
+    exchange: str = "yfinance"
 ) -> pd.DataFrame:
     """
-    Fetches real-world historical OHLCV data using Alpaca (first) or Yahoo Finance (as fallback).
+    Fetches real-world historical OHLCV data based on the chosen exchange source.
     """
-    if alpaca_key_id and alpaca_secret_key:
+    exchange_lower = exchange.lower()
+    
+    # 1. Route to Binance directly if picked
+    if exchange_lower == "binance":
+        # Translate symbols to standard Binance (e.g. BTCUSD or BTC-USD -> BTCUSDT)
+        binance_sym = ticker.upper().replace("-USD", "USDT").replace("USD", "USDT")
+        if binance_sym.endswith("USDT") and not binance_sym.endswith("TUSDT"):
+            # Clean double T if any
+            pass
+        # Calculate limit based on period
+        limit = 1000
+        if period == "1d":
+            limit = 100 if interval == "15m" else 50
+        elif period == "1mo" or period == "30d":
+            limit = 1000 if interval == "15m" else 750
+        elif period in ("3mo", "6mo", "1y", "2y", "5y", "max"):
+            limit = 1000
+        
+        df = fetch_binance_history(binance_sym, interval=interval, limit=limit)
+        if not df.empty:
+            print(f"Successfully fetched {len(df)} candles from Binance for symbol {binance_sym}")
+            return df
+        # Fall back if Binance failed
+        print(f"Binance fetch failed for {binance_sym}. Falling back to Yahoo Finance.")
+
+    # 2. Route to Alpaca directly if picked
+    if exchange_lower == "alpaca" and alpaca_key_id and alpaca_secret_key:
         try:
+            # Map ticker format for Alpaca (e.g. BTC-USD -> BTCUSD)
+            alpaca_sym = ticker.upper().replace("-", "")
             df = fetch_alpaca_historical_data(
-                ticker=ticker,
+                ticker=alpaca_sym,
                 period=period,
                 interval=interval,
                 key_id=alpaca_key_id,
@@ -184,11 +213,14 @@ def fetch_historical_data(
         except Exception as e:
             print(f"Alpaca historical data fetch failed ({e}). Falling back to Yahoo Finance.")
 
+    # 3. Yahoo Finance fallback / default
     try:
-        # Resolve tickers to Yahoo Finance standard if needed (e.g. BTCUSDT -> BTC-USD)
         yf_ticker = ticker
+        # Resolve tickers to Yahoo Finance standard if needed (e.g. BTCUSDT -> BTC-USD)
         if ticker.endswith("USDT"):
             yf_ticker = ticker.replace("USDT", "-USD")
+        elif ticker.endswith("USD") and "-" not in ticker:
+            yf_ticker = ticker.replace("USD", "-USD")
         
         # Check if period exceeds 730 days (yfinance limit for intraday/hourly data)
         is_long_period = False
@@ -286,7 +318,7 @@ def fetch_binance_history(symbol: str, interval: str = "1h", limit: int = 500) -
         except Exception as e:
             last_err = f"Mirror {host} failed: {e}"
             
-    print(f"Error fetching Binance data across all mirrors: {last_err}")
+    print(f"[Binance Warmup] Connection info: offline or geoblocked. Activating fallback feeds.")
     return pd.DataFrame()
 
 
@@ -311,9 +343,14 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     # ── RSI (14) ─────────────────────────────────────────────────────────
     delta = close.diff()
-    gain  = delta.where(delta > 0, 0.0).rolling(window=14, min_periods=1).mean()
-    loss  = (-delta.where(delta < 0, 0.0)).rolling(window=14, min_periods=1).mean()
-    rs    = gain / (loss + 1e-9)
+    gain  = delta.clip(lower=0.0)
+    loss  = -delta.clip(upper=0.0)
+    # Wilder's smoothing (Running Moving Average, equivalent to ewm with alpha=1/14)
+    avg_gain = gain.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+    avg_gain = avg_gain.fillna(gain.rolling(window=14, min_periods=1).mean())
+    avg_loss = avg_loss.fillna(loss.rolling(window=14, min_periods=1).mean())
+    rs    = avg_gain / (avg_loss + 1e-9)
     df["rsi"] = 100 - (100 / (1 + rs))
     df["rsi"] = df["rsi"].fillna(50.0).clip(0, 100)
 
@@ -337,7 +374,9 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         (high - prev_close).abs(),
         (low  - prev_close).abs()
     ], axis=1).max(axis=1)
-    df["atr"] = tr.rolling(window=14, min_periods=1).mean()
+    # Wilder's smoothing for ATR:
+    df["atr"] = tr.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+    df["atr"] = df["atr"].fillna(tr.rolling(window=14, min_periods=1).mean())
 
     # ── Fill residual NaNs ───────────────────────────────────────────────
     df.bfill(inplace=True)

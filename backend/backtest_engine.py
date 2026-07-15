@@ -2,27 +2,52 @@ import sys
 import traceback
 import numpy as np
 import pandas as pd
+import os
+
+# ── Ensure backend path is always on sys.path so `jesse` package is importable ──
+_BACKEND_PATH = os.path.abspath(os.path.dirname(__file__))
+if _BACKEND_PATH not in sys.path:
+    sys.path.insert(0, _BACKEND_PATH)
+
+# ── Import our Jesse shim so it's available in exec namespaces ──────────────
+from jesse.strategies import Strategy as JesseStrategy
 
 
 class BaseStrategy:
     """
-    Base strategy class from which all user strategy scripts must inherit.
+    Simple on_candle-style base class (original Aiquant format).
     """
     def __init__(self, parameters=None):
         self.parameters = parameters or {}
 
     def on_candle(self, candle: dict, state: dict):
-        """
-        Processes a single K-line candle and returns a trade action.
-        """
         raise NotImplementedError("Strategies must implement the 'on_candle' method.")
+
+
+def _is_jesse_strategy(cls) -> bool:
+    """Return True if cls inherits from our Jesse Strategy shim."""
+    try:
+        return issubclass(cls, JesseStrategy) and cls is not JesseStrategy
+    except TypeError:
+        return False
+
+
+def _is_base_strategy(cls) -> bool:
+    """Return True if cls inherits from BaseStrategy (original format)."""
+    try:
+        return issubclass(cls, BaseStrategy) and cls is not BaseStrategy
+    except TypeError:
+        return False
+
+
 
 
 def run_historical_backtest(
     strategy_code: str, 
     df: pd.DataFrame, 
     starting_capital: float = 10000.0, 
-    commission_pct: float = 0.001
+    commission_pct: float = 0.001,
+    warmup_candles: int = 0
 ) -> dict:
     """
     Dynamically compiles and executes a custom Python strategy script 
@@ -31,21 +56,30 @@ def run_historical_backtest(
     if df.empty or len(df) < 5:
         return {"success": False, "error": "Insufficient historical data for backtesting."}
 
-    # Define variables that should be available in the execution namespace
-    # User class should inherit from BaseStrategy
-    exec_globals = {
+    import os
+    backend_path = os.path.abspath(os.path.dirname(__file__))
+    if backend_path not in sys.path:
+        sys.path.insert(0, backend_path)
+
+    # Define variables that should be available in the execution namespace.
+    # Supports both BaseStrategy (on_candle style) and JesseStrategy (should_long/go_long style).
+    import jesse.utils as jesse_utils
+    exec_namespace = {
+        "__builtins__": __builtins__,
         "BaseStrategy": BaseStrategy,
+        "Strategy": JesseStrategy,          # jesse.strategies.Strategy alias
+        "JesseStrategy": JesseStrategy,
         "pd": pd,
-        "np": np
+        "np": np,
+        "utils": jesse_utils,               # `from jesse import utils` compat
+        "jesse_utils": jesse_utils,
     }
-    exec_locals = {}
 
     # 1. Compile and execute user code in a local namespace
     try:
         compiled = compile(strategy_code, "<string>", "exec")
-        exec(compiled, exec_globals, exec_locals)
+        exec(compiled, exec_namespace)
     except SyntaxError as e:
-        tb = traceback.extract_tb(e.__traceback__)
         line_num = e.lineno
         return {
             "success": False,
@@ -61,29 +95,34 @@ def run_historical_backtest(
             "traceback": traceback.format_exc()
         }
 
-    # 2. Extract strategy class (checks for CustomStrategy or any class inheriting from BaseStrategy)
+    # 2. Extract strategy class — detect Jesse-style first, then BaseStrategy fallback
     strategy_class = None
-    for name, obj in exec_locals.items():
-        if isinstance(obj, type) and issubclass(obj, BaseStrategy) and obj is not BaseStrategy:
+    is_jesse = False
+    for name, obj in exec_namespace.items():
+        if not isinstance(obj, type):
+            continue
+        if _is_jesse_strategy(obj):
             strategy_class = obj
+            is_jesse = True
             break
-
-    if not strategy_class:
-        # Fallback to search in globals just in case
-        for name, obj in exec_globals.items():
-            if isinstance(obj, type) and issubclass(obj, BaseStrategy) and obj is not BaseStrategy:
-                strategy_class = obj
-                break
+        if _is_base_strategy(obj) and strategy_class is None:
+            strategy_class = obj
 
     if not strategy_class:
         return {
             "success": False,
-            "error": "Could not find a class inheriting from 'BaseStrategy' in your script."
+            "error": (
+                "Could not find a strategy class in your script. "
+                "Your class must inherit from either:\n"
+                "  • BaseStrategy  (on_candle style)\n"
+                "  • Strategy      (Jesse style: from jesse.strategies import Strategy)"
+            )
         }
 
     # Instantiate strategy
     try:
         strategy_instance = strategy_class()
+        strategy_instance.candles = np.empty((0, 6))
     except Exception as e:
         return {
             "success": False,
@@ -93,21 +132,246 @@ def run_historical_backtest(
 
     # 3. Setup Backtest State variables
     cash = starting_capital
-    positions = {} # Symbol -> shares (for simplicity, we assume single asset backtest)
+    positions = {}   # symbol -> shares
     portfolio_value_history = []
     trade_logs = []
     avg_cost = 0.0
     initial_close = float(df.iloc[0]["close"]) if len(df) > 0 else 1.0
-    
-    # Identify symbol (defaults to BTC or the single column we trade)
     symbol = "ASSET"
-    
-    # 4. Main historical simulation loop
-    try:
-        for idx in range(len(df)):
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # 4A.  JESSE-STYLE simulation loop
+    # ══════════════════════════════════════════════════════════════════════════
+    if is_jesse:
+        si = strategy_instance   # shorter alias
+        si._commission_pct = commission_pct
+        si._balance = starting_capital
+        si._available_margin = starting_capital
+
+        try:
+            for idx in range(len(df)):
+                row = df.iloc[idx]
+                close = float(row["close"])
+                timestamp = str(pd.to_datetime(row["timestamp"], utc=True))
+
+                # Build Jesse-format candle row: [ts, open, CLOSE, high, low, volume]
+                try:
+                    ts_ms = pd.to_datetime(row["timestamp"], utc=True).timestamp() * 1000.0
+                except Exception:
+                    ts_ms = float(idx)
+
+                jesse_row = np.array([[
+                    ts_ms,
+                    float(row["open"]),
+                    float(row["close"]),   # ← index 2 = close (Jesse layout)
+                    float(row["high"]),    # ← index 3 = high
+                    float(row["low"]),     # ← index 4 = low
+                    float(row["volume"])
+                ]])
+                si._candles = np.vstack([si._candles, jesse_row])
+
+                # ── Skip execution logic if we are still in the warmup period ──
+                if idx < warmup_candles:
+                    continue
+
+                # Sync position state
+                pos = si._position
+                pos.current_price = close
+                total_val = cash + (pos.qty * close if pos.qty > 0 else 0.0)
+                si._balance = total_val
+                si._available_margin = cash
+
+                # ── lifecycle calls ──
+                si.before()
+
+                si.buy = None
+                si.sell = None
+                si.stop_loss = None
+                si.take_profit = None
+                si._liquidate_flag = False
+
+                if pos.is_open:
+                    # ── Check stop-loss ──
+                    hit_sl = False
+                    if si.stop_loss is not None:
+                        sl_tuple = si.stop_loss if isinstance(si.stop_loss, (list, tuple)) and len(si.stop_loss) == 2 else None
+                        if sl_tuple:
+                            sl_qty, sl_price = float(sl_tuple[0]), float(sl_tuple[1])
+                            if pos.qty > 0 and close <= sl_price:
+                                hit_sl = True
+                            elif pos.qty < 0 and close >= sl_price:
+                                hit_sl = True
+                        if hit_sl:
+                            sell_qty = min(abs(pos.qty), sl_qty)
+                            revenue = sell_qty * close
+                            fee = revenue * commission_pct
+                            cash += revenue - fee
+                            pnl = (close - pos.entry_price) * sell_qty - fee
+                            pnl_pct = ((close - pos.entry_price) / pos.entry_price * 100.0) if pos.entry_price > 0 else 0.0
+                            trade_logs.append({
+                                "timestamp": timestamp, "action": "SELL",
+                                "price": close, "qty": sell_qty, "fee": fee,
+                                "cash_balance": cash, "pnl": float(pnl), "pnl_pct": float(pnl_pct),
+                                "mfe": 0.0, "mae": 0.0, "reason": "Stop Loss"
+                            })
+                            pos.qty -= sell_qty
+                            if abs(pos.qty) < 1e-9:
+                                pos.qty = 0.0
+                                si.on_close_position(None)
+                            si.stop_loss = None
+
+                    # ── Check take-profit ──
+                    if si.take_profit is not None and not hit_sl:
+                        tp_list = si.take_profit
+                        if isinstance(tp_list, (list, tuple)) and len(tp_list) == 2 and not isinstance(tp_list[0], (list, tuple)):
+                            tp_list = [tp_list]
+                        for tp_entry in tp_list:
+                            tp_qty, tp_price = float(tp_entry[0]), float(tp_entry[1])
+                            hit = (pos.qty > 0 and close >= tp_price) or (pos.qty < 0 and close <= tp_price)
+                            if hit:
+                                sell_qty = min(abs(pos.qty), tp_qty)
+                                revenue = sell_qty * close
+                                fee = revenue * commission_pct
+                                cash += revenue - fee
+                                pnl = (close - pos.entry_price) * sell_qty - fee
+                                pnl_pct = ((close - pos.entry_price) / pos.entry_price * 100.0) if pos.entry_price > 0 else 0.0
+                                trade_logs.append({
+                                    "timestamp": timestamp, "action": "SELL",
+                                    "price": close, "qty": sell_qty, "fee": fee,
+                                    "cash_balance": cash, "pnl": float(pnl), "pnl_pct": float(pnl_pct),
+                                    "mfe": 0.0, "mae": 0.0, "reason": "Take Profit"
+                                })
+                                pos.qty -= sell_qty
+                                if abs(pos.qty) < 1e-9:
+                                    pos.qty = 0.0
+                                    si.on_close_position(None)
+                                break
+
+                    # ── update_position each candle ──
+                    si.update_position()
+
+                    # ── liquidate() called inside update_position ──
+                    if si._liquidate_flag and pos.qty > 0:
+                        sell_qty = pos.qty
+                        revenue = sell_qty * close
+                        fee = revenue * commission_pct
+                        cash += revenue - fee
+                        pnl = (close - pos.entry_price) * sell_qty - fee
+                        pnl_pct = ((close - pos.entry_price) / pos.entry_price * 100.0) if pos.entry_price > 0 else 0.0
+                        trade_logs.append({
+                            "timestamp": timestamp, "action": "SELL",
+                            "price": close, "qty": sell_qty, "fee": fee,
+                            "cash_balance": cash, "pnl": float(pnl), "pnl_pct": float(pnl_pct),
+                            "mfe": 0.0, "mae": 0.0, "reason": "Liquidate"
+                        })
+                        pos.qty = 0.0
+                        si.on_close_position(None)
+
+                else:
+                    # ── No open position — check entry signals ──
+                    filters_ok = all(si.filters()) if si.filters() else True
+
+                    if filters_ok and si.should_long():
+                        si.go_long()
+                        # Resolve buy order: (price, qty) tuple or scalar qty
+                        if si.buy is not None:
+                            if isinstance(si.buy, (list, tuple)) and len(si.buy) == 2:
+                                _price, _qty = float(si.buy[0]), float(si.buy[1])
+                            else:
+                                _qty = float(si.buy)
+                                _price = close
+                            cost = _qty * _price
+                            fee = cost * commission_pct
+                            if cash >= cost + fee:
+                                cash -= cost + fee
+                                pos.qty = _qty
+                                pos.entry_price = _price
+                                trade_logs.append({
+                                    "timestamp": timestamp, "action": "BUY",
+                                    "price": _price, "qty": _qty, "fee": fee,
+                                    "cash_balance": cash, "pnl": 0.0, "pnl_pct": 0.0,
+                                    "mfe": 0.0, "mae": 0.0, "reason": "Strategy Signal"
+                                })
+                                si.on_open_position(None)
+                            else:
+                                # Partial fill with available cash
+                                max_qty = (cash / (_price * (1 + commission_pct))) * 0.99
+                                if max_qty > 1e-9:
+                                    cost = max_qty * _price
+                                    fee = cost * commission_pct
+                                    cash -= cost + fee
+                                    pos.qty = max_qty
+                                    pos.entry_price = _price
+                                    trade_logs.append({
+                                        "timestamp": timestamp, "action": "BUY",
+                                        "price": _price, "qty": max_qty, "fee": fee,
+                                        "cash_balance": cash, "pnl": 0.0, "pnl_pct": 0.0,
+                                        "mfe": 0.0, "mae": 0.0, "reason": "Partial fill"
+                                    })
+                                    si.on_open_position(None)
+
+                    elif filters_ok and si.should_short():
+                        si.go_short()
+                        if si.sell is not None:
+                            if isinstance(si.sell, (list, tuple)) and len(si.sell) == 2:
+                                _price, _qty = float(si.sell[0]), float(si.sell[1])
+                            else:
+                                _qty = float(si.sell)
+                                _price = close
+                            # Simulate short (we only track negative qty, settle at close)
+                            pos.qty = -_qty
+                            pos.entry_price = _price
+                            trade_logs.append({
+                                "timestamp": timestamp, "action": "SELL",
+                                "price": _price, "qty": _qty, "fee": _qty * _price * commission_pct,
+                                "cash_balance": cash, "pnl": 0.0, "pnl_pct": 0.0,
+                                "mfe": 0.0, "mae": 0.0, "reason": "Short Entry"
+                            })
+                            si.on_open_position(None)
+
+                si.after()
+
+                current_value = cash + (pos.qty * close if pos.qty > 0 else 0.0)
+                portfolio_value_history.append({
+                    "timestamp": timestamp,
+                    "value": current_value,
+                    "benchmark": float((close / initial_close) * starting_capital) if initial_close > 0 else starting_capital
+                })
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            return {
+                "success": False,
+                "error_type": "RuntimeError",
+                "error": f"Runtime crash during Jesse simulation: {str(e)}",
+                "traceback": tb
+            }
+
+    else:
+        # ══════════════════════════════════════════════════════════════════════
+        # 4B.  ORIGINAL on_candle-style simulation loop
+        # ══════════════════════════════════════════════════════════════════════
+        try:
+          for idx in range(len(df)):
             row = df.iloc[idx]
             close = float(row["close"])
             timestamp = str(row["timestamp"])
+            
+            # Populate strategy_instance.candles with new candle tick for indicators
+            try:
+                ts_ms = pd.to_datetime(row["timestamp"]).timestamp() * 1000.0
+            except Exception:
+                ts_ms = 0.0
+            
+            current_row = np.array([[
+                ts_ms,
+                float(row["open"]),
+                float(row["high"]),
+                float(row["low"]),
+                float(row["close"]),
+                float(row["volume"])
+            ]])
+            strategy_instance.candles = np.vstack([strategy_instance.candles, current_row])
             
             # Map candle row to standard dictionary format for strategy
             candle = {
@@ -230,15 +494,15 @@ def run_historical_backtest(
                 "benchmark": float((close / initial_close) * starting_capital) if initial_close > 0 else starting_capital
             })
             
-    except Exception as e:
-        # Gracefully handle runtime crashes in the on_candle loop
-        tb = traceback.format_exc()
-        return {
-            "success": False,
-            "error_type": "RuntimeError",
-            "error": f"Runtime crash during simulation: {str(e)}",
-            "traceback": tb
-        }
+        except Exception as e:
+            # Gracefully handle runtime crashes in the on_candle loop
+            tb = traceback.format_exc()
+            return {
+                "success": False,
+                "error_type": "RuntimeError",
+                "error": f"Runtime crash during simulation: {str(e)}",
+                "traceback": tb
+            }
 
     # 5. Compute Quantitative KPIs & Performance Metrics
     hist_values = [p["value"] for p in portfolio_value_history]
@@ -258,8 +522,12 @@ def run_historical_backtest(
         dd = (peak - val) / peak
         if dd > max_dd:
             max_dd = dd
+            
+        # Safely get timestamp if portfolio_value_history is empty
+        ts = portfolio_value_history[idx_val]["timestamp"] if idx_val < len(portfolio_value_history) else (df.iloc[-1]["timestamp"] if not df.empty else "N/A")
+            
         drawdown_history.append({
-            "timestamp": portfolio_value_history[idx_val]["timestamp"],
+            "timestamp": ts,
             "drawdown": -float(dd * 100.0)  # Negative percentage for underwater area charts
         })
     max_dd_pct = max_dd * 100.0

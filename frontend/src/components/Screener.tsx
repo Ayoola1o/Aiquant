@@ -313,7 +313,9 @@ export default function Screener() {
         </div>
 
         {/* --- Key Metrics & Chart Dashboard Section --- */}
-        <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
           {/* Past 5 Days */}
           <div className="flex items-center gap-2 select-none">
             <span className="text-[10px] text-slate-500 uppercase font-bold">Past 5 Days:</span>
@@ -488,10 +490,7 @@ export default function Screener() {
         </div>
 
         {/* --- Fundamental Statements & AI Analysis Section --- */}
-        <div className="grid md:grid-cols-3 gap-6 items-start">
-          
-          {/* Card 1: Tabbed Financial Statements */}
-          <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5 md:col-span-2">
+        <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -627,9 +626,10 @@ export default function Screener() {
               </div>
             </div>
           </div>
-
-          {/* Card 2: Valuation Layers & AI Insights */}
-          <div className="flex flex-col gap-6 md:col-span-1">
+        </div>
+ 
+        {/* Card 2: Valuation Layers & AI Insights */}
+        <div className="lg:col-span-1 flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pr-1">
             {/* Valuation ratios */}
             <div className="bg-[#1A1D24] border border-white/5 rounded-xl p-5 shadow-lg flex flex-col gap-4">
               <div>

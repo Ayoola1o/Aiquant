@@ -1,5 +1,6 @@
 import re
 import requests
+import os
 
 def clean_llm_code(text: str) -> str:
     """
@@ -10,7 +11,7 @@ def clean_llm_code(text: str) -> str:
     text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
     return text.strip()
 
-# Base Strategy Template that all generated strategies inherit from
+# Base Strategy Template used for fallback generation
 BASE_STRATEGY_TEMPLATE = """class CustomStrategy(BaseStrategy):
     \"\"\"
     AI-Generated Quantitative Trading Strategy.
@@ -30,7 +31,18 @@ BASE_STRATEGY_TEMPLATE = """class CustomStrategy(BaseStrategy):
         \"\"\"
         # Strategy logic:
 {strategy_logic}
+\"\"\"
 """
+
+# Load Aiquant Instructions for the LLM to use
+
+try:
+    instructions_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "aiquant_instruction.md")
+    with open(instructions_path, "r", encoding="utf-8") as f:
+        AIQUANT_INSTRUCTIONS = f.read()
+except Exception as e:
+    print(f"Could not load aiquant_instruction.md: {e}")
+    AIQUANT_INSTRUCTIONS = "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks."
 
 
 def generate_strategy_script(
@@ -70,8 +82,8 @@ def generate_strategy_script(
             payload = {
                 "model": model_to_use,
                 "messages": [
-                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
-                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                    {"role": "system", "content": AIQUANT_INSTRUCTIONS + "\n\nYou must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class named CustomStrategy that inherits from Strategy (from aiquant.strategies).\nInstructions: {prompt}"}
                 ],
                 "temperature": 0.2
             }
@@ -91,7 +103,7 @@ def generate_strategy_script(
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [{
-                    "parts": [{"text": f"You are a professional AI quantitative developer assistant. Output ONLY executable python code without markdown formatting (no ```python blocks). Write a CustomStrategy(BaseStrategy) class conforming to: \n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}]
+                    "parts": [{"text": AIQUANT_INSTRUCTIONS + f"\n\nOutput ONLY executable python code without markdown formatting (no ```python blocks). Write a CustomStrategy class inheriting from Strategy (from aiquant.strategies).\nInstructions: {prompt}"}]
                 }],
                 "generationConfig": {"temperature": 0.2}
             }
@@ -114,8 +126,8 @@ def generate_strategy_script(
             payload = {
                 "model": model_to_use,
                 "messages": [
-                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
-                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                    {"role": "system", "content": AIQUANT_INSTRUCTIONS + "\n\nYou must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class named CustomStrategy that inherits from Strategy (from aiquant.strategies).\nInstructions: {prompt}"}
                 ],
                 "temperature": 0.2
             }
@@ -136,8 +148,8 @@ def generate_strategy_script(
             payload = {
                 "model": model_to_use,
                 "messages": [
-                    {"role": "system", "content": "You are a professional quantitative developer assistant. You must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
-                    {"role": "user", "content": f"Write a Python strategy class CustomStrategy(BaseStrategy) following this structure:\n{BASE_STRATEGY_TEMPLATE.format(prompt=prompt, init_params='        self.short_window = 9', strategy_logic='        pass')}\nInstructions: {prompt}"}
+                    {"role": "system", "content": AIQUANT_INSTRUCTIONS + "\n\nYou must output ONLY raw executable python strategy class code. Do not output markdown codeblocks (no ```python), text explanations, or wrapper commentary outside the class."},
+                    {"role": "user", "content": f"Write a Python strategy class named CustomStrategy that inherits from Strategy (from aiquant.strategies).\nInstructions: {prompt}"}
                 ],
                 "temperature": 0.2
             }

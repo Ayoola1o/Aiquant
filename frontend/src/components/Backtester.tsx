@@ -20,6 +20,31 @@ interface BacktesterProps {
   alpacaSecretKey?: string;
 }
 
+const FEED_SYMBOLS: Record<string, { value: string; label: string }[]> = {
+  binance: [
+    { value: 'BTCUSDT', label: 'BTC/USDT' },
+    { value: 'ETHUSDT', label: 'ETH/USDT' },
+    { value: 'SOLUSDT', label: 'SOL/USDT' },
+    { value: 'ADAUSDT', label: 'ADA/USDT' },
+  ],
+  yfinance: [
+    { value: 'AAPL', label: 'AAPL (Apple)' },
+    { value: 'MSFT', label: 'MSFT (Microsoft)' },
+    { value: 'TSLA', label: 'TSLA (Tesla)' },
+    { value: 'NVDA', label: 'NVDA (NVIDIA)' },
+    { value: 'BTC-USD', label: 'BTC-USD (Bitcoin)' },
+    { value: 'ETH-USD', label: 'ETH-USD (Ethereum)' },
+  ],
+  alpaca: [
+    { value: 'AAPL', label: 'AAPL (Apple)' },
+    { value: 'MSFT', label: 'MSFT (Microsoft)' },
+    { value: 'TSLA', label: 'TSLA (Tesla)' },
+    { value: 'NVDA', label: 'NVDA (NVIDIA)' },
+    { value: 'BTCUSD', label: 'BTCUSD (Bitcoin)' },
+    { value: 'ETHUSD', label: 'ETHUSD (Ethereum)' },
+  ]
+};
+
 export default function Backtester({ 
   strategies, 
   selectedStrategyId, 
@@ -27,13 +52,24 @@ export default function Backtester({
   alpacaSecretKey = '' 
 }: BacktesterProps) {
   // Filter Metrics states
+  const [exchange, setExchange] = useState('yfinance');
   const [tradingPeriod, setTradingPeriod] = useState('2y');
   const [customStartDate, setCustomStartDate] = useState('2020-01-01');
   const [customEndDate, setCustomEndDate] = useState('2023-01-01');
-  const [symbol, setSymbol] = useState('BTC-USDT');
+  const [symbol, setSymbol] = useState('BTC-USD');
   const [customTicker, setCustomTicker] = useState('EURUSD=X');
   const [timeframe, setTimeframe] = useState('15m');
   const [activeId, setActiveId] = useState(selectedStrategyId);
+
+  const handleExchangeChange = (newExchange: string) => {
+    setExchange(newExchange);
+    const options = FEED_SYMBOLS[newExchange] || [];
+    if (options.length > 0) {
+      setSymbol(options[0].value);
+    } else {
+      setSymbol('custom');
+    }
+  };
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,10 +101,7 @@ export default function Backtester({
     setError('');
     
     // Map Symbol to standard yahoo format
-    let mappedSymbol = symbol;
-    if (symbol === 'BTC-USDT') mappedSymbol = 'BTC-USD';
-    else if (symbol === 'ETH-USDT') mappedSymbol = 'ETH-USD';
-    else if (symbol === 'custom') mappedSymbol = customTicker;
+    let mappedSymbol = symbol === 'custom' ? customTicker : symbol;
     
     // Map Trading Period to yahoo period
     let mappedPeriod = tradingPeriod;
@@ -88,7 +121,8 @@ export default function Backtester({
           starting_capital: 10000.0,
           commission_pct: 0.001,
           alpaca_key_id: alpacaKeyId,
-          alpaca_secret_key: alpacaSecretKey
+          alpaca_secret_key: alpacaSecretKey,
+          exchange: exchange
         })
       });
       
@@ -102,12 +136,9 @@ export default function Backtester({
           const logsList: string[] = [];
           logsList.push(`[System] Initializing backtest simulation...`);
           logsList.push(`[System] Symbol: ${mappedSymbol.toUpperCase()}`);
+          logsList.push(`[System] Exchange Source: ${exchange.toUpperCase()}`);
           logsList.push(`[System] Timeframe: ${timeframe}`);
-          if (alpacaKeyId && alpacaSecretKey) {
-            logsList.push(`[System] Downloading historical candles from Alpaca Market Data API...`);
-          } else {
-            logsList.push(`[System] Downloading historical candles from Yahoo Finance...`);
-          }
+          logsList.push(`[System] Downloading historical candles from ${exchange.toUpperCase()}...`);
           logsList.push(`[System] Data fetched successfully. Total bars: ${data.equity_curve.length}`);
           logsList.push(`[System] Running strategy simulation...`);
           
@@ -226,22 +257,34 @@ export default function Backtester({
               </div>
 
               <div>
+                <label className="block text-[#A1A5B0] text-[9px] font-bold uppercase tracking-wider mb-1.5">Exchange Source</label>
+                <select
+                  value={exchange}
+                  onChange={(e) => handleExchangeChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#0F1115] border border-white/5 rounded-lg text-xs font-semibold outline-none focus:border-[#4D88FF]/50 text-white"
+                >
+                  <option value="yfinance">Yahoo Finance</option>
+                  <option value="alpaca">Alpaca Market Data</option>
+                  <option value="binance">Binance public API</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-[#A1A5B0] text-[9px] font-bold uppercase tracking-wider mb-1.5">Symbol</label>
                 <select
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}
                   className="w-full px-3 py-2 bg-[#0F1115] border border-white/5 rounded-lg text-xs font-semibold outline-none focus:border-[#4D88FF]/50 text-white"
                 >
-                  <option value="BTC-USDT">BTC/USDT (Crypto)</option>
-                  <option value="ETH-USDT">ETH/USDT (Crypto)</option>
-                  <option value="AAPL">AAPL (NASDAQ)</option>
-                  <option value="TSLA">TSLA (NASDAQ)</option>
+                  {(FEED_SYMBOLS[exchange] || []).map((sym) => (
+                    <option key={sym.value} value={sym.value}>{sym.label}</option>
+                  ))}
                   <option value="custom">Custom Exchange Ticker</option>
                 </select>
 
                 {symbol === 'custom' && (
                   <div className="mt-3">
-                    <label className="block text-[#A1A5B0] text-[8px] font-bold uppercase tracking-wider mb-1">yfinance Ticker Suffix</label>
+                    <label className="block text-[#A1A5B0] text-[8px] font-bold uppercase tracking-wider mb-1">Custom Ticker Suffix / Symbol</label>
                     <input
                       type="text"
                       value={customTicker}

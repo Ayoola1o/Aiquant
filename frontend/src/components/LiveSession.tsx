@@ -8,7 +8,45 @@ interface LiveSessionProps {
   alpacaKeyId?: string;
   alpacaSecretKey?: string;
   riskProfile?: any;
+  geminiApiKey?: string;
+  techAgentKey?: string;
+  sentimentAgentKey?: string;
+  tradingViewAgentKey?: string;
+  hyperliquidAgentKey?: string;
+  hyperliquidPrivateKey?: string;
+  firecrawlAgentKey?: string;
 }
+
+const FEED_SYMBOLS: Record<string, { value: string; label: string }[]> = {
+  binance: [
+    { value: 'BTCUSDT', label: 'BTC/USDT' },
+    { value: 'ETHUSDT', label: 'ETH/USDT' },
+    { value: 'SOLUSDT', label: 'SOL/USDT' },
+    { value: 'ADAUSDT', label: 'ADA/USDT' },
+  ],
+  yfinance: [
+    { value: 'AAPL', label: 'AAPL (Apple)' },
+    { value: 'MSFT', label: 'MSFT (Microsoft)' },
+    { value: 'TSLA', label: 'TSLA (Tesla)' },
+    { value: 'NVDA', label: 'NVDA (NVIDIA)' },
+    { value: 'BTC-USD', label: 'BTC-USD (Bitcoin)' },
+    { value: 'ETH-USD', label: 'ETH-USD (Ethereum)' },
+  ],
+  alpaca: [
+    { value: 'AAPL', label: 'AAPL (Apple)' },
+    { value: 'MSFT', label: 'MSFT (Microsoft)' },
+    { value: 'TSLA', label: 'TSLA (Tesla)' },
+    { value: 'NVDA', label: 'NVDA (NVIDIA)' },
+    { value: 'BTCUSD', label: 'BTCUSD (Bitcoin)' },
+    { value: 'ETHUSD', label: 'ETHUSD (Ethereum)' },
+  ],
+  mock: [
+    { value: 'BTCUSDT', label: 'BTC/USDT (Mock)' },
+    { value: 'ETHUSDT', label: 'ETH/USDT (Mock)' },
+    { value: 'AAPL', label: 'AAPL (Mock)' },
+    { value: 'MSFT', label: 'MSFT (Mock)' },
+  ],
+};
 
 // Custom Candlestick rendering shape (same as predictor)
 const CandlestickShape = (props: any) => {
@@ -43,7 +81,14 @@ export default function LiveSession({
   selectedStrategyId,
   alpacaKeyId: globalAlpacaKeyId = '',
   alpacaSecretKey: globalAlpacaSecretKey = '',
-  riskProfile = null
+  riskProfile = null,
+  geminiApiKey = '',
+  techAgentKey = '',
+  sentimentAgentKey = '',
+  tradingViewAgentKey = '',
+  hyperliquidAgentKey = '',
+  hyperliquidPrivateKey = '',
+  firecrawlAgentKey = ''
 }: LiveSessionProps) {
   // Multi-bot list states
   const [bots, setBots] = useState<Record<string, any>>({});
@@ -59,7 +104,17 @@ export default function LiveSession({
   // Pre-fill from global settings — user can still override per-bot
   const [alpacaKeyId, setAlpacaKeyId] = useState(globalAlpacaKeyId);
   const [alpacaSecretKey, setAlpacaSecretKey] = useState(globalAlpacaSecretKey);
+  const [agenticMode, setAgenticMode] = useState(false);
   const [selectedBotToTerminate, setSelectedBotToTerminate] = useState<string | null>(null);
+  const [closePct, setClosePct] = useState<number>(1.0);
+
+  const handleFeedSourceChange = (feed: string) => {
+    setLiveFeedSource(feed);
+    const symbolsForFeed = FEED_SYMBOLS[feed] || FEED_SYMBOLS.mock;
+    if (symbolsForFeed.length > 0) {
+      setLiveSymbol(symbolsForFeed[0].value);
+    }
+  };
 
   useEffect(() => {
     setAlpacaKeyId(globalAlpacaKeyId);
@@ -111,7 +166,15 @@ export default function LiveSession({
           feed_source: liveFeedSource,
           alpaca_key_id: alpacaKeyId,
           alpaca_secret_key: alpacaSecretKey,
-          risk_profile: riskProfile
+          risk_profile: riskProfile,
+          agentic_mode: agenticMode,
+          gemini_api_key: geminiApiKey,
+          tech_agent_key: techAgentKey,
+          sentiment_agent_key: sentimentAgentKey,
+          tradingview_agent_key: tradingViewAgentKey,
+          hyperliquid_agent_key: hyperliquidAgentKey,
+          hyperliquid_private_key: hyperliquidPrivateKey,
+          firecrawl_agent_key: firecrawlAgentKey
         })
       });
       if (res.ok) {
@@ -139,7 +202,7 @@ export default function LiveSession({
     if (!selectedBotToTerminate) return;
     const botId = selectedBotToTerminate;
     try {
-      const res = await fetch(`/api/live/bots/stop/${botId}`, {
+      const res = await fetch(`/api/live/bots/stop/${botId}?close_pct=${closePct}`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -206,7 +269,10 @@ export default function LiveSession({
         type: 'start',
         symbol: liveSymbol,
         strategy_code: selectedStrategy ? selectedStrategy.code : "",
-        timeframe: liveTimeframe
+        timeframe: liveTimeframe,
+        feed_source: liveFeedSource,
+        alpaca_key_id: alpacaKeyId,
+        alpaca_secret_key: alpacaSecretKey
       }));
     }
   };
@@ -307,8 +373,9 @@ export default function LiveSession({
                   <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Symbol</label>
                   <select value={liveSymbol} onChange={(e) => setLiveSymbol(e.target.value)}
                     className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none">
-                    <option value="BTCUSDT">BTC/USDT</option>
-                    <option value="ETHUSDT">ETH/USDT</option>
+                    {(FEED_SYMBOLS[liveFeedSource] || FEED_SYMBOLS.mock).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -325,7 +392,7 @@ export default function LiveSession({
                   </div>
                   <div>
                     <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Feed Source</label>
-                    <select value={liveFeedSource} onChange={(e) => setLiveFeedSource(e.target.value)}
+                    <select value={liveFeedSource} onChange={(e) => handleFeedSourceChange(e.target.value)}
                       className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none">
                       <option value="binance">Binance (WS)</option>
                       <option value="yfinance">yfinance (Poll)</option>
@@ -360,10 +427,20 @@ export default function LiveSession({
 
                 <div>
                   <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Select Strategy</label>
-                  <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none">
+                  <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} disabled={agenticMode}
+                    className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none disabled:opacity-50">
                     {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                  <button type="button" onClick={() => setAgenticMode(!agenticMode)}
+                    className={`relative w-8 h-4 rounded-full transition-colors ${agenticMode ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${agenticMode ? 'translate-x-4' : ''}`} />
+                  </button>
+                  <label className="text-[10px] font-bold text-indigo-300 uppercase cursor-pointer" onClick={() => setAgenticMode(!agenticMode)}>
+                    Agentic AI Mode (Autonomous)
+                  </label>
                 </div>
 
                 <button type="submit"
@@ -587,6 +664,21 @@ export default function LiveSession({
 
                   </div>
 
+                  {/* Agentic Alpha Brief Panel */}
+                  {b.last_alpha_rationale && (
+                    <div className="glass-panel p-4 mb-4 border border-blue-500/20 bg-blue-500/5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${b.last_alpha_status === 'APPROVED' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {b.last_alpha_status || 'UNKNOWN'}
+                        </span>
+                        <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Latest Alpha Brief Rationale</h3>
+                      </div>
+                      <p className="text-xs text-slate-300 font-mono leading-relaxed">
+                        {b.last_alpha_rationale}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Bottom Row: Order History & Local Logs */}
                   <div className="grid md:grid-cols-2 gap-4">
 
@@ -692,6 +784,21 @@ export default function LiveSession({
             <p className="text-xs text-slate-300 leading-relaxed font-sans font-light">
               Are you sure you want to terminate bot: <strong className="text-white font-bold">{bots[selectedBotToTerminate]?.name || selectedBotToTerminate}</strong>? This will stop its live feed parsing execution thread and remove it from your console dashboard.
             </p>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+              <span className="text-xs font-semibold text-slate-300">Exit Sizing: Close {Math.round(closePct * 100)}% of Positions</span>
+              <div className="flex gap-2">
+                {[0, 0.25, 0.5, 0.75, 1.0].map(pct => (
+                  <button
+                    key={pct}
+                    onClick={() => setClosePct(pct)}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded ${closePct === pct ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                  >
+                    {pct === 0 ? "0%" : `${pct * 100}%`}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button

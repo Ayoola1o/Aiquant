@@ -11,6 +11,9 @@ import Portfolio from './components/Portfolio';
 import Settings from './components/Settings';
 import Screener from './components/Screener';
 import UserProfile from './components/UserProfile';
+import GlobalNews from './components/GlobalNews';
+import HistoryPage from './components/HistoryPage';
+import HistoryResultPage from './components/HistoryResultPage';
 
 import { 
   LayoutDashboard, 
@@ -25,7 +28,9 @@ import {
   ShieldCheck,
   Layers,
   Menu,
-  X
+  X,
+  Newspaper,
+  Archive
 } from 'lucide-react';
 
 export default function App() {
@@ -166,8 +171,26 @@ function QuantApp() {
   const [openAiApiKey, setOpenAiApiKey] = useState<string>(() =>
     localStorage.getItem('neuroquant_openai_api_key') || ''
   );
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() =>
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
     localStorage.getItem('neuroquant_gemini_api_key') || ''
+  );
+  const [techAgentKey, setTechAgentKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_tech_agent_key') || ''
+  );
+  const [sentimentAgentKey, setSentimentAgentKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_sentiment_agent_key') || ''
+  );
+  const [tradingViewAgentKey, setTradingViewAgentKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_tradingview_agent_key') || ''
+  );
+  const [hyperliquidAgentKey, setHyperliquidAgentKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_hyperliquid_agent_key') || ''
+  );
+  const [hyperliquidPrivateKey, setHyperliquidPrivateKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_hyperliquid_private_key') || ''
+  );
+  const [firecrawlAgentKey, setFirecrawlAgentKey] = useState<string>(() => 
+    localStorage.getItem('neuroquant_firecrawl_agent_key') || ''
   );
   const [openRouterApiKey, setOpenRouterApiKey] = useState<string>(() =>
     localStorage.getItem('neuroquant_openrouter_api_key') || ''
@@ -309,6 +332,12 @@ function QuantApp() {
   useEffect(() => {
     localStorage.setItem('neuroquant_openai_api_key', openAiApiKey);
     localStorage.setItem('neuroquant_gemini_api_key', geminiApiKey);
+    localStorage.setItem('neuroquant_tech_agent_key', techAgentKey);
+    localStorage.setItem('neuroquant_sentiment_agent_key', sentimentAgentKey);
+    localStorage.setItem('neuroquant_tradingview_agent_key', tradingViewAgentKey);
+    localStorage.setItem('neuroquant_hyperliquid_agent_key', hyperliquidAgentKey);
+    localStorage.setItem('neuroquant_hyperliquid_private_key', hyperliquidPrivateKey);
+    localStorage.setItem('neuroquant_firecrawl_agent_key', firecrawlAgentKey);
     localStorage.setItem('neuroquant_openrouter_api_key', openRouterApiKey);
     localStorage.setItem('neuroquant_nvidia_api_key', nvidiaApiKey);
     localStorage.setItem('neuroquant_ai_model', aiModel);
@@ -318,7 +347,13 @@ function QuantApp() {
     localStorage.setItem('neuroquant_nvidia_model', nvidiaModel);
   }, [
     openAiApiKey, 
-    geminiApiKey, 
+    geminiApiKey,
+    techAgentKey,
+    sentimentAgentKey,
+    tradingViewAgentKey,
+    hyperliquidAgentKey,
+    hyperliquidPrivateKey,
+    firecrawlAgentKey,
     openRouterApiKey, 
     nvidiaApiKey, 
     aiModel, 
@@ -369,7 +404,7 @@ function QuantApp() {
   return (
     <div className="flex min-h-screen text-slate-200">
       {/* Sidebar Navigation */}
-      <aside className={`bg-slate-950/70 border-r border-white/5 flex flex-col justify-between shrink-0 backdrop-blur-md transition-all duration-300 ease-in-out ${
+      <aside className={`bg-slate-950/70 border-r border-white/5 flex flex-col justify-between shrink-0 backdrop-blur-md transition-all duration-300 ease-in-out sticky top-0 h-screen overflow-y-auto ${
         sidebarOpen ? 'w-64 p-6 opacity-100' : 'w-0 p-0 opacity-0 border-r-0 overflow-hidden'
       }`}>
         <div className="space-y-8">
@@ -435,6 +470,19 @@ function QuantApp() {
               <Layers className="w-4 h-4" />
               AI Asset Screener
             </button>
+ 
+            {/* X Social News */}
+            <button
+              onClick={() => navigate('/news')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/news' 
+                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Newspaper className="w-4 h-4" />
+              X Social News
+            </button>
 
             {/* AI Strategy Lab */}
             <button
@@ -473,6 +521,19 @@ function QuantApp() {
             >
               <Activity className="w-4 h-4" />
               Live Terminal
+            </button>
+
+            {/* Trade History */}
+            <button
+              onClick={() => navigate('/history')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/history' 
+                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              Trade History
             </button>
 
             {/* Portfolio */}
@@ -561,10 +622,12 @@ function QuantApp() {
             <h1 className="font-extrabold text-lg tracking-wide uppercase text-white truncate">
               {location.pathname === '/dashboard' && 'Market Dashboard'}
               {location.pathname === '/screener' && 'Quant Signal Matrix / AI Asset Screener'}
+              {location.pathname === '/news' && 'X Social News Feed'}
               {location.pathname === '/predictor' && 'AI Price Forecasting'}
               {location.pathname === '/strategylab' && 'AI Strategy Playground'}
               {location.pathname === '/backtester' && 'Strategy Backtesting'}
               {location.pathname === '/live' && 'Live simulated Session'}
+              {location.pathname === '/history' && 'Trade History Ledger'}
               {location.pathname === '/portfolio' && 'Portfolio & Risk Diagnostics'}
               {location.pathname === '/settings' && 'Platform Configuration'}
               {location.pathname === '/profile' && 'Alexander Ramirez (Alex R.) - User Profile Terminal'}
@@ -583,6 +646,7 @@ function QuantApp() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/predictor" element={<AIPredictor />} />
             <Route path="/screener" element={<Screener />} />
+            <Route path="/news" element={<GlobalNews />} />
             <Route path="/strategylab" element={
               <AIStrategyLab 
                 strategies={strategies} 
@@ -615,8 +679,17 @@ function QuantApp() {
                 alpacaKeyId={alpacaKeyId}
                 alpacaSecretKey={alpacaSecretKey}
                 riskProfile={riskProfile}
+                geminiApiKey={geminiApiKey}
+                techAgentKey={techAgentKey}
+                sentimentAgentKey={sentimentAgentKey}
+                tradingViewAgentKey={tradingViewAgentKey}
+                hyperliquidAgentKey={hyperliquidAgentKey}
+                hyperliquidPrivateKey={hyperliquidPrivateKey}
+                firecrawlAgentKey={firecrawlAgentKey}
               />
             } />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/history/:sessionId" element={<HistoryResultPage />} />
             <Route path="/portfolio" element={
               <Portfolio
                 alpacaKeyId={alpacaKeyId}
@@ -633,6 +706,18 @@ function QuantApp() {
                 setOpenAiApiKey={setOpenAiApiKey}
                 geminiApiKey={geminiApiKey}
                 setGeminiApiKey={setGeminiApiKey}
+                techAgentKey={techAgentKey}
+                setTechAgentKey={setTechAgentKey}
+                sentimentAgentKey={sentimentAgentKey}
+                setSentimentAgentKey={setSentimentAgentKey}
+                tradingViewAgentKey={tradingViewAgentKey}
+                setTradingViewAgentKey={setTradingViewAgentKey}
+                hyperliquidAgentKey={hyperliquidAgentKey}
+                hyperliquidPrivateKey={hyperliquidPrivateKey}
+                setHyperliquidPrivateKey={setHyperliquidPrivateKey}
+                setHyperliquidAgentKey={setHyperliquidAgentKey}
+                firecrawlAgentKey={firecrawlAgentKey}
+                setFirecrawlAgentKey={setFirecrawlAgentKey}
                 openRouterApiKey={openRouterApiKey}
                 setOpenRouterApiKey={setOpenRouterApiKey}
                 nvidiaApiKey={nvidiaApiKey}

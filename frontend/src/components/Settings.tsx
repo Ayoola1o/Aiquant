@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database } from 'lucide-react';
 
 interface SettingsProps {
   alpacaKeyId: string;
@@ -10,6 +10,17 @@ interface SettingsProps {
   setOpenAiApiKey: (v: string) => void;
   geminiApiKey: string;
   setGeminiApiKey: (v: string) => void;
+  techAgentKey: string;
+  setTechAgentKey: (v: string) => void;
+  sentimentAgentKey: string;
+  setSentimentAgentKey: (v: string) => void;
+  tradingViewAgentKey: string;
+  setTradingViewAgentKey: (v: string) => void;
+  hyperliquidPrivateKey: string;
+  setHyperliquidPrivateKey: (v: string) => void;
+  setHyperliquidAgentKey: (v: string) => void;
+  firecrawlAgentKey: string;
+  setFirecrawlAgentKey: (v: string) => void;
   openRouterApiKey: string;
   setOpenRouterApiKey: (v: string) => void;
   nvidiaApiKey: string;
@@ -68,6 +79,18 @@ export default function Settings({
   setOpenAiApiKey,
   geminiApiKey,
   setGeminiApiKey,
+  techAgentKey,
+  setTechAgentKey,
+  sentimentAgentKey,
+  setSentimentAgentKey,
+  tradingViewAgentKey,
+  setTradingViewAgentKey,
+  hyperliquidAgentKey,
+  hyperliquidPrivateKey,
+  setHyperliquidPrivateKey,
+  setHyperliquidAgentKey,
+  firecrawlAgentKey,
+  setFirecrawlAgentKey,
   openRouterApiKey,
   setOpenRouterApiKey,
   nvidiaApiKey,
@@ -131,12 +154,134 @@ export default function Settings({
   const [themeMode, setThemeMode] = useState('obsidian');
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [syncFlash, setSyncFlash] = useState<string | null>(null);
+ 
+  // Dynamic X/Twitter Handles Configuration
+  const [xHandles, setXHandles] = useState<string[]>([]);
+  const [newHandle, setNewHandle] = useState('');
+  const [loadingHandles, setLoadingHandles] = useState(false);
+  const [handlesError, setHandlesError] = useState('');
+
+  // Google ADK Settings State
+  const [adkSupervisionEnabled, setAdkSupervisionEnabled] = useState(() => {
+    return localStorage.getItem('adk_supervision_enabled') === 'true';
+  });
+  const [adkTemp, setAdkTemp] = useState(() => {
+    return Number(localStorage.getItem('adk_temperature') || '0.1');
+  });
+  const [adkLatencyThreshold, setAdkLatencyThreshold] = useState(() => {
+    return Number(localStorage.getItem('adk_latency_threshold') || '3000');
+  });
+
+  const fetchXHandles = async () => {
+    setLoadingHandles(true);
+    try {
+      const res = await fetch('/api/social/x-handles');
+      if (res.ok) {
+        const data = await res.json();
+        setXHandles(data.handles || []);
+      }
+    } catch (e) {
+      console.error("Failed to load X handles:", e);
+    } finally {
+      setLoadingHandles(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchXHandles();
+  }, []);
+
+  const handleAddHandle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!newHandle.trim()) return;
+    
+    let formatted = newHandle.trim();
+    if (!formatted.startsWith('@')) {
+      formatted = '@' + formatted;
+    }
+    
+    setHandlesError('');
+    try {
+      const res = await fetch('/api/social/x-handles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: formatted })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setXHandles(data.handles || []);
+        setNewHandle('');
+      } else {
+        const errData = await res.json();
+        setHandlesError(errData.detail || "Failed to add handle.");
+      }
+    } catch (err) {
+      console.error("Error adding handle:", err);
+      setHandlesError("Network error. Could not add handle.");
+    }
+  };
+
+  const handleDeleteHandle = async (handle: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setHandlesError('');
+    try {
+      const res = await fetch(`/api/social/x-handles?handle=${encodeURIComponent(handle)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setXHandles(data.handles || []);
+      } else {
+        const errData = await res.json();
+        setHandlesError(errData.detail || "Failed to delete handle.");
+      }
+    } catch (err) {
+      console.error("Error deleting handle:", err);
+      setHandlesError("Network error. Could not delete handle.");
+    }
+  };
+
+  const syncAgentKeys = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      setSyncFlash("Syncing keys...");
+      const res = await fetch('/api/live/bots/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gemini: geminiApiKey,
+          tech: techAgentKey,
+          sentiment: sentimentAgentKey,
+          tradingview: tradingViewAgentKey,
+          hyperliquid: hyperliquidAgentKey,
+          firecrawl: firecrawlAgentKey
+        })
+      });
+      if (res.ok) {
+        setSyncFlash("✅ API Keys successfully synced to all running bots!");
+      } else {
+        setSyncFlash("❌ Failed to sync keys.");
+      }
+      setTimeout(() => setSyncFlash(null), 3000);
+    } catch (err) {
+      console.error("Error syncing keys:", err);
+      setSyncFlash("❌ Network error. Could not sync keys.");
+      setTimeout(() => setSyncFlash(null), 3000);
+    }
+  };
 
   const alpacaConnected = alpacaKeyId.length > 4 && alpacaSecretKey.length > 4;
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavedFlash(true);
+
+    // Save ADK Settings locally
+    localStorage.setItem('adk_supervision_enabled', adkSupervisionEnabled.toString());
+    localStorage.setItem('adk_temperature', adkTemp.toString());
+    localStorage.setItem('adk_latency_threshold', adkLatencyThreshold.toString());
+
     try {
       await fetch('/api/live/risk_profile', {
         method: 'POST',
@@ -202,7 +347,7 @@ export default function Settings({
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">Alpaca Secret Key</label>
             <input
-              type="password"
+              type="text"
               value={alpacaSecretKey}
               onChange={(e) => setAlpacaSecretKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
@@ -830,7 +975,227 @@ export default function Settings({
                 </div>
               )}
             </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Technical Analyst Agent Key (Optional)</label>
+              <input 
+                type="password"
+                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
+                value={techAgentKey}
+                onChange={(e) => setTechAgentKey(e.target.value)}
+                placeholder="Uses Main Gemini Key if empty"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Sentiment Analyst Agent Key (Optional)</label>
+              <input 
+                type="password"
+                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
+                value={sentimentAgentKey}
+                onChange={(e) => setSentimentAgentKey(e.target.value)}
+                placeholder="Uses Main Gemini Key if empty"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">TradingView Analyst Agent Key (Optional)</label>
+              <input 
+                type="password"
+                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
+                value={tradingViewAgentKey}
+                onChange={(e) => setTradingViewAgentKey(e.target.value)}
+                placeholder="Uses Main Gemini Key if empty"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Hyperliquid Tracker Agent Key (Optional)</label>
+              <input 
+                type="password"
+                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
+                value={hyperliquidAgentKey}
+                onChange={(e) => setHyperliquidAgentKey(e.target.value)}
+              />
+            </div>
           </div>
+          
+          {/* Sync Button */}
+          <div className="px-6 pb-6 pt-2 flex justify-between items-center">
+            <div className="text-sm font-medium">
+              {syncFlash && (
+                <span className={syncFlash.includes('❌') ? "text-red-400" : "text-green-400"}>
+                  {syncFlash}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={syncAgentKeys}
+              className="bg-[#4D88FF] hover:bg-[#3B76EB] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/20"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Sync Keys to Live Bots
+            </button>
+          </div>
+        </div>
+
+        {/* Hyperliquid Trading Section */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-700 bg-gray-800/80 flex items-center space-x-3">
+            <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Hyperliquid Trading</h2>
+              <p className="text-sm text-gray-400">Execution credentials for Hyperliquid Testnet/Mainnet.</p>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Hyperliquid Wallet Private Key (Ethereum Address)
+              </label>
+              <input
+                type="password"
+                placeholder="0x..."
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                value={hyperliquidPrivateKey}
+                onChange={(e) => setHyperliquidPrivateKey(e.target.value)}
+                placeholder="Uses Main Gemini Key if empty"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Firecrawl Researcher Agent Key (Optional)</label>
+              <input 
+                type="password"
+                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
+                value={firecrawlAgentKey}
+                onChange={(e) => setFirecrawlAgentKey(e.target.value)}
+                placeholder="Uses Main Gemini Key if empty"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* X/Twitter Scraper Configurations */}
+      <div className="glass-panel p-6 space-y-4">
+        <h3 className="font-bold text-base text-white flex items-center gap-2 mb-1">
+          <Globe className="w-5 h-5 text-indigo-400" />
+          X (Twitter) Scraper Configurations
+        </h3>
+        <p className="text-xs text-slate-500 font-light">
+          Narrow down the social media scraper to target these specific accounts/handles. Enter any custom handle to scrape news dynamically from it.
+        </p>
+
+        {/* Input box to enter new accounts */}
+        <div className="flex gap-2 max-w-md pt-2">
+          <input
+            type="text"
+            value={newHandle}
+            onChange={(e) => setNewHandle(e.target.value)}
+            className="flex-1 px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs outline-none text-white placeholder-slate-600 font-semibold"
+            placeholder="Enter X handle (e.g. @Nairametrics)"
+          />
+          <button
+            onClick={handleAddHandle}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Source
+          </button>
+        </div>
+
+        {handlesError && (
+          <p className="text-xs text-[#FF4B55] font-semibold animate-pulse">{handlesError}</p>
+        )}
+
+        {/* List of active handles */}
+        <div className="pt-2">
+          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Tracked News Accounts</span>
+          {loadingHandles ? (
+            <div className="text-xs text-slate-500 animate-pulse">Loading sources list...</div>
+          ) : xHandles.length === 0 ? (
+            <div className="text-xs text-slate-600">No custom handles registered. Nairametrics defaults active.</div>
+          ) : (
+            <div className="flex flex-wrap gap-2.5">
+              {xHandles.map((handle, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#0F1115] border border-white/5 rounded-xl text-xs text-slate-300 font-semibold group hover:border-slate-700 transition-all"
+                >
+                  <span className="font-mono text-indigo-400">{handle}</span>
+                  <button
+                    onClick={(e) => handleDeleteHandle(handle, e)}
+                    className="text-slate-500 hover:text-[#FF4B55] transition-colors p-0.5 rounded cursor-pointer"
+                    title={`Stop tracking ${handle}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Google ADK Multi-Agent Cognitive Settings */}
+      <div className="glass-panel p-6 space-y-4">
+        <h3 className="font-bold text-base text-white flex items-center gap-2 mb-1">
+          <Brain className="w-5 h-5 text-indigo-400" />
+          Google ADK Cognitive Agent Settings
+        </h3>
+        <p className="text-xs text-slate-500 font-light">
+          Configure the Google Agent Development Kit (ADK) supervisor framework. When enabled, a multi-agent desk (Quantitative & Sentiment Analysts) evaluates and must clear trading setups.
+        </p>
+
+        <div className="space-y-4 pt-2">
+          {/* Toggle Switch */}
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-bold text-white">Enable Multi-Agent Desk Supervision</span>
+              <span className="text-[10px] text-slate-500">Enable Gemini 1.5/2.5 supervisor compliance layer</span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={adkSupervisionEnabled}
+                onChange={(e) => setAdkSupervisionEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-950/70 border border-slate-800 rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white peer-checked:after:border-white"></div>
+            </label>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supervisor Temperature</label>
+              <input
+                type="number"
+                step="0.05"
+                min="0"
+                max="1.0"
+                value={adkTemp}
+                onChange={(e) => setAdkTemp(Number(e.target.value))}
+                className="px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs outline-none text-white w-full font-mono"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Max Decision Latency (ms)</label>
+              <input
+                type="number"
+                step="100"
+                min="500"
+                max="10000"
+                value={adkLatencyThreshold}
+                onChange={(e) => setAdkLatencyThreshold(Number(e.target.value))}
+                className="px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs outline-none text-white w-full font-mono"
+              />
+            </div>
+          </div>
+          
+          {adkSupervisionEnabled && (
+            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3 text-[10px] text-amber-300 font-semibold flex items-center gap-2">
+              ⚠️ Note: LLM cognitive reasoning cycles add 800ms - 3s latency. This setup is not suitable for high-frequency scalping.
+            </div>
+          )}
         </div>
       </div>
 
