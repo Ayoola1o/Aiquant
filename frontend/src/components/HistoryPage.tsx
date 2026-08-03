@@ -2,13 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Archive, 
-  ChevronDown, 
-  ChevronUp, 
   TrendingUp, 
   TrendingDown,
-  Clock,
-  DollarSign,
-  Activity,
   Bot
 } from 'lucide-react';
 

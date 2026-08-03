@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database } from 'lucide-react';
+import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff } from 'lucide-react';
 
 interface SettingsProps {
   alpacaKeyId: string;
@@ -18,6 +18,7 @@ interface SettingsProps {
   setTradingViewAgentKey: (v: string) => void;
   hyperliquidPrivateKey: string;
   setHyperliquidPrivateKey: (v: string) => void;
+  hyperliquidAgentKey: string;
   setHyperliquidAgentKey: (v: string) => void;
   firecrawlAgentKey: string;
   setFirecrawlAgentKey: (v: string) => void;
@@ -68,6 +69,13 @@ interface SettingsProps {
   setHeartbeatCheckEnabled: (v: boolean) => void;
   maxHeartbeatStaleSeconds: number;
   setMaxHeartbeatStaleSeconds: (v: number) => void;
+
+  autoRebalanceEnabled: boolean;
+  setAutoRebalanceEnabled: (v: boolean) => void;
+  autoRebalanceIntervalMinutes: number;
+  setAutoRebalanceIntervalMinutes: (v: number) => void;
+  slippageTolerancePct: number;
+  setSlippageTolerancePct: (v: number) => void;
 }
 
 export default function Settings({ 
@@ -137,7 +145,14 @@ export default function Settings({
   heartbeatCheckEnabled,
   setHeartbeatCheckEnabled,
   maxHeartbeatStaleSeconds,
-  setMaxHeartbeatStaleSeconds
+  setMaxHeartbeatStaleSeconds,
+
+  autoRebalanceEnabled,
+  setAutoRebalanceEnabled,
+  autoRebalanceIntervalMinutes,
+  setAutoRebalanceIntervalMinutes,
+  slippageTolerancePct,
+  setSlippageTolerancePct
 }: SettingsProps) {
   // Local-only settings (not globally shared)
   const [binanceKey, setBinanceKey] = useState('');
@@ -146,6 +161,7 @@ export default function Settings({
   const [defaultSize, setDefaultSize] = useState(10);
   const [maxDrawdown, setMaxDrawdown] = useState(5.0);
   const [leverage, setLeverage] = useState(1);
+  const [showKeys, setShowKeys] = useState(false);
 
   const [aiTemp, setAiTemp] = useState(0.2);
   const [signalThreshold, setSignalThreshold] = useState(70);
@@ -302,7 +318,10 @@ export default function Settings({
           max_drawdown_enabled: maxDrawdownEnabled,
           max_drawdown_percent: Number(maxDrawdownPercent),
           heartbeat_check_enabled: heartbeatCheckEnabled,
-          max_heartbeat_stale_seconds: Number(maxHeartbeatStaleSeconds)
+          max_heartbeat_stale_seconds: Number(maxHeartbeatStaleSeconds),
+          auto_rebalance_enabled: autoRebalanceEnabled,
+          auto_rebalance_interval_minutes: Number(autoRebalanceIntervalMinutes),
+          slippage_tolerance_pct: Number(slippageTolerancePct)
         })
       });
     } catch (err) {
@@ -367,10 +386,22 @@ export default function Settings({
             />
           </div>
 
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs text-slate-500 font-semibold">API Keys are stored locally in your browser.</span>
+            <button
+              type="button"
+              onClick={() => setShowKeys(!showKeys)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:border-indigo-500/30 text-[10px] font-bold text-slate-400 hover:text-white transition-all"
+            >
+              {showKeys ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              {showKeys ? 'Hide Keys' : 'Show Keys'}
+            </button>
+          </div>
+
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">OpenAI API Key (Optional)</label>
             <input
-              type="password"
+              type={showKeys ? "text" : "password"}
               value={openAiApiKey}
               onChange={(e) => setOpenAiApiKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
@@ -382,19 +413,19 @@ export default function Settings({
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">Gemini API Key (Optional)</label>
             <input
-              type="password"
+              type={showKeys ? "text" : "password"}
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
               placeholder="AIzaSy••••••••••••••••••••••••••••••••"
             />
-            <p className="text-[10px] text-slate-600 mt-1">Fallback generator model key for custom agent scripts.</p>
+            <p className="text-[10px] text-slate-600 mt-1">Powers the Agentic AI multi-agent pipeline (ADK). Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">AI Studio</a>.</p>
           </div>
 
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">OpenRouter API Key (Optional)</label>
             <input
-              type="password"
+              type={showKeys ? "text" : "password"}
               value={openRouterApiKey}
               onChange={(e) => setOpenRouterApiKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
@@ -406,13 +437,75 @@ export default function Settings({
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">NVIDIA API Key (Optional)</label>
             <input
-              type="password"
+              type={showKeys ? "text" : "password"}
               value={nvidiaApiKey}
               onChange={(e) => setNvidiaApiKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
               placeholder="nvapi-••••••••••••••••••••••••••••••••"
             />
             <p className="text-[10px] text-slate-600 mt-1">Used for fast inference on NVIDIA NIM optimized models.</p>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-slate-800/50">
+            <h4 className="text-sm font-semibold text-white mb-4">ADK Agent-Specific Keys</h4>
+            <p className="text-[10px] text-slate-500 mb-4 font-light">By default, all sub-agents use the Main Gemini Key. Provide separate keys below to distribute API rate-limits.</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-slate-400 text-xs font-semibold mb-2">Technical Analyst Agent Key (Optional)</label>
+                <input 
+                  type={showKeys ? "text" : "password"}
+                  value={techAgentKey}
+                  onChange={(e) => setTechAgentKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+                  placeholder="Uses Main Gemini Key if empty"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-slate-400 text-xs font-semibold mb-2">Sentiment Analyst Agent Key (Optional)</label>
+                <input 
+                  type={showKeys ? "text" : "password"}
+                  value={sentimentAgentKey}
+                  onChange={(e) => setSentimentAgentKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+                  placeholder="Uses Main Gemini Key if empty"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-xs font-semibold mb-2">TradingView Analyst Agent Key (Optional)</label>
+                <input 
+                  type={showKeys ? "text" : "password"}
+                  value={tradingViewAgentKey}
+                  onChange={(e) => setTradingViewAgentKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+                  placeholder="Uses Main Gemini Key if empty"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-xs font-semibold mb-2">Hyperliquid Tracker Agent Key (Optional)</label>
+                <input 
+                  type={showKeys ? "text" : "password"}
+                  value={hyperliquidAgentKey}
+                  onChange={(e) => setHyperliquidAgentKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+                  placeholder="Uses Main Gemini Key if empty"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-xs font-semibold mb-2">Firecrawl Researcher Agent Key (Optional)</label>
+                <input 
+                  type={showKeys ? "text" : "password"}
+                  value={firecrawlAgentKey}
+                  onChange={(e) => setFirecrawlAgentKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
+                  placeholder="Uses Main Gemini Key if empty"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -975,44 +1068,56 @@ export default function Settings({
                 </div>
               )}
             </div>
-            <div>
-              <label className="block text-slate-400 text-xs font-semibold mb-2">Technical Analyst Agent Key (Optional)</label>
-              <input 
-                type="password"
-                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
-                value={techAgentKey}
-                onChange={(e) => setTechAgentKey(e.target.value)}
-                placeholder="Uses Main Gemini Key if empty"
-              />
+
+            {/* Auto Risk Rebalancing */}
+            <div className="space-y-3 pt-2 border-t border-slate-900/60">
+              <div className="flex justify-between items-center">
+                <div>
+                  <label className="block text-slate-300 text-xs font-semibold">Auto Risk Rebalancing</label>
+                  <span className="text-[10px] text-slate-500 font-light block">Periodically adjust portfolio weights inversely to bot volatility</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoRebalanceEnabled}
+                  onChange={(e) => setAutoRebalanceEnabled(e.target.checked)}
+                  className="rounded border-slate-800 text-indigo-500 bg-slate-950/60 focus:ring-indigo-500"
+                />
+              </div>
+              {autoRebalanceEnabled && (
+                <div className="pl-2">
+                  <label className="block text-slate-400 text-[10px] mb-1">Rebalance Interval</label>
+                  <select
+                    value={autoRebalanceIntervalMinutes}
+                    onChange={(e) => setAutoRebalanceIntervalMinutes(Number(e.target.value))}
+                    className="w-48 px-2 py-1 bg-slate-950/80 border border-slate-800 focus:border-indigo-500/50 rounded-lg text-xs font-mono outline-none text-white"
+                  >
+                    <option value="5">5 Minutes</option>
+                    <option value="15">15 Minutes</option>
+                    <option value="30">30 Minutes</option>
+                    <option value="60">1 Hour</option>
+                    <option value="240">4 Hours</option>
+                  </select>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-slate-400 text-xs font-semibold mb-2">Sentiment Analyst Agent Key (Optional)</label>
-              <input 
-                type="password"
-                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
-                value={sentimentAgentKey}
-                onChange={(e) => setSentimentAgentKey(e.target.value)}
-                placeholder="Uses Main Gemini Key if empty"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-400 text-xs font-semibold mb-2">TradingView Analyst Agent Key (Optional)</label>
-              <input 
-                type="password"
-                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
-                value={tradingViewAgentKey}
-                onChange={(e) => setTradingViewAgentKey(e.target.value)}
-                placeholder="Uses Main Gemini Key if empty"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-400 text-xs font-semibold mb-2">Hyperliquid Tracker Agent Key (Optional)</label>
-              <input 
-                type="password"
-                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
-                value={hyperliquidAgentKey}
-                onChange={(e) => setHyperliquidAgentKey(e.target.value)}
-              />
+
+            {/* Slippage Tolerance */}
+            <div className="space-y-3 pt-2 border-t border-slate-900/60">
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold">Slippage Tolerance (%)</label>
+                <span className="text-[10px] text-slate-500 font-light block">Defines execution price buffer for orders and simulator execution penalty</span>
+              </div>
+              <div className="pl-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="5.0"
+                  value={slippageTolerancePct}
+                  onChange={(e) => setSlippageTolerancePct(Number(e.target.value))}
+                  className="w-48 px-2 py-1 bg-slate-950/80 border border-slate-800 focus:border-indigo-500/50 rounded-lg text-xs font-mono outline-none text-white"
+                />
+              </div>
             </div>
           </div>
           
@@ -1054,21 +1159,10 @@ export default function Settings({
               </label>
               <input
                 type="password"
-                placeholder="0x..."
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
                 value={hyperliquidPrivateKey}
                 onChange={(e) => setHyperliquidPrivateKey(e.target.value)}
-                placeholder="Uses Main Gemini Key if empty"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-400 text-xs font-semibold mb-2">Firecrawl Researcher Agent Key (Optional)</label>
-              <input 
-                type="password"
-                className="w-full bg-[#0a0c16] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#4D88FF] transition-colors font-mono text-sm"
-                value={firecrawlAgentKey}
-                onChange={(e) => setFirecrawlAgentKey(e.target.value)}
-                placeholder="Uses Main Gemini Key if empty"
+                placeholder="Uses Main Gemini Key if empty (0x...)"
               />
             </div>
           </div>

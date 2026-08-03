@@ -36,22 +36,6 @@ const CandlestickBar = (props: any) => {
   );
 };
 
-// ─── Buy / Sell signal dot ────────────────────────────────────────────────────
-const TradeDot = (props: any) => {
-  const { cx, cy, payload } = props;
-  if (!payload?.signal) return null;
-  const isBuy = payload.signal === 'BUY';
-  const color = isBuy ? '#22c55e' : '#ef4444';
-  const arrow = isBuy ? '▲' : '▼';
-  const offsetY = isBuy ? 18 : -18;
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={5} fill={color} stroke="#0f1115" strokeWidth={1.5} />
-      <text x={cx} y={cy - offsetY} textAnchor="middle" fontSize={9} fontWeight="bold" fill={color}>{arrow} {payload.signal}</text>
-    </g>
-  );
-};
-
 interface PortfolioProps {
   alpacaKeyId?: string;
   alpacaSecretKey?: string;
@@ -700,10 +684,6 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                 _signal: c.signalPrice != null ? c.signalPrice - priceMin : null,
               }));
 
-              const fmt = (v: number) => {
-                const real = v + priceMin;  // add back baseline for display
-                return real > 1000 ? `$${(real / 1000).toFixed(2)}k` : `$${real.toFixed(2)}`;
-              };
               const fmtReal = (v: number) => v > 1000 ? `$${(v / 1000).toFixed(2)}k` : `$${v.toFixed(2)}`;
 
               return (
@@ -873,7 +853,7 @@ export default function Portfolio({ alpacaKeyId = '', alpacaSecretKey = '' }: Po
                         <Tooltip
                           contentStyle={{ background: '#0a101e', borderColor: '#1e293b', fontSize: 10 }}
                           formatter={(v: any) => [`$${parseFloat(v).toLocaleString(undefined, {minimumFractionDigits: 2})}`, 'Equity']}
-                          labelFormatter={(l: string) => new Date(l).toLocaleDateString()}
+                          labelFormatter={(l: any) => new Date(l).toLocaleDateString()}
                         />
                         <Area type="monotone" dataKey="equity"
                           stroke={isPos ? '#10b981' : '#ef4444'} strokeWidth={2}

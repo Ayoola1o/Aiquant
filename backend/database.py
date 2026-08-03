@@ -106,7 +106,46 @@ def init_db():
             wins INTEGER NOT NULL,
             losses INTEGER NOT NULL,
             trades_json TEXT NOT NULL,
-            last_alpha_rationale TEXT DEFAULT ''
+            last_alpha_rationale TEXT DEFAULT '',
+            custom_charts_json TEXT DEFAULT ''
+        )
+    """)
+    
+    # Check if custom_charts_json column exists (migration for existing db)
+    try:
+        cursor.execute("SELECT custom_charts_json FROM bot_sessions LIMIT 1")
+    except sqlite3.OperationalError:
+        cursor.execute("ALTER TABLE bot_sessions ADD COLUMN custom_charts_json TEXT DEFAULT ''")
+
+    # 7. Active Bots (for crash recovery / state restoration)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS active_bots (
+            bot_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            strategy_code TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            starting_cash REAL NOT NULL,
+            feed_source TEXT NOT NULL,
+            alpaca_key_id TEXT,
+            alpaca_secret_key TEXT,
+            hyperliquid_private_key TEXT,
+            risk_profile_json TEXT,
+            agentic_mode INTEGER NOT NULL DEFAULT 0,
+            agent_attitude TEXT,
+            gemini_api_key TEXT,
+            tech_agent_key TEXT,
+            sentiment_agent_key TEXT,
+            tradingview_agent_key TEXT,
+            hyperliquid_agent_key TEXT,
+            firecrawl_agent_key TEXT,
+            leverage_limit REAL DEFAULT 1.0,
+            current_cash REAL,
+            positions_json TEXT,
+            trades_json TEXT,
+            avg_cost REAL,
+            realized_pnl REAL,
+            start_time TEXT
         )
     """)
 
@@ -116,18 +155,19 @@ def init_db():
 
 def save_bot_session(bot_id: str, strategy_name: str, symbol: str, start_time: str, end_time: str, 
                      start_cash: float, end_cash: float, pnl: float, total_trades: int, 
-                     wins: int, losses: int, trades_json: str, last_alpha_rationale: str = ""):
+                     wins: int, losses: int, trades_json: str, last_alpha_rationale: str = "",
+                     custom_charts_json: str = ""):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO bot_sessions (
                 bot_id, strategy_name, symbol, start_time, end_time, 
-                start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale, custom_charts_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             bot_id, strategy_name, symbol, start_time, end_time, 
-            start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale
+            start_cash, end_cash, pnl, total_trades, wins, losses, trades_json, last_alpha_rationale, custom_charts_json
         ))
         conn.commit()
     finally:
@@ -143,6 +183,14 @@ def get_bot_sessions():
         sessions = []
         import json
         for r in rows:
+            # Safely get custom_charts
+            custom_charts = {}
+            if "custom_charts_json" in r.keys() and r["custom_charts_json"]:
+                try:
+                    custom_charts = json.loads(r["custom_charts_json"])
+                except Exception:
+                    pass
+
             sessions.append({
                 "id": r["id"],
                 "bot_id": r["bot_id"],
@@ -157,7 +205,8 @@ def get_bot_sessions():
                 "wins": r["wins"],
                 "losses": r["losses"],
                 "trades_json": json.loads(r["trades_json"]),
-                "last_alpha_rationale": r["last_alpha_rationale"]
+                "last_alpha_rationale": r["last_alpha_rationale"],
+                "custom_charts": custom_charts
             })
         return sessions
     finally:
@@ -345,3 +394,53 @@ def delete_x_handle(handle: str) -> bool:
     conn.commit()
     conn.close()
     return rowcount > 0
+
+def save_active_bot(
+    bot_id: str, name: str, symbol: str, strategy_code: str, timeframe: str,
+    starting_cash: float, feed_source: str, alpaca_key_id: str, alpaca_secret_key: str,
+    hyperliquid_private_key: str, risk_profile_json: str, agentic_mode: int,
+    agent_attitude: str, gemini_api_key: str, tech_agent_key: str, sentiment_agent_key: str,
+    tradingview_agent_key: str, hyperliquid_agent_key: str, firecrawl_agent_key: str,
+    leverage_limit: float, current_cash: float, positions_json: str, trades_json: str,
+    avg_cost: float, realized_pnl: float, start_time: str
+):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO active_bots (
+                bot_id, name, symbol, strategy_code, timeframe, starting_cash, feed_source,
+                alpaca_key_id, alpaca_secret_key, hyperliquid_private_key, risk_profile_json,
+                agentic_mode, agent_attitude, gemini_api_key, tech_agent_key, sentiment_agent_key,
+                tradingview_agent_key, hyperliquid_agent_key, firecrawl_agent_key, leverage_limit,
+                current_cash, positions_json, trades_json, avg_cost, realized_pnl, start_time
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            bot_id, name, symbol, strategy_code, timeframe, starting_cash, feed_source,
+            alpaca_key_id, alpaca_secret_key, hyperliquid_private_key, risk_profile_json,
+            agentic_mode, agent_attitude, gemini_api_key, tech_agent_key, sentiment_agent_key,
+            tradingview_agent_key, hyperliquid_agent_key, firecrawl_agent_key, leverage_limit,
+            current_cash, positions_json, trades_json, avg_cost, realized_pnl, start_time
+        ))
+        conn.commit()
+    finally:
+        conn.close()
+
+def delete_active_bot(bot_id: str):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM active_bots WHERE bot_id = ?", (bot_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_active_bots() -> list:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM active_bots")
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()

@@ -272,6 +272,16 @@ function QuantApp() {
     Number(localStorage.getItem('neuroquant_risk_max_heartbeat_stale_seconds') || '30')
   );
 
+  const [autoRebalanceEnabled, setAutoRebalanceEnabled] = useState<boolean>(() =>
+    localStorage.getItem('neuroquant_risk_auto_rebalance_enabled') === 'true'
+  );
+  const [autoRebalanceIntervalMinutes, setAutoRebalanceIntervalMinutes] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_auto_rebalance_interval_minutes') || '30')
+  );
+  const [slippageTolerancePct, setSlippageTolerancePct] = useState<number>(() =>
+    Number(localStorage.getItem('neuroquant_risk_slippage_tolerance_pct') || '0.5')
+  );
+
   // Sync Risk settings to localStorage
   useEffect(() => {
     localStorage.setItem('neuroquant_risk_atr_sizing_enabled', String(atrSizingEnabled));
@@ -290,11 +300,15 @@ function QuantApp() {
     localStorage.setItem('neuroquant_risk_max_drawdown_percent', String(maxDrawdownPercent));
     localStorage.setItem('neuroquant_risk_heartbeat_check_enabled', String(heartbeatCheckEnabled));
     localStorage.setItem('neuroquant_risk_max_heartbeat_stale_seconds', String(maxHeartbeatStaleSeconds));
+    localStorage.setItem('neuroquant_risk_auto_rebalance_enabled', String(autoRebalanceEnabled));
+    localStorage.setItem('neuroquant_risk_auto_rebalance_interval_minutes', String(autoRebalanceIntervalMinutes));
+    localStorage.setItem('neuroquant_risk_slippage_tolerance_pct', String(slippageTolerancePct));
   }, [
     atrSizingEnabled, atrRiskPercent, atrPeriod, atrMultiplier,
     maxOrderValueEnabled, maxOrderValue, priceCollarEnabled, maxSpreadPercent,
     correlationLimitEnabled, maxAllocationPerAsset, maxSimultaneousTradesEnabled, maxSimultaneousTrades,
-    maxDrawdownEnabled, maxDrawdownPercent, heartbeatCheckEnabled, maxHeartbeatStaleSeconds
+    maxDrawdownEnabled, maxDrawdownPercent, heartbeatCheckEnabled, maxHeartbeatStaleSeconds,
+    autoRebalanceEnabled, autoRebalanceIntervalMinutes, slippageTolerancePct
   ]);
 
   const riskProfile = {
@@ -313,7 +327,10 @@ function QuantApp() {
     max_drawdown_enabled: maxDrawdownEnabled,
     max_drawdown_percent: maxDrawdownPercent,
     heartbeat_check_enabled: heartbeatCheckEnabled,
-    max_heartbeat_stale_seconds: maxHeartbeatStaleSeconds
+    max_heartbeat_stale_seconds: maxHeartbeatStaleSeconds,
+    auto_rebalance_enabled: autoRebalanceEnabled,
+    auto_rebalance_interval_minutes: autoRebalanceIntervalMinutes,
+    slippage_tolerance_pct: slippageTolerancePct
   };
 
 
@@ -765,6 +782,13 @@ function QuantApp() {
                 setHeartbeatCheckEnabled={setHeartbeatCheckEnabled}
                 maxHeartbeatStaleSeconds={maxHeartbeatStaleSeconds}
                 setMaxHeartbeatStaleSeconds={setMaxHeartbeatStaleSeconds}
+                
+                autoRebalanceEnabled={autoRebalanceEnabled}
+                setAutoRebalanceEnabled={setAutoRebalanceEnabled}
+                autoRebalanceIntervalMinutes={autoRebalanceIntervalMinutes}
+                setAutoRebalanceIntervalMinutes={setAutoRebalanceIntervalMinutes}
+                slippageTolerancePct={slippageTolerancePct}
+                setSlippageTolerancePct={setSlippageTolerancePct}
               />
             } />
             <Route path="/profile" element={<UserProfile />} />

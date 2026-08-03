@@ -42,6 +42,10 @@ app.add_middleware(
 def startup_event():
     import database as db
     db.init_db()
+    try:
+        live_session.restore_previous_active_bots()
+    except Exception as e:
+        print(f"[Startup Error] Failed to restore active bots: {e}", flush=True)
  
 # --- Pydantic Schemes for API Validation ---
 
@@ -116,6 +120,9 @@ class RiskProfileModel(BaseModel):
     heartbeat_check_enabled: bool = False
     max_heartbeat_stale_seconds: int = 30
     exit_size_pct: float = 100.0
+    auto_rebalance_enabled: bool = False
+    auto_rebalance_interval_minutes: int = 30
+    slippage_tolerance_pct: float = 0.5
 
 class StartSessionRequest(BaseModel):
     symbol: str = "BTCUSDT"
@@ -136,12 +143,14 @@ class SpawnBotRequest(BaseModel):
     hyperliquid_private_key: Optional[str] = ""
     risk_profile: Optional[dict] = None
     agentic_mode: Optional[bool] = False
+    agent_attitude: Optional[str] = "balanced"
     gemini_api_key: Optional[str] = ""
     tech_agent_key: Optional[str] = ""
     sentiment_agent_key: Optional[str] = ""
     tradingview_agent_key: Optional[str] = ""
     hyperliquid_agent_key: Optional[str] = ""
     firecrawl_agent_key: Optional[str] = ""
+    leverage_limit: Optional[float] = 1.0
 
 class SyncKeysRequest(BaseModel):
     gemini: Optional[str] = ""
@@ -150,6 +159,9 @@ class SyncKeysRequest(BaseModel):
     tradingview: Optional[str] = ""
     hyperliquid: Optional[str] = ""
     firecrawl: Optional[str] = ""
+
+class AttitudeUpdateRequest(BaseModel):
+    attitude: str
 
 class AlpacaOrderRequest(BaseModel):
     alpaca_key_id: str
@@ -403,12 +415,14 @@ def spawn_bot(req: SpawnBotRequest):
         hyperliquid_private_key=req.hyperliquid_private_key,
         risk_profile=req.risk_profile,
         agentic_mode=req.agentic_mode,
+        agent_attitude=req.agent_attitude,
         gemini_api_key=req.gemini_api_key,
         tech_agent_key=req.tech_agent_key,
         sentiment_agent_key=req.sentiment_agent_key,
         tradingview_agent_key=req.tradingview_agent_key,
         hyperliquid_agent_key=req.hyperliquid_agent_key,
-        firecrawl_agent_key=req.firecrawl_agent_key
+        firecrawl_agent_key=req.firecrawl_agent_key,
+        leverage_limit=req.leverage_limit
     )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to spawn bot.")
@@ -426,6 +440,25 @@ def stop_bot(bot_id: str, close_pct: float = 1.0):
 
 @app.get("/api/live/bots")
 def get_all_bots():
+    return {"status": "success", "bots": live_session.get_all_states()}
+
+@app.post("/api/live/bots/rebalance")
+def rebalance_bots():
+    success, message = live_session.rebalance_fleet_due_to_risk()
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "message": message, "bots": live_session.get_all_states()}
+
+@app.post("/api/live/bots/panic")
+def panic_all_bots():
+    terminated_ids = live_session.panic_stop_all()
+    return {"status": "success", "message": f"PANIC triggered: stopped and flattened {len(terminated_ids)} active bots.", "terminated_bots": terminated_ids, "bots": live_session.get_all_states()}
+
+@app.post("/api/live/bots/attitude/{bot_id}")
+def update_bot_attitude(bot_id: str, req: AttitudeUpdateRequest):
+    success = live_session.update_attitude_for_bot(bot_id, req.attitude)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update attitude. Bot not found or not in Agentic mode.")
     return {"status": "success", "bots": live_session.get_all_states()}
 
 @app.post("/api/live/bots/keys")
@@ -451,6 +484,133 @@ def get_history():
         return {"status": "success", "sessions": sessions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/history/{session_id}/candles")
+def get_session_candles(session_id: int):
+    from database import get_bot_sessions
+    import yfinance as yf
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    sessions = get_bot_sessions()
+    session = next((s for s in sessions if s["id"] == session_id), None)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    symbol = session["symbol"]
+    start_time_str = session["start_time"]
+    end_time_str = session["end_time"]
+
+    try:
+        start_dt = datetime.strptime(start_time_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        try:
+            start_dt = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+        except Exception:
+            start_dt = datetime.now() - timedelta(days=5)
+
+    try:
+        end_dt = datetime.strptime(end_time_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        try:
+            end_dt = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+        except Exception:
+            end_dt = datetime.now()
+
+    # Add 2 days of buffer on each side
+    start_date_str = (start_dt - timedelta(days=2)).strftime("%Y-%m-%d")
+    end_date_str = (end_dt + timedelta(days=2)).strftime("%Y-%m-%d")
+
+    duration = end_dt - start_dt
+    if duration.total_seconds() <= 3600 * 24:
+        interval = "15m"
+    elif duration.total_seconds() <= 3600 * 24 * 7:
+        interval = "1h"
+    else:
+        interval = "1d"
+
+    yf_sym = symbol
+    crypto_map = {
+        "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD", "SOLUSD": "SOL-USD",
+        "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD",
+        "ADAUSD": "ADA-USD", "DOTUSD": "DOT-USD", "AVAXUSD": "AVAX-USD",
+        "LINKUSD": "LINK-USD", "MATICUSD": "MATIC-USD",
+    }
+    yf_sym = crypto_map.get(symbol, symbol)
+
+    candles = []
+    try:
+        df = yf.download(yf_sym, start=start_date_str, end=end_date_str, interval=interval)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        if df is not None and not df.empty:
+            df = df.reset_index()
+            ts_col = "Datetime" if "Datetime" in df.columns else "Date"
+            for _, row in df.iterrows():
+                ts = row[ts_col]
+                if hasattr(ts, "isoformat"):
+                    ts_str = ts.isoformat()
+                else:
+                    ts_str = str(ts)
+
+                candles.append({
+                    "time": ts_str,
+                    "open": float(row["Open"]),
+                    "high": float(row["High"]),
+                    "low": float(row["Low"]),
+                    "close": float(row["Close"]),
+                    "volume": float(row["Volume"]) if "Volume" in row else 0.0
+                })
+    except Exception as e:
+        print(f"Error fetching candles from yfinance: {e}. Generating mock fallback...")
+
+    # If yfinance failed or returned no data (e.g. offline sandbox or invalid symbol)
+    if not candles:
+        import random
+        anchor_price = 100.0
+        prices = []
+        if session.get("trades_json"):
+            import json
+            try:
+                t_list = json.loads(session["trades_json"]) if isinstance(session["trades_json"], str) else session["trades_json"]
+                for t in t_list:
+                    if t.get("entry_price"):
+                        prices.append(t["entry_price"])
+                    if t.get("exit_price"):
+                        prices.append(t["exit_price"])
+            except Exception as e:
+                print(f"Error parsing session trades for mock generation: {e}")
+        
+        if prices:
+            valid_prices = [p for p in prices if p > 0]
+            if valid_prices:
+                anchor_price = sum(valid_prices) / len(valid_prices)
+
+        steps = 40
+        time_step = (end_dt - start_dt) / steps if steps > 0 else timedelta(hours=1)
+        curr_price = anchor_price
+        
+        for step in range(steps + 1):
+            candle_time = start_dt + (time_step * step)
+            change = curr_price * random.uniform(-0.015, 0.015)
+            o = curr_price
+            c_val = curr_price + change
+            h = max(o, c_val) + (curr_price * random.uniform(0.0005, 0.005))
+            l = min(o, c_val) - (curr_price * random.uniform(0.0005, 0.005))
+            
+            candles.append({
+                "time": candle_time.isoformat() + "Z",
+                "open": round(o, 4),
+                "high": round(h, 4),
+                "low": round(l, 4),
+                "close": round(c_val, 4),
+                "volume": round(random.uniform(500, 5000), 1)
+            })
+            curr_price = c_val
+
+    return {"status": "success", "candles": candles, "symbol": symbol, "interval": interval}
 
 
 class AlpacaCredentials(BaseModel):
@@ -1933,7 +2093,7 @@ def get_alpaca_performance(req: AlpacaPerformanceRequest):
     try:
         # 1. Fetch transaction fills
         url = f"{base}/account/activities/FILL"
-        params = {"page_size": 200, "direction": "asc"}
+        params = {"page_size": 100, "direction": "asc"}
         r = rq.get(url, headers=headers, params=params, timeout=10)
         
         fills = []

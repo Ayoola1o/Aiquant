@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Send, Copy, FileCode, Terminal, MessageCircle, X } from 'lucide-react';
+import { Sparkles, Send, Copy, FileCode, Terminal, MessageCircle, X, Zap } from 'lucide-react';
 
 interface AIStrategyLabProps {
   strategies: Array<{ id: string; name: string; code: string }>;
@@ -100,13 +100,77 @@ export default function AIStrategyLab({
         setPrompt('');
       } else {
         setCompileStatus('error');
-        setConsoleLogs(prev => [...prev, "[Compiler] Error: Generation request rejected by backend."]);
+        setConsoleLogs(prev => [...prev, "[Compiler] Error: Refinement request rejected by backend."]);
       }
     } catch (e) {
       setCompileStatus('error');
       setConsoleLogs(prev => [...prev, `[Compiler] Connection Error: ${e}`]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const handleAutoOptimize = async () => {
+    if (!workingCode) return;
+    setIsOptimizing(true);
+    setConsoleLogs(prev => [...prev, "[Optimizer] Initiating backtest for optimization..."]);
+
+    try {
+      const btRes = await fetch('/api/backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategy_code: workingCode,
+          symbol: "BTCUSDT",
+          timeframe: "15m",
+          starting_cash: 10000.0,
+          commission_pct: 0.001
+        })
+      });
+
+      if (!btRes.ok) throw new Error("Backtest failed.");
+      const btData = await btRes.json();
+      const pnl = btData.total_pnl;
+      const winRate = btData.win_rate;
+
+      setConsoleLogs(prev => [...prev, `[Optimizer] Backtest complete. PnL: $${pnl.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%`, "[Optimizer] Requesting AI parameter refinement..."]);
+
+      const refineRes = await fetch('/api/ai/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: workingCode,
+          adjustment: `This strategy yielded a Net PnL of $${pnl.toFixed(2)} and a Win Rate of ${winRate.toFixed(1)}% in the latest backtest. Optimize the hardcoded parameters (like SMA lengths, RSI thresholds, or multipliers) to improve profitability and reduce drawdown. Return the updated Python code. Do not change the core logic.`,
+          openai_api_key: openAiApiKey,
+          gemini_api_key: geminiApiKey,
+          openrouter_api_key: openRouterApiKey,
+          nvidia_api_key: nvidiaApiKey,
+          ai_model: aiModel,
+          openai_model: openaiModel,
+          gemini_model: geminiModel,
+          openrouter_model: openRouterModel,
+          nvidia_model: nvidiaModel
+        })
+      });
+
+      if (!refineRes.ok) throw new Error("AI refinement failed.");
+
+      const refineData = await refineRes.json();
+      setWorkingCode(refineData.code);
+      setCompileStatus('success');
+      setConsoleLogs(prev => [...prev, "[Optimizer] Optimization complete! Updated parameters injected."]);
+
+      if (!isChatOpen) setIsChatOpen(true);
+      setChatMessages(prev => [
+        ...prev,
+        { id: prev.length + 1, sender: 'assistant', text: `I have optimized the strategy parameters based on the backtest results (PnL: $${pnl.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%). Check the code for changes!` }
+      ]);
+    } catch (e: any) {
+      setConsoleLogs(prev => [...prev, `[Optimizer] Error: ${e.message || e}`]);
+    } finally {
+      setIsOptimizing(false);
     }
   };
 
@@ -356,13 +420,23 @@ export default function AIStrategyLab({
             </h3>
             
             {workingCode && (
-              <button
-                onClick={copyCode}
-                className="text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 bg-slate-950/40 border border-slate-800 px-3 py-1.5 rounded-lg hover:border-slate-700 transition-colors"
-              >
-                <Copy className="w-3 h-3" />
-                {copied ? 'Copied!' : 'Copy Code'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAutoOptimize}
+                  disabled={isOptimizing}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-lg hover:border-indigo-500/50 transition-colors disabled:opacity-50"
+                >
+                  <Zap className={`w-3 h-3 ${isOptimizing ? 'animate-pulse' : ''}`} />
+                  {isOptimizing ? 'Optimizing...' : 'Auto-Optimize'}
+                </button>
+                <button
+                  onClick={copyCode}
+                  className="text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 bg-slate-950/40 border border-slate-800 px-3 py-1.5 rounded-lg hover:border-slate-700 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  {copied ? 'Copied!' : 'Copy Code'}
+                </button>
+              </div>
             )}
           </div>
 

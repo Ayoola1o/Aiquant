@@ -657,5 +657,6 @@ def run_historical_backtest(
         "equity_curve": portfolio_value_history,
         "drawdown_curve": drawdown_history,
         "volatility_curve": volatility_history,
-        "trade_logs": trade_logs
+        "trade_logs": trade_logs,
+        "custom_charts": getattr(strategy_instance, "_custom_charts", {})
     }

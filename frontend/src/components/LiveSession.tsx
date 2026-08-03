@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Bar, AreaChart, Area } from 'recharts';
-import { Play, Square, Cpu, Plus, Power, Activity, Terminal, AlertTriangle } from 'lucide-react';
+import { Play, Square, Cpu, Plus, Power, Activity, Terminal, AlertTriangle, Save, X, Bookmark, Scale, RefreshCw, ShieldAlert } from 'lucide-react';
 
 interface LiveSessionProps {
   strategies: Array<{ id: string; name: string; code: string }>;
@@ -105,8 +105,79 @@ export default function LiveSession({
   const [alpacaKeyId, setAlpacaKeyId] = useState(globalAlpacaKeyId);
   const [alpacaSecretKey, setAlpacaSecretKey] = useState(globalAlpacaSecretKey);
   const [agenticMode, setAgenticMode] = useState(false);
+  const [leverageLimit, setLeverageLimit] = useState(1);
+  const [localSlippagePct, setLocalSlippagePct] = useState(0.5);
+  const [localAgentAttitude, setLocalAgentAttitude] = useState('balanced');
   const [selectedBotToTerminate, setSelectedBotToTerminate] = useState<string | null>(null);
   const [closePct, setClosePct] = useState<number>(1.0);
+  const [rebalanceLoading, setRebalanceLoading] = useState(false);
+  const [rebalanceMessage, setRebalanceMessage] = useState<string | null>(null);
+  const [panicLoading, setPanicLoading] = useState(false);
+  const [panicMessage, setPanicMessage] = useState<string | null>(null);
+
+  // Template modal state
+  interface BotTemplate {
+    name: string;
+    botName: string;
+    strategyId: string;
+    symbol: string;
+    timeframe: string;
+    startingCash: number;
+    feedSource: string;
+    agenticMode: boolean;
+    leverageLimit: number;
+    slippagePct: number;
+    agentAttitude: string;
+  }
+  const [savedTemplates, setSavedTemplates] = useState<BotTemplate[]>(() => {
+    try {
+      const stored = localStorage.getItem('aiquant_bot_templates');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+
+  const handleSaveTemplate = () => {
+    if (!templateName.trim()) return;
+    const tpl: BotTemplate = {
+      name: templateName.trim(),
+      botName,
+      strategyId,
+      symbol: liveSymbol,
+      timeframe: liveTimeframe,
+      startingCash,
+      feedSource: liveFeedSource,
+      agenticMode,
+      leverageLimit,
+      slippagePct: localSlippagePct,
+      agentAttitude: localAgentAttitude,
+    };
+    const updated = [...savedTemplates, tpl];
+    setSavedTemplates(updated);
+    localStorage.setItem('aiquant_bot_templates', JSON.stringify(updated));
+    setTemplateName('');
+    setShowSaveTemplateModal(false);
+  };
+
+  const handleLoadTemplate = (tpl: BotTemplate) => {
+    setBotName(tpl.botName);
+    setStrategyId(tpl.strategyId);
+    setLiveSymbol(tpl.symbol);
+    setLiveTimeframe(tpl.timeframe);
+    setStartingCash(tpl.startingCash);
+    setLiveFeedSource(tpl.feedSource);
+    setAgenticMode(tpl.agenticMode);
+    setLeverageLimit(tpl.leverageLimit);
+    setLocalSlippagePct(tpl.slippagePct ?? 0.5);
+    setLocalAgentAttitude(tpl.agentAttitude ?? 'balanced');
+  };
+
+  const handleDeleteTemplate = (idx: number) => {
+    const updated = savedTemplates.filter((_, i) => i !== idx);
+    setSavedTemplates(updated);
+    localStorage.setItem('aiquant_bot_templates', JSON.stringify(updated));
+  };
 
   const handleFeedSourceChange = (feed: string) => {
     setLiveFeedSource(feed);
@@ -133,7 +204,9 @@ export default function LiveSession({
   }, []);
 
   const socketRef = useRef<WebSocket | null>(null);
-
+  const reconnectTimeoutRef = useRef<any | null>(null);
+  const reconnectDelayRef = useRef(1000);
+ 
   const fetchAllBots = async () => {
     try {
       const res = await fetch('/api/live/bots');
@@ -143,6 +216,31 @@ export default function LiveSession({
       }
     } catch (e) {
       console.error("Failed to load active bots:", e);
+    }
+  };
+
+  const handlePanicStopAll = async () => {
+    if (!window.confirm("⚠️ WARNING: This will immediately close all active bots and flatten 100% of open positions on Alpaca & Hyperliquid. Proceed?")) {
+      return;
+    }
+    setPanicLoading(true);
+    setPanicMessage(null);
+    try {
+      const res = await fetch('/api/live/bots/panic', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBots(data.bots || {});
+        setPanicMessage("🚨 PANIC: Stopped all bots & closed positions.");
+      } else {
+        setPanicMessage(`❌ Panic action failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (e) {
+      setPanicMessage("❌ Network error triggering panic action.");
+    } finally {
+      setPanicLoading(false);
+      setTimeout(() => setPanicMessage(null), 8000);
     }
   };
 
@@ -166,8 +264,13 @@ export default function LiveSession({
           feed_source: liveFeedSource,
           alpaca_key_id: alpacaKeyId,
           alpaca_secret_key: alpacaSecretKey,
-          risk_profile: riskProfile,
+          risk_profile: {
+            ...(riskProfile || {}),
+            slippage_tolerance_pct: Number(localSlippagePct)
+          },
           agentic_mode: agenticMode,
+          agent_attitude: localAgentAttitude,
+          leverage_limit: leverageLimit,
           gemini_api_key: geminiApiKey,
           tech_agent_key: techAgentKey,
           sentiment_agent_key: sentimentAgentKey,
@@ -219,19 +322,46 @@ export default function LiveSession({
     }
   };
 
+  const handleRebalancePortfolio = async () => {
+    setRebalanceLoading(true);
+    setRebalanceMessage(null);
+    try {
+      const res = await fetch('/api/live/bots/rebalance', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBots(data.bots || {});
+        setRebalanceMessage(data.message || "Portfolio successfully risk-balanced.");
+      } else {
+        setRebalanceMessage(`❌ Rebalance failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (e) {
+      setRebalanceMessage("❌ Network error triggering rebalance.");
+    } finally {
+      setRebalanceLoading(false);
+      setTimeout(() => setRebalanceMessage(null), 8000);
+    }
+  };
+
   const connectWebSocket = () => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : window.location.host;
     const wsUrl = `${wsProto}//${wsHost}/ws/live-trading`;
-
+ 
     console.log(`Connecting Live WebSocket to ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
+ 
+    ws.onopen = () => {
+      console.log('WebSocket connected.');
+      reconnectDelayRef.current = 1000; // Reset delay on successful connection
+    };
 
     ws.onmessage = (event) => {
       const payload = jsonParse(event.data);
       if (!payload) return;
-
+ 
       if (payload.type === 'all_bots') {
         // Full fleet snapshot on connect
         setBots(payload.data || {});
@@ -244,13 +374,19 @@ export default function LiveSession({
         setBots(prev => ({ ...prev, [bot_id]: data }));
       }
     };
-
-    ws.onclose = () => {
-      console.log('WebSocket closed.');
+ 
+    ws.onclose = (event) => {
+      console.log(`WebSocket closed. Reconnecting in ${reconnectDelayRef.current}ms...`, event);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 30000);
+        connectWebSocket();
+      }, reconnectDelayRef.current);
     };
-
+ 
     ws.onerror = (e) => {
       console.error('WebSocket Error:', e);
+      ws.close(); // Force trigger onclose
     };
   };
 
@@ -304,6 +440,9 @@ export default function LiveSession({
       if (socketRef.current) {
         socketRef.current.close();
       }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -349,12 +488,12 @@ export default function LiveSession({
         <div className="w-[320px] shrink-0 space-y-4">
 
           {/* Spawn Strategy Bot */}
-          <div className="glass-panel p-5 flex flex-col max-h-[460px]">
+          <div className="glass-panel p-5 flex flex-col h-auto">
             <h3 className="text-sm font-extrabold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5 shrink-0">
               <Plus className="w-4 h-4 text-indigo-400" />
               Spawn Strategy Bot
             </h3>
-            <div className="overflow-y-auto flex-1 pr-1 -mr-1">
+            <div className="flex-1 pr-1 -mr-1">
               <form onSubmit={handleSpawnBot} className="space-y-1.5 text-xs">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -426,28 +565,109 @@ export default function LiveSession({
                 )}
 
                 <div>
-                  <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Select Strategy</label>
-                  <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} disabled={agenticMode}
-                    className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none disabled:opacity-50">
-                    {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Trading Mode</label>
+                  <select 
+                    value={agenticMode ? "agent" : "standard"} 
+                    onChange={(e) => setAgenticMode(e.target.value === "agent")}
+                    className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none text-[10px]"
+                  >
+                    <option value="standard">Standard Strategy Script</option>
+                    <option value="agent">Autonomous AI Agent</option>
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
-                  <button type="button" onClick={() => setAgenticMode(!agenticMode)}
-                    className={`relative w-8 h-4 rounded-full transition-colors ${agenticMode ? 'bg-indigo-500' : 'bg-slate-700'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${agenticMode ? 'translate-x-4' : ''}`} />
-                  </button>
-                  <label className="text-[10px] font-bold text-indigo-300 uppercase cursor-pointer" onClick={() => setAgenticMode(!agenticMode)}>
-                    Agentic AI Mode (Autonomous)
-                  </label>
+                {!agenticMode ? (
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Select Strategy</label>
+                    <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none text-[10px]">
+                      {strategies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Select Agent Stance / Mode</label>
+                    <select 
+                      value={localAgentAttitude} 
+                      onChange={(e) => setLocalAgentAttitude(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-semibold outline-none text-[10px]"
+                    >
+                      <option value="balanced">balanced ⭐ (Medium Risk)</option>
+                      <option value="conservative">conservative (Low Risk)</option>
+                      <option value="aggressive">aggressive (High Risk)</option>
+                      <option value="ultra-short">ultra-short (High Risk Scalper)</option>
+                      <option value="swing-trend">swing-trend (High Risk Trend Capture)</option>
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Max Leverage</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 5, 10].map(lv => (
+                      <button key={lv} type="button" onClick={() => setLeverageLimit(lv)}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-all ${
+                          leverageLimit === lv
+                            ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                            : 'bg-[#0F1115] border border-white/5 text-slate-400 hover:border-indigo-500/30 hover:text-white'
+                        }`}>
+                        {lv}x
+                      </button>
+                    ))}
+                  </div>
+                  {leverageLimit > 1 && (
+                    <p className="text-[8px] text-amber-400/70 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      {leverageLimit}x leverage amplifies both gains and losses
+                    </p>
+                  )}
+                </div>
+ 
+                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/5">
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">Slippage (%)</label>
+                    <input 
+                      type="number" 
+                      step="0.1" 
+                      min="0.0" 
+                      max="5.0"
+                      value={localSlippagePct} 
+                      onChange={(e) => setLocalSlippagePct(parseFloat(e.target.value) || 0.5)}
+                      className="w-full px-2 py-1.5 bg-[#0F1115] border border-white/5 rounded text-white font-mono text-[10px] outline-none" 
+                    />
+                  </div>
                 </div>
 
-                <button type="submit"
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded transition-all flex items-center justify-center gap-1 mt-1 shadow">
-                  <Cpu className="w-3.5 h-3.5" />
-                  Spawn Strategy Agent
-                </button>
+                <div className="flex gap-2 mt-1">
+                  <button type="submit"
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded transition-all flex items-center justify-center gap-1 shadow">
+                    <Cpu className="w-3.5 h-3.5" />
+                    Spawn Agent
+                  </button>
+                  <button type="button" onClick={() => { setTemplateName(''); setShowSaveTemplateModal(true); }}
+                    className="px-3 py-2 bg-white/5 border border-white/10 hover:border-indigo-500/30 text-slate-400 hover:text-white font-bold text-xs rounded transition-all flex items-center gap-1">
+                    <Bookmark className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Saved Templates List */}
+                {savedTemplates.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase">Saved Templates</span>
+                    {savedTemplates.map((tpl, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 group">
+                        <button type="button" onClick={() => handleLoadTemplate(tpl)}
+                          className="flex-1 text-left px-2 py-1 rounded bg-white/[0.02] border border-white/5 hover:border-indigo-500/30 text-[10px] text-slate-300 hover:text-white font-semibold transition-all truncate">
+                          {tpl.name}
+                        </button>
+                        <button type="button" onClick={() => handleDeleteTemplate(idx)}
+                          className="opacity-0 group-hover:opacity-100 px-1 py-1 text-red-400 hover:text-red-300 transition-all">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </form>
             </div>
           </div>
@@ -480,6 +700,50 @@ export default function LiveSession({
 
         {/* ═══ RIGHT MAIN AREA (Spawned Bot Cards Stack) ═══════════════════════ */}
         <div className="flex-1 min-w-0 space-y-6">
+
+          {/* Portfolio Risk Header & Rebalance Panel */}
+          {Object.keys(bots).length > 0 && (
+            <div className="glass-panel p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-indigo-950/10 border-indigo-500/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Fleet Management Actions</h3>
+                  <p className="text-[10px] text-slate-500 font-light">Rebalance allocations to scale risk down, or stop everything immediately under severe conditions.</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                {rebalanceMessage && (
+                  <span className={`text-[10px] font-mono px-2 py-1 rounded bg-[#0f1115] border ${rebalanceMessage.includes('❌') ? 'border-red-500/20 text-red-400' : 'border-emerald-500/20 text-emerald-400'}`}>
+                    {rebalanceMessage}
+                  </span>
+                )}
+                {panicMessage && (
+                  <span className="text-[10px] font-mono px-2 py-1 rounded bg-[#0f1115] border border-red-500/30 text-red-400">
+                    {panicMessage}
+                  </span>
+                )}
+                <button
+                  onClick={handleRebalancePortfolio}
+                  disabled={rebalanceLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-500/15"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${rebalanceLoading ? 'animate-spin' : ''}`} />
+                  {rebalanceLoading ? 'Rebalancing...' : 'Rebalance Portfolio'}
+                </button>
+                <button
+                  onClick={handlePanicStopAll}
+                  disabled={panicLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-red-650 hover:bg-red-750 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-red-500/15"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  {panicLoading ? 'STOPPING ALL...' : 'PANIC STOP & FLATTEN'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {Object.keys(bots).length === 0 ? (
             <div className="glass-panel p-12 text-center text-slate-500 italic font-mono flex flex-col items-center justify-center space-y-3">
@@ -579,6 +843,42 @@ export default function LiveSession({
                         { label: 'Unrealized P&L', val: `${uPnl >= 0 ? '+' : ''}$${uPnl.toFixed(2)}`, color: uPnl >= 0 ? 'text-emerald-400/70' : 'text-red-400/70' },
                         { label: `${b.symbol} Holding`, val: `${posQty.toFixed(6)}`, color: 'text-indigo-300' },
                         { label: 'Uptime', val: runtime, color: 'text-white' },
+                        { label: 'Trading Mode', val: b.is_agentic ? 'AUTONOMOUS AI' : 'STANDARD SCRIPT', color: b.is_agentic ? 'text-indigo-400 font-bold' : 'text-slate-400' },
+                        { label: 'Slippage Tol.', val: `${b.risk_profile?.slippage_tolerance_pct ?? 0.5}%`, color: 'text-slate-300' },
+                        ...(b.is_agentic ? [{
+                          label: 'Stance / Attitude',
+                          val: (
+                            <select
+                              value={b.agent_attitude}
+                              onChange={async (e) => {
+                                const newAttitude = e.target.value;
+                                try {
+                                  const res = await fetch(`/api/live/bots/attitude/${bid}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ attitude: newAttitude })
+                                  });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setBots(data.bots || {});
+                                  } else {
+                                    alert("Failed to update agent attitude.");
+                                  }
+                                } catch (err) {
+                                  console.error("Failed to update attitude:", err);
+                                }
+                              }}
+                              className="bg-[#0b0f19] border border-white/10 rounded px-1 py-0.5 text-[9px] font-bold text-indigo-400 focus:outline-none cursor-pointer"
+                            >
+                              <option value="balanced">balanced ⭐</option>
+                              <option value="conservative">conservative</option>
+                              <option value="aggressive">aggressive</option>
+                              <option value="ultra-short">ultra-short</option>
+                              <option value="swing-trend">swing-trend</option>
+                            </select>
+                          ),
+                          color: 'text-indigo-300'
+                        }] : []),
                       ].map((m, idx) => (
                         <div key={idx} className="flex justify-between items-center border-b border-white/[0.01] pb-0.5">
                           <span className="text-slate-500 truncate">{m.label}</span>
@@ -588,6 +888,27 @@ export default function LiveSession({
                     </div>
 
                   </div>
+
+                  {/* Capital Allocation Visualizer */}
+                  {(() => {
+                    const totalVal = b.portfolio_value ?? startCash;
+                    const cashVal = b.cash ?? startCash;
+                    const deployedVal = Math.max(0, totalVal - cashVal);
+                    const deployedPct = totalVal > 0 ? (deployedVal / totalVal) * 100 : 0;
+                    const idlePct = 100 - deployedPct;
+                    return (
+                      <div className="glass-panel p-4 bg-[#07090D]/20 space-y-2">
+                        <div className="flex justify-between items-center text-[10px] font-mono">
+                          <span className="text-indigo-400 font-semibold">Active Exposure: ${deployedVal.toLocaleString(undefined, {minimumFractionDigits: 2})} ({deployedPct.toFixed(1)}%)</span>
+                          <span className="text-slate-400">Idle Capital: ${cashVal.toLocaleString(undefined, {minimumFractionDigits: 2})} ({idlePct.toFixed(1)}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                          <div style={{ width: `${deployedPct}%` }} className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all duration-500" />
+                          <div style={{ width: `${idlePct}%` }} className="h-full bg-slate-800 transition-all duration-500" />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Charts: OHLCV Candlesticks + Equity Curve side-by-side */}
                   <div className="grid md:grid-cols-2 gap-4">
@@ -812,6 +1133,70 @@ export default function LiveSession({
                 className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all cursor-pointer focus:outline-none"
               >
                 Terminate Bot
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save Template Modal ────────────────────────────────────────── */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#1A1D24] border border-indigo-500/20 max-w-sm w-full rounded-2xl p-6 shadow-2xl space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                <Save className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Save Bot Template</h3>
+                <span className="text-[10px] text-[#A1A5B0] font-light">Store current config for quick re-use</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1.5">Enter a name for this bot template:</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplate(); }}
+                placeholder="e.g. BTC Scalper, ETH Swing..."
+                autoFocus
+                className="w-full px-3 py-2.5 bg-[#0F1115] border border-white/10 rounded-lg text-white font-semibold text-xs outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 placeholder:text-slate-600 transition-all"
+              />
+            </div>
+
+            {/* Config Preview */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-mono bg-[#0a0d12] rounded-lg p-3 border border-white/5">
+              {[
+                { label: 'Symbol', val: liveSymbol },
+                { label: 'Timeframe', val: liveTimeframe },
+                { label: 'Capital', val: `$${startingCash.toLocaleString()}` },
+                { label: 'Leverage', val: `${leverageLimit}x` },
+                { label: 'Feed', val: liveFeedSource.toUpperCase() },
+                { label: 'Agentic', val: agenticMode ? 'ON' : 'OFF' },
+              ].map((m, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="text-slate-500">{m.label}</span>
+                  <span className="text-slate-300">{m.val}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowSaveTemplateModal(false)}
+                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTemplate}
+                disabled={!templateName.trim()}
+                className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-500/30 disabled:cursor-not-allowed text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all cursor-pointer focus:outline-none flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save Template
               </button>
             </div>
           </div>

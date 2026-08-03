@@ -133,6 +133,12 @@ class Strategy:
         self._liquidate_flag = False
         self._cache = {}
         self.fee_rate = 0.001
+        self._custom_charts = {
+            "candle_lines": {},
+            "candle_horizontal_lines": {},
+            "extra_charts": {},
+            "extra_horizontal_lines": {}
+        }
 
         
         # internal tracking
@@ -414,3 +420,80 @@ class Strategy:
             res[i, 5] = np.sum(s[:, 5])
             
         return res
+
+    # ── Jesse Interactive Charting Methods ──
+    def add_line_to_candle_chart(self, title: str, value: float, color: str | None = None):
+        if title not in self._custom_charts["candle_lines"]:
+            self._custom_charts["candle_lines"][title] = []
+        self._custom_charts["candle_lines"][title].append({
+            "time": self.time,
+            "value": float(value) if value is not None else None,
+            "color": color
+        })
+
+    def add_horizontal_line_to_candle_chart(self, title: str, value: float, color: str | None = None, line_width: float = 1.5, line_style: str = 'solid'):
+        self._custom_charts["candle_horizontal_lines"][title] = {
+            "value": float(value),
+            "color": color,
+            "line_width": line_width,
+            "line_style": line_style
+        }
+
+    def add_extra_line_chart(self, chart_name: str, title: str, value: float, color: str | None = None):
+        if chart_name not in self._custom_charts["extra_charts"]:
+            self._custom_charts["extra_charts"][chart_name] = {}
+        if title not in self._custom_charts["extra_charts"][chart_name]:
+            self._custom_charts["extra_charts"][chart_name][title] = []
+        self._custom_charts["extra_charts"][chart_name][title].append({
+            "time": self.time,
+            "value": float(value) if value is not None else None,
+            "color": color
+        })
+
+    def add_horizontal_line_to_extra_chart(self, chart_name: str, title: str, value: float, color: str | None = None):
+        if chart_name not in self._custom_charts["extra_horizontal_lines"]:
+            self._custom_charts["extra_horizontal_lines"][chart_name] = {}
+        self._custom_charts["extra_horizontal_lines"][chart_name][title] = {
+            "value": float(value),
+            "color": color
+        }
+
+    def on_candle(self, candle: dict, state: dict) -> dict | None:
+        """
+        Bridge to adapt Jesse lifecycle methods to Aiquant live trading engine's on_candle loop.
+        """
+        # Update state variables
+        self._balance = state.get("cash", self._balance)
+        self._available_margin = self._balance
+        self._position.qty = state.get("positions", {}).get(self.symbol, 0.0)
+        self._position.entry_price = state.get("avg_cost", 0.0)
+        self._position.current_price = candle.get("close", self.close)
+
+        # Reset signals
+        self.buy = None
+        self.sell = None
+        self._liquidate_flag = False
+
+        # Run strategy logic
+        self.before()
+
+        if self._position.is_open:
+            self.update_position()
+            if self._liquidate_flag:
+                return {"action": "SELL" if self.is_long else "BUY", "qty": abs(self._position.qty)}
+        else:
+            filters_ok = all(self.filters()) if self.filters() else True
+            if filters_ok:
+                if self.should_long():
+                    self.go_long()
+                    if self.buy is not None:
+                        qty = self.buy[1] if isinstance(self.buy, (list, tuple)) else self.buy
+                        return {"action": "BUY", "qty": qty}
+                elif self.should_short():
+                    self.go_short()
+                    if self.sell is not None:
+                        qty = self.sell[1] if isinstance(self.sell, (list, tuple)) else self.sell
+                        return {"action": "SELL", "qty": qty}
+
+        self.after()
+        return None

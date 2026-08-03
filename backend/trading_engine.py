@@ -80,7 +80,11 @@ class RiskManager:
             "max_drawdown_percent": 3.0,
             
             "heartbeat_check_enabled": False,
-            "max_heartbeat_stale_seconds": 30
+            "max_heartbeat_stale_seconds": 30,
+
+            "auto_rebalance_enabled": False,
+            "auto_rebalance_interval_minutes": 30,
+            "slippage_tolerance_pct": 0.5
         }
         self.paused = False
         self.daily_starting_equity = None
@@ -170,6 +174,30 @@ class RiskManager:
                 bot.log(f"[RISK] Order rejected: Max simultaneous active positions ({active_positions}/{profile.get('max_simultaneous_trades')}) reached.")
                 return False, 0.0, "MAX_SIMULTANEOUS_TRADES_EXCEEDED"
 
+        # 4.5. Max Leverage Limit Check
+        leverage_limit = getattr(bot, "leverage_limit", 1.0)
+        max_exposure = portfolio_value * leverage_limit
+        current_exposure = abs(held_qty) * price
+        
+        if action == "BUY" and held_qty >= 0:
+            order_value = qty * price
+            if current_exposure + order_value > max_exposure:
+                available_exposure = max(0.0, max_exposure - current_exposure)
+                new_qty = round(available_exposure / price, 6)
+                bot.log(f"[RISK] Order exposure + current exposure exceeds leverage limit of {leverage_limit}x. Downsizing qty {qty:.6f} -> {new_qty:.6f}")
+                qty = new_qty
+                if qty <= 0.000001:
+                    return False, 0.0, "EXCEEDS_LEVERAGE_LIMIT"
+        elif action == "SELL" and held_qty <= 0:
+            order_value = qty * price
+            if current_exposure + order_value > max_exposure:
+                available_exposure = max(0.0, max_exposure - current_exposure)
+                new_qty = round(available_exposure / price, 6)
+                bot.log(f"[RISK] Short exposure exceeds leverage limit of {leverage_limit}x. Downsizing qty {qty:.6f} -> {new_qty:.6f}")
+                qty = new_qty
+                if qty <= 0.000001:
+                    return False, 0.0, "EXCEEDS_LEVERAGE_LIMIT"
+
         # 5. Sector/Asset Allocation Limit (Only for opening/adding to buy trades)
         if action == "BUY" and profile.get("correlation_limit_enabled"):
             current_position_value = held_qty * price
@@ -238,7 +266,7 @@ class TradingBot:
 
     def __init__(self, bot_id, name, symbol, strategy_code, timeframe,
                  starting_cash=10000.0, feed_source="binance",
-                 alpaca_key_id="", alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None):
+                 alpaca_key_id="", alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None, leverage_limit=1.0):
         self.bot_id = bot_id
         self.name = name
         self.symbol = symbol.upper()
@@ -249,6 +277,7 @@ class TradingBot:
         self.alpaca_key_id = alpaca_key_id
         self.alpaca_secret_key = alpaca_secret_key
         self.hyperliquid_private_key = hyperliquid_private_key
+        self.leverage_limit = leverage_limit
         
         self.risk_manager = RiskManager(risk_profile)
         self.last_tick_time = time.time()
@@ -257,6 +286,7 @@ class TradingBot:
         self.start_time = None
         self.cash = starting_cash
         self.starting_cash = starting_cash
+        self.alpaca_account_cash = starting_cash
         self.positions = {}
         self.trades = []
         self.limit_orders = []
@@ -267,6 +297,9 @@ class TradingBot:
         self.candle_start_time = 0
         self.avg_cost = 0.0
         self.realized_pnl = 0.0
+        self.stop_loss = 0.0
+        self.take_profit = 0.0
+        self.position_opened_at = None
 
         self.candle_duration = self.DURATION_MAP.get(timeframe, 10)
 
@@ -285,6 +318,64 @@ class TradingBot:
         self._on_tick_callbacks = []
 
         self.load_strategy(strategy_code)
+
+    def persist_active_state(self):
+        try:
+            from database import save_active_bot
+            import json
+            
+            risk_profile_json = "{}"
+            if hasattr(self, "risk_manager") and getattr(self.risk_manager, "profile", None):
+                risk_profile_json = json.dumps(self.risk_manager.profile)
+                
+            agentic_mode = 1 if isinstance(self, AgenticLiveBot) else 0
+            agent_attitude = getattr(self, "agent_attitude", "balanced")
+            
+            agent_keys = getattr(self, "agent_keys", {})
+            gemini_api_key = agent_keys.get("gemini", "")
+            tech_agent_key = agent_keys.get("tech", "")
+            sentiment_agent_key = agent_keys.get("sentiment", "")
+            tradingview_agent_key = agent_keys.get("tradingview", "")
+            hyperliquid_agent_key = agent_keys.get("hyperliquid", "")
+            firecrawl_agent_key = agent_keys.get("firecrawl", "")
+
+            with self._lock:
+                positions_json = json.dumps(self.positions)
+                trades_json = json.dumps(self.trades)
+                curr_cash = self.cash
+                avg_cost = self.avg_cost
+                realized_pnl = self.realized_pnl
+            
+            save_active_bot(
+                bot_id=self.bot_id,
+                name=self.name,
+                symbol=self.symbol,
+                strategy_code=self.strategy_code,
+                timeframe=self.timeframe,
+                starting_cash=self.starting_cash,
+                feed_source=self.feed_source,
+                alpaca_key_id=self.alpaca_key_id,
+                alpaca_secret_key=self.alpaca_secret_key,
+                hyperliquid_private_key=self.hyperliquid_private_key,
+                risk_profile_json=risk_profile_json,
+                agentic_mode=agentic_mode,
+                agent_attitude=agent_attitude,
+                gemini_api_key=gemini_api_key,
+                tech_agent_key=tech_agent_key,
+                sentiment_agent_key=sentiment_agent_key,
+                tradingview_agent_key=tradingview_agent_key,
+                hyperliquid_agent_key=hyperliquid_agent_key,
+                firecrawl_agent_key=firecrawl_agent_key,
+                leverage_limit=self.leverage_limit,
+                current_cash=curr_cash,
+                positions_json=positions_json,
+                trades_json=trades_json,
+                avg_cost=avg_cost,
+                realized_pnl=realized_pnl,
+                start_time=str(self.start_time) if self.start_time else ""
+            )
+        except Exception as e:
+            self.log(f"Failed to persist active state: {e}")
 
     # ------------------------------------------------------------------
     # Logging
@@ -497,13 +588,12 @@ class TradingBot:
             r = requests.get("https://paper-api.alpaca.markets/v2/account",
                              headers=self._alpaca_headers(), timeout=5)
             if r.status_code == 200:
-                self.cash = float(r.json().get("cash", self.cash))
-                self.log(f"[Alpaca] Account synced — Cash: ${self.cash:,.2f}")
+                self.alpaca_account_cash = float(r.json().get("cash", 0.0))
+                self.log(f"[Alpaca] Account synced — Total Account Cash: ${self.alpaca_account_cash:,.2f} | Bot Allocated Cash: ${self.cash:,.2f}")
             else:
                 self.log(f"[Alpaca] Account sync error: {r.text}")
         except Exception as e:
             self.log(f"[Alpaca] Account sync exception: {e}")
-
     def sync_alpaca_positions(self):
         if not (self.alpaca_key_id and self.alpaca_secret_key):
             return
@@ -512,15 +602,28 @@ class TradingBot:
                              headers=self._alpaca_headers(), timeout=5)
             if r.status_code == 200:
                 self.positions = {}
+                alpaca_target = self.symbol.replace("USDT", "USD").upper()
                 for p in r.json():
                     sym = p.get("symbol", "").upper()
                     self.positions[sym] = float(p.get("qty", 0.0))
-                    if sym == self.symbol:
+                    if sym == alpaca_target:
+                        self.positions[self.symbol] = float(p.get("qty", 0.0))
                         self.avg_cost = float(p.get("avg_entry_price", 0.0))
             else:
                 self.log(f"[Alpaca] Positions sync error: {r.text}")
         except Exception as e:
             self.log(f"[Alpaca] Positions sync exception: {e}")
+        self._update_position_tracking()
+
+    def _update_position_tracking(self):
+        qty = self.positions.get(self.symbol, 0.0)
+        if abs(qty) > 1e-8:
+            if self.position_opened_at is None:
+                self.position_opened_at = time.time()
+        else:
+            self.position_opened_at = None
+            self.stop_loss = 0.0
+            self.take_profit = 0.0
 
     # ------------------------------------------------------------------
     # Order execution
@@ -583,6 +686,14 @@ class TradingBot:
                     self.realized_pnl += pnl
                     self._record_trade(action, fill_price, actual_qty, 0.0, pnl)
                     
+                    # Update local cash allocation for Hyperliquid bot
+                    cost = actual_qty * fill_price
+                    fee = cost * 0.001
+                    if action == "BUY":
+                        self.cash -= (cost + fee)
+                    else:
+                        self.cash += (cost - fee)
+                    
                     if action == "BUY":
                         self.positions[self.symbol] = self.positions.get(self.symbol, 0.0) + qty
                         self.avg_cost = ((self.positions.get(self.symbol, 0.0) * self.avg_cost) + (qty * fill_price)) / (self.positions.get(self.symbol, 0.0) + qty)
@@ -616,7 +727,12 @@ class TradingBot:
                         return False
 
                     if action == "BUY" and notional <= 0 and current_price > 0:
-                        buying_power = float(acc_info.get("buying_power", 0.0))
+                        is_crypto = "USD" in alpaca_sym or "USDT" in alpaca_sym
+                        if is_crypto:
+                            buying_power = float(acc_info.get("non_marginable_buying_power") or acc_info.get("cash", 0.0))
+                        else:
+                            buying_power = float(acc_info.get("buying_power", 0.0))
+
                         order_cost = qty * current_price
                         if order_cost > buying_power:
                             safe_buying_power = buying_power * 0.98
@@ -704,18 +820,49 @@ class TradingBot:
                                   json=payload, timeout=6)
                 if r.status_code in (200, 201):
                     order = r.json()
-                    fill_price = float(order.get("filled_avg_price") or 0)
-                    if fill_price == 0 and self.active_candle:
-                        fill_price = self.active_candle["close"]
-                    actual_qty = float(order.get("filled_qty") or qty)
+                    
+                    try:
+                        f_price = float(order.get("filled_avg_price") or 0)
+                    except (ValueError, TypeError):
+                        f_price = 0.0
+                        
+                    try:
+                        f_qty = float(order.get("filled_qty") or 0)
+                    except (ValueError, TypeError):
+                        f_qty = 0.0
+                        
+                    fill_price = f_price
+                    if fill_price <= 0:
+                        if self.active_candle:
+                            fill_price = self.active_candle["close"]
+                        elif self.candles:
+                            fill_price = self.candles[-1]["close"]
+                        else:
+                            fill_price = current_price
+                            
+                    actual_qty = f_qty
+                    if actual_qty <= 0:
+                        try:
+                            actual_qty = float(order.get("qty") or qty)
+                        except (ValueError, TypeError):
+                            actual_qty = float(qty)
+                            
                     self.log(f"[Alpaca] Order accepted — id: {order.get('id')} | status: {order.get('status')}")
                     time.sleep(1)
                     old_cost = self.avg_cost
+                    # Update local cash allocation for Alpaca bot
+                    cost = actual_qty * fill_price
+                    fee = cost * 0.001
+                    if action == "BUY":
+                        self.cash -= (cost + fee)
+                    else:
+                        self.cash += (cost - fee)
+
                     self.sync_alpaca_account()
                     self.sync_alpaca_positions()
                     pnl = (fill_price - old_cost) * actual_qty if action == "SELL" and old_cost else 0.0
                     self.realized_pnl += pnl
-                    self._record_trade(action, fill_price, actual_qty, 0.0, pnl)
+                    self._record_trade(action, fill_price, actual_qty, fee, pnl)
                     return True
                 else:
                     self.log(f"[Alpaca] Order rejected: {r.text}")
@@ -731,34 +878,45 @@ class TradingBot:
                     self.log("Cannot place simulated order — no active price available.")
                     return False
                 
+                # Apply simulated execution slippage penalty
+                slip_pct = 0.0
+                if hasattr(self, "risk_manager") and self.risk_manager.profile:
+                    slip_pct = float(self.risk_manager.profile.get("slippage_tolerance_pct", 0.5)) / 100.0
+                
                 action = action.upper()
                 if action == "BUY":
-                    cost = qty * price
+                    fill_price = price * (1.0 + slip_pct)
+                    cost = qty * fill_price
                     fee = cost * 0.001
-                    if self.cash >= cost + fee:
+                    pos_qty = self.positions.get(self.symbol, 0.0)
+                    portfolio_value = self.cash + pos_qty * price
+                    buying_power = portfolio_value * getattr(self, "leverage_limit", 1.0)
+
+                    if buying_power >= cost + fee:
                         self.cash -= cost + fee
                         prev = self.positions.get(self.symbol, 0.0)
                         self.positions[self.symbol] = prev + qty
-                        self.avg_cost = ((prev * self.avg_cost) + (qty * price)) / (prev + qty) if (prev + qty) else price
-                        self._record_trade("BUY", price, qty, fee, 0.0)
-                        self.log(f"SIM BUY {qty} {self.symbol} @ ${price:,.2f}")
+                        self.avg_cost = ((prev * self.avg_cost) + (qty * fill_price)) / (prev + qty) if (prev + qty) else fill_price
+                        self._record_trade("BUY", fill_price, qty, fee, 0.0)
+                        self.log(f"SIM BUY {qty} {self.symbol} @ ${fill_price:,.2f} (base: ${price:,.2f}, slippage: +{slip_pct*100:.2f}%)")
                         return True
-                    self.log("BUY rejected — insufficient cash.")
+                    self.log(f"BUY rejected — insufficient buying power (${buying_power:,.2f} available for ${cost+fee:,.2f} order).")
                     return False
 
                 elif action == "SELL":
                     held = self.positions.get(self.symbol, 0.0)
                     if held >= qty:
-                        revenue = qty * price
+                        fill_price = price * (1.0 - slip_pct)
+                        revenue = qty * fill_price
                         fee = revenue * 0.001
-                        pnl = (price - self.avg_cost) * qty - fee
+                        pnl = (fill_price - self.avg_cost) * qty - fee
                         self.cash += revenue - fee
                         self.realized_pnl += pnl
                         self.positions[self.symbol] = max(0.0, held - qty)
                         if self.positions[self.symbol] < 1e-8:
                             self.avg_cost = 0.0
-                        self._record_trade("SELL", price, qty, fee, pnl)
-                        self.log(f"SIM SELL {qty} {self.symbol} @ ${price:,.2f} | P&L: ${pnl:,.2f}")
+                        self._record_trade("SELL", fill_price, qty, fee, pnl)
+                        self.log(f"SIM SELL {qty} {self.symbol} @ ${fill_price:,.2f} (base: ${price:,.2f}, slippage: -{slip_pct*100:.2f}%) | P&L: ${pnl:,.2f}")
                         return True
                     self.log("SELL rejected — insufficient position.")
                     return False
@@ -917,6 +1075,8 @@ class TradingBot:
             "fee": fee,
             "pnl": float(pnl),
         })
+        self._update_position_tracking()
+        self.persist_active_state()
 
     # ------------------------------------------------------------------
     # State snapshot (called frequently — keep fast)
@@ -928,6 +1088,10 @@ class TradingBot:
             pos_qty = self.positions.get(self.symbol, 0.0)
             portfolio_value = self.cash + pos_qty * cp
             unrealized = (cp - self.avg_cost) * pos_qty if pos_qty > 0 and self.avg_cost > 0 else 0.0
+
+            exposure = abs(pos_qty) * cp
+            leverage = exposure / portfolio_value if portfolio_value > 0 else 0.0
+            pos_duration = time.time() - self.position_opened_at if self.position_opened_at else 0.0
 
             sells = [t for t in self.trades if t["action"] == "SELL"]
             wins = [t for t in sells if t.get("pnl", 0) > 0]
@@ -968,6 +1132,15 @@ class TradingBot:
                 "logs": self.logs[-100:],
                 "last_alpha_status": self.last_alpha_status,
                 "last_alpha_rationale": self.last_alpha_rationale,
+                "is_agentic": type(self).__name__ == "AgenticLiveBot",
+                "agent_attitude": getattr(self, "agent_attitude", "balanced"),
+                "leverage": leverage,
+                "position_opened_at": self.position_opened_at,
+                "position_duration": pos_duration,
+                "stop_loss": self.stop_loss,
+                "take_profit": self.take_profit,
+                "leverage_limit": self.leverage_limit,
+                "risk_profile": self.risk_manager.profile if hasattr(self, "risk_manager") else {},
             }
 
     # ------------------------------------------------------------------
@@ -976,6 +1149,27 @@ class TradingBot:
     def _update_active_candle(self, price: float, qty: float):
         now = time.time()
         self.last_tick_time = now
+
+        # Stop-loss / Take-profit validation on incoming tick
+        pos_qty = self.positions.get(self.symbol, 0.0)
+        if abs(pos_qty) > 1e-8:
+            sl = getattr(self, "stop_loss", 0.0)
+            tp = getattr(self, "take_profit", 0.0)
+            if pos_qty > 0:  # Long
+                if sl > 0 and price <= sl:
+                    self.log(f"[STOP LOSS] Current price ${price:,.2f} crossed SL ${sl:,.2f}. Closing position.")
+                    self.place_market_order("SELL", pos_qty)
+                elif tp > 0 and price >= tp:
+                    self.log(f"[TAKE PROFIT] Current price ${price:,.2f} crossed TP ${tp:,.2f}. Closing position.")
+                    self.place_market_order("SELL", pos_qty)
+            elif pos_qty < 0:  # Short
+                if sl > 0 and price >= sl:
+                    self.log(f"[STOP LOSS] Current price ${price:,.2f} crossed SL ${sl:,.2f}. Closing short position.")
+                    self.place_market_order("BUY", abs(pos_qty))
+                elif tp > 0 and price <= tp:
+                    self.log(f"[TAKE PROFIT] Current price ${price:,.2f} crossed TP ${tp:,.2f}. Closing short position.")
+                    self.place_market_order("BUY", abs(pos_qty))
+
         # Accelerated duration for mock feed so strategies fire trades immediately (every 8s)
         duration = 8.0 if self.feed_source == "mock" else self.candle_duration
 
@@ -1386,11 +1580,19 @@ class TradingBot:
         self.thread = threading.Thread(target=_run, daemon=True, name=f"bot-{self.bot_id}")
         self.thread.start()
         self.log(f"Bot started — feed: {self.feed_source}, symbol: {self.symbol}, tf: {self.timeframe}")
+        self.persist_active_state()
 
     def stop(self, close_pct: float = 1.0):
         with self._lock:
             if not self.is_active:
                 return
+            
+            # Remove from active bots database on shutdown
+            try:
+                from database import delete_active_bot
+                delete_active_bot(self.bot_id)
+            except Exception as e:
+                self.log(f"Failed to delete active bot from DB: {e}")
             
             # --- Flatten Book on Stop ---
             try:
@@ -1411,7 +1613,11 @@ class TradingBot:
                 from database import save_bot_session
                 import json
                 
-                start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time)) if self.start_time else "Unknown"
+                if isinstance(self.start_time, (int, float)):
+                    start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time))
+                else:
+                    start_str = str(self.start_time) if self.start_time else "Unknown"
+                    
                 end_str = time.strftime('%Y-%m-%d %H:%M:%S')
                 
                 trades_json = []
@@ -1426,7 +1632,11 @@ class TradingBot:
                         else:
                             losses += 1
                             
-                    t_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t["timestamp"]))
+                    ts = t.get("timestamp")
+                    if isinstance(ts, (int, float)):
+                        t_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))
+                    else:
+                        t_time = str(ts)
                     
                     trades_json.append({
                         "symbol": self.symbol,
@@ -1446,8 +1656,12 @@ class TradingBot:
                 if len(self.trades) > 0:
                     pnl = sum(t.get("pnl", 0.0) - t.get("fee", 0.0) for t in self.trades)
                 
-                bot_name = getattr(self, "strategy_name", f"AI Agent ({self.timeframe})")
+                bot_name = getattr(self, "name", None) or getattr(self, "strategy_name", None) or f"AI Agent ({self.timeframe})"
                 
+                custom_charts_json = "{}"
+                if getattr(self, "strategy_instance", None) and hasattr(self.strategy_instance, "_custom_charts"):
+                    custom_charts_json = json.dumps(self.strategy_instance._custom_charts)
+
                 save_bot_session(
                     bot_id=self.bot_id,
                     strategy_name=bot_name,
@@ -1461,7 +1675,8 @@ class TradingBot:
                     wins=wins,
                     losses=losses,
                     trades_json=json.dumps(trades_json),
-                    last_alpha_rationale=self.last_alpha_rationale or ""
+                    last_alpha_rationale=self.last_alpha_rationale or "",
+                    custom_charts_json=custom_charts_json
                 )
                 self.log("Session saved to History Ledger.")
             except Exception as e:
@@ -1480,16 +1695,23 @@ class TradingBot:
 class AgenticLiveBot(TradingBot):
     def __init__(self, bot_id, name, symbol, strategy_code, timeframe,
                  starting_cash=10000.0, feed_source="binance", alpaca_key_id="",
-                 alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None, agent_keys=None):
+                 alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None, agent_keys=None, agent_attitude="balanced", leverage_limit=1.0):
         super().__init__(bot_id, name, symbol, strategy_code, timeframe,
                          starting_cash, feed_source, alpaca_key_id, alpaca_secret_key, hyperliquid_private_key,
-                         risk_profile)
+                         risk_profile, leverage_limit=leverage_limit)
         self.agent_keys = agent_keys or {}
+        self.agent_attitude = agent_attitude
 
     def update_agent_keys(self, new_keys: dict):
         """Hot-swap the ADK keys for this bot without restarting."""
         self.agent_keys.update(new_keys)
         self.log("Agent API keys successfully hot-swapped.")
+
+    def update_attitude(self, new_attitude: str):
+        """Hot-swap the agent's risk attitude without restarting."""
+        self.agent_attitude = new_attitude
+        self.log(f"Agent attitude hot-swapped to: {new_attitude.upper()}")
+        self.persist_active_state()
 
     async def _master_loop(self):
         fs = self.feed_source
@@ -1511,14 +1733,20 @@ class AgenticLiveBot(TradingBot):
 
     async def _agent_evaluation_loop(self):
         """
-        Background loop that polls the Multi-Agent ADK every 60 seconds for cognitive trade validation.
+        Background loop that polls the Multi-Agent ADK with adaptive interval.
+        Backs off on rate-limit failures to avoid hammering the API.
         """
         from adk_agent import run_adk_validation
         import json
         self.log("Autonomous Agentic Loop Started.")
         
+        # Adaptive interval: start at 90s, back off on failures, cap at 300s
+        poll_interval = 90
+        min_interval = 90
+        max_interval = 300
+        
         while self.is_active:
-            await asyncio.sleep(60) # Demo polling frequency
+            await asyncio.sleep(poll_interval)
             self.log(f"Triggering ADK Daily Alpha Brief for {self.symbol}...")
             
             try:
@@ -1526,7 +1754,6 @@ class AgenticLiveBot(TradingBot):
                 price = self.active_candle['close'] if self.active_candle else 0.0
                 port_val = self.cash + (pos_qty * price)
                 
-                # Extract account profile (positions, balance, etc.)
                 account_profile = {
                     "balance": self.cash,
                     "positions": {self.symbol: pos_qty},
@@ -1535,10 +1762,21 @@ class AgenticLiveBot(TradingBot):
                     "max_allocation_pct": getattr(self.risk_manager, 'max_position_pct', 2.0) if hasattr(self, 'risk_manager') else 2.0
                 }
                 
-                res = await run_adk_validation(self.symbol, self.agent_keys, account_profile)
+                res = await run_adk_validation(self.symbol, self.agent_keys, account_profile, self.agent_attitude)
                 
-                status = res.get("status", "REJECTED")
-                rationale = res.get("risk_assessment", "")
+                final_action = res.get("final_action", "ABORT")
+                status = "APPROVED" if final_action == "EXECUTE" else "REJECTED"
+                rationale = res.get("execution_notes", "")
+                
+                # Detect rate-limit in the response and adapt polling
+                is_rate_limited = any(kw in rationale.lower() for kw in ["rate limit", "429", "quota", "exhausted"])
+                
+                if is_rate_limited:
+                    poll_interval = min(poll_interval * 2, max_interval)
+                    self.log(f"[Agentic] Rate limit detected — backing off to {poll_interval}s polling interval.")
+                else:
+                    # Success or non-rate-limit failure — reset to normal
+                    poll_interval = min_interval
                 
                 # Append raw tool thoughts (Senpi/Hyperliquid actions) to the Alpha Brief
                 thoughts = res.get("thoughts", [])
@@ -1552,18 +1790,19 @@ class AgenticLiveBot(TradingBot):
                 self.log(f"[Agentic] Alpha Brief Evaluation Status: {status}")
                 self.log(f"[Agentic] Rationale: {rationale}")
                 
-                order = res.get("validated_order")
+                order = res.get("approved_order")
                 if status == "APPROVED" and order:
                     direction = order.get("direction", "")
+                    allocation_pct = res.get("allocation_pct", account_profile["max_allocation_pct"])
                     if direction == "BUY" and pos_qty <= 0:
-                        qty = (port_val * (account_profile["max_allocation_pct"]/100)) / price if price > 0 else 0.1
-                        self.log(f"[Agentic->BUY] Executing autonomously based on Alpha Brief. Qty: {qty:.4f}")
+                        qty = (port_val * (allocation_pct/100)) / price if price > 0 else 0.1
+                        self.log(f"[Agentic->BUY] Executing autonomously based on Alpha Brief. Qty: {qty:.4f} (allocated {allocation_pct}%)")
+                        self.stop_loss = float(order.get("stop_loss", 0.0))
+                        self.take_profit = float(order.get("take_profit", 0.0))
+                        self.log(f"[Agentic] Set SL: ${self.stop_loss:,.2f}, TP: ${self.take_profit:,.2f}")
                         self.place_market_order("BUY", qty)
                     elif direction == "SELL" and pos_qty > 0:
-                        exit_pct = getattr(self.risk_manager, 'profile', {}).get("exit_size_pct", 100.0)
-                        if order.get("exit_size_pct"):
-                            exit_pct = float(order["exit_size_pct"])
-                            
+                        exit_pct = float(order.get("exit_size_pct", 100.0))
                         qty_to_sell = pos_qty * (exit_pct / 100.0)
                         self.log(f"[Agentic->SELL] Executing autonomously based on Alpha Brief. Qty: {qty_to_sell:.4f} ({exit_pct}% exit)")
                         self.place_market_order("SELL", qty_to_sell)
@@ -1572,6 +1811,8 @@ class AgenticLiveBot(TradingBot):
                         
             except Exception as e:
                 self.log(f"[Agentic Error] Failed to run ADK evaluation: {e}")
+                # Back off on any exception too
+                poll_interval = min(poll_interval * 2, max_interval)
 
 # ======================================================================
 # LiveSessionManager
@@ -1587,11 +1828,114 @@ class LiveSessionManager:
     def __init__(self):
         self.bots: dict[str, TradingBot] = {}
         self.connected_websockets: set = set()
-        self.global_risk_profile: dict = {}
+        self.global_risk_profile: dict = {
+            "auto_rebalance_enabled": False,
+            "auto_rebalance_interval_minutes": 30,
+            "slippage_tolerance_pct": 0.5
+        }
         self._lock = threading.Lock()
+        
+        # Start background risk rebalancer scheduler thread
+        self._rebalance_thread = threading.Thread(target=self._auto_rebalance_loop, daemon=True, name="live-rebalancer")
+        self._rebalance_thread.start()
 
     def log(self, message: str):
         print(f"[LiveSessionManager] {message}", flush=True)
+
+    def restore_previous_active_bots(self):
+        from database import get_active_bots
+        import json
+        
+        try:
+            active_list = get_active_bots()
+        except Exception as e:
+            self.log(f"Error querying active bots for restoration: {e}")
+            return
+            
+        if not active_list:
+            self.log("No previous active bots found in database to restore.")
+            return
+            
+        self.log(f"Restoring {len(active_list)} active bot(s) from database...")
+        for item in active_list:
+            bot_id = item["bot_id"]
+            name = item["name"]
+            symbol = item["symbol"]
+            strategy_code = item["strategy_code"]
+            timeframe = item["timeframe"]
+            starting_cash = float(item["starting_cash"])
+            feed_source = item["feed_source"]
+            alpaca_key_id = item["alpaca_key_id"] or ""
+            alpaca_secret_key = item["alpaca_secret_key"] or ""
+            hyperliquid_private_key = item["hyperliquid_private_key"] or ""
+            
+            risk_profile = {}
+            if item["risk_profile_json"]:
+                try:
+                    risk_profile = json.loads(item["risk_profile_json"])
+                except Exception:
+                    pass
+            
+            agentic_mode = bool(item["agentic_mode"])
+            agent_attitude = item["agent_attitude"] or "balanced"
+            gemini_api_key = item["gemini_api_key"] or ""
+            tech_agent_key = item["tech_agent_key"] or ""
+            sentiment_agent_key = item["sentiment_agent_key"] or ""
+            tradingview_agent_key = item["tradingview_agent_key"] or ""
+            hyperliquid_agent_key = item["hyperliquid_agent_key"] or ""
+            firecrawl_agent_key = item["firecrawl_agent_key"] or ""
+            leverage_limit = float(item["leverage_limit"] or 1.0)
+            
+            # Start the bot with start_bot
+            self.start_bot(
+                bot_id=bot_id,
+                name=name,
+                symbol=symbol,
+                strategy_code=strategy_code,
+                timeframe=timeframe,
+                starting_cash=starting_cash,
+                feed_source=feed_source,
+                alpaca_key_id=alpaca_key_id,
+                alpaca_secret_key=alpaca_secret_key,
+                hyperliquid_private_key=hyperliquid_private_key,
+                risk_profile=risk_profile,
+                agentic_mode=agentic_mode,
+                agent_attitude=agent_attitude,
+                gemini_api_key=gemini_api_key,
+                tech_agent_key=tech_agent_key,
+                sentiment_agent_key=sentiment_agent_key,
+                tradingview_agent_key=tradingview_agent_key,
+                hyperliquid_agent_key=hyperliquid_agent_key,
+                firecrawl_agent_key=firecrawl_agent_key,
+                leverage_limit=leverage_limit
+            )
+            
+            # Now, override the bot's runtime states to restore where it was
+            bot = self.get_bot(bot_id)
+            if bot:
+                with bot._lock:
+                    if item["current_cash"] is not None:
+                        bot.cash = float(item["current_cash"])
+                    if item["positions_json"]:
+                        try:
+                            bot.positions = json.loads(item["positions_json"])
+                        except Exception:
+                            pass
+                    if item["trades_json"]:
+                        try:
+                            bot.trades = json.loads(item["trades_json"])
+                        except Exception:
+                            pass
+                    if item["avg_cost"] is not None:
+                        bot.avg_cost = float(item["avg_cost"])
+                    if item["realized_pnl"] is not None:
+                        bot.realized_pnl = float(item["realized_pnl"])
+                    if item["start_time"]:
+                        try:
+                            bot.start_time = float(item["start_time"])
+                        except ValueError:
+                            pass
+                self.log(f"Successfully restored bot state for {name} ({symbol}) | Cash: ${bot.cash:.2f}")
 
     def update_global_risk_profile(self, profile: dict):
         with self._lock:
@@ -1607,9 +1951,9 @@ class LiveSessionManager:
     def start_bot(self, bot_id, name, symbol, strategy_code, timeframe,
                   starting_cash=10000.0, feed_source="binance",
                   alpaca_key_id="", alpaca_secret_key="", hyperliquid_private_key="", risk_profile=None,
-                  agentic_mode=False, gemini_api_key="", tech_agent_key="",
+                  agentic_mode=False, agent_attitude="balanced", gemini_api_key="", tech_agent_key="",
                   sentiment_agent_key="", tradingview_agent_key="",
-                  hyperliquid_agent_key="", firecrawl_agent_key="") -> bool:
+                  hyperliquid_agent_key="", firecrawl_agent_key="", leverage_limit=1.0) -> bool:
         with self._lock:
             if bot_id in self.bots:
                 self.bots[bot_id].stop()
@@ -1627,12 +1971,12 @@ class LiveSessionManager:
                 bot = AgenticLiveBot(bot_id, name, symbol, strategy_code, timeframe,
                                      starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
                                      hyperliquid_private_key=hyperliquid_private_key,
-                                     risk_profile=profile_to_use, agent_keys=agent_keys)
+                                     risk_profile=profile_to_use, agent_keys=agent_keys, agent_attitude=agent_attitude, leverage_limit=leverage_limit)
             else:
                 bot = TradingBot(bot_id, name, symbol, strategy_code, timeframe,
                                  starting_cash, feed_source, alpaca_key_id, alpaca_secret_key,
                                  hyperliquid_private_key=hyperliquid_private_key,
-                                 risk_profile=profile_to_use)
+                                 risk_profile=profile_to_use, leverage_limit=leverage_limit)
             self.bots[bot_id] = bot
         bot.start()
         return True
@@ -1663,6 +2007,149 @@ class LiveSessionManager:
             for bot in self.bots.values():
                 if isinstance(bot, AgenticLiveBot):
                     bot.update_agent_keys(new_keys)
+
+    def update_attitude_for_bot(self, bot_id: str, new_attitude: str):
+        bot = self.get_bot(bot_id)
+        if isinstance(bot, AgenticLiveBot):
+            bot.update_attitude(new_attitude)
+            return True
+        return False
+
+    def rebalance_fleet_due_to_risk(self) -> tuple[bool, str]:
+        """
+        Performs volatility-inverse risk parity rebalancing across all active trading bots.
+        High volatility bots have their positions scaled down.
+        Drawdown penalties are applied (scaling down positions of bots that are losing).
+        """
+        with self._lock:
+            active_bots = [b for b in self.bots.values() if b.is_active]
+            if not active_bots:
+                return False, "No active bots to rebalance."
+            
+            bot_metrics = []
+            total_equity = 0.0
+            
+            for bot in active_bots:
+                price = bot.active_candle['close'] if bot.active_candle else (bot.candles[-1]['close'] if bot.candles else 0.0)
+                if price <= 0.0:
+                    price = _get_fallback_crypto_price(bot.symbol)
+                    if price <= 0.0:
+                        continue
+                
+                qty = bot.positions.get(bot.symbol, 0.0)
+                position_value = qty * price
+                equity = bot.cash + position_value
+                total_equity += equity
+                
+                # Volatility calculation based on last 20 candles
+                closes = [c['close'] for c in bot.candles[-20:]] if len(bot.candles) >= 5 else []
+                if len(closes) >= 5:
+                    returns = [(closes[i] - closes[i-1])/closes[i-1] for i in range(1, len(closes))]
+                    vol = float(np.std(returns)) if returns else 0.02
+                else:
+                    vol = 0.02
+                
+                if vol <= 0.0001:
+                    vol = 0.02
+                
+                # Drawdown penalty
+                drawdown = max(0.0, (bot.starting_cash - equity) / bot.starting_cash)
+                drawdown_penalty = 1.0
+                if drawdown > 0.02:
+                    drawdown_penalty = 0.75
+                if drawdown > 0.05:
+                    drawdown_penalty = 0.50
+                if drawdown > 0.08:
+                    drawdown_penalty = 0.20
+                
+                bot_metrics.append({
+                    "bot": bot,
+                    "symbol": bot.symbol,
+                    "price": price,
+                    "qty": qty,
+                    "equity": equity,
+                    "vol": vol,
+                    "drawdown_penalty": drawdown_penalty,
+                    "raw_weight": 1.0 / vol
+                })
+            
+            if not bot_metrics:
+                return False, "No active bots with valid price feeds."
+            
+            # Normalize target weights
+            total_raw_weight = sum(m["raw_weight"] for m in bot_metrics)
+            if total_raw_weight <= 0.0:
+                total_raw_weight = 1.0
+                
+            for m in bot_metrics:
+                m["target_weight"] = (m["raw_weight"] / total_raw_weight) * m["drawdown_penalty"]
+                m["target_value"] = total_equity * m["target_weight"]
+                m["target_value"] = min(m["target_value"], m["equity"] * getattr(m["bot"], "leverage_limit", 1.0))
+                m["target_qty"] = round(m["target_value"] / m["price"], 6)
+            
+            # Execute rebalancing orders
+            actions = []
+            for m in bot_metrics:
+                bot = m["bot"]
+                current_qty = m["qty"]
+                target_qty = m["target_qty"]
+                diff = target_qty - current_qty
+                
+                # Threshold of $5 to place trades to avoid dust orders
+                if abs(diff) * m["price"] < 5.0:
+                    continue
+                
+                if diff < 0:
+                    sell_qty = abs(diff)
+                    bot.log(f"[REBALANCE] Risk parity scale down: selling {sell_qty:.6f} {bot.symbol} (Target: {target_qty:.6f}, Vol: {m['vol']*100:.2f}%)")
+                    bot.place_market_order("SELL", sell_qty)
+                    actions.append(f"Scaled down {bot.symbol} by {sell_qty:.4f}")
+                elif diff > 0:
+                    buy_qty = min(diff, bot.cash / m["price"])
+                    if buy_qty * m["price"] >= 5.0:
+                        bot.log(f"[REBALANCE] Risk parity scale up: buying {buy_qty:.6f} {bot.symbol} (Target: {target_qty:.6f}, Vol: {m['vol']*100:.2f}%)")
+                        bot.place_market_order("BUY", buy_qty)
+                        actions.append(f"Scaled up {bot.symbol} by {buy_qty:.4f}")
+            
+            if not actions:
+                return True, "Portfolio is already risk-balanced."
+            
+            return True, "Rebalanced: " + ", ".join(actions)
+
+    def _auto_rebalance_loop(self):
+        self.log("Auto-rebalance background scheduler thread active.")
+        last_rebalance_time = time.time()
+        while True:
+            time.sleep(10)
+            try:
+                profile = self.global_risk_profile
+                enabled = profile.get("auto_rebalance_enabled", False)
+                interval = profile.get("auto_rebalance_interval_minutes", 30)
+                if enabled and interval > 0:
+                    now = time.time()
+                    if now - last_rebalance_time >= interval * 60:
+                        self.log("[Auto-Rebalance] Scheduled interval reached. Triggering fleet risk rebalancer...")
+                        success, msg = self.rebalance_fleet_due_to_risk()
+                        self.log(f"[Auto-Rebalance] Rebalance finished. Success={success} | {msg}")
+                        last_rebalance_time = now
+            except Exception as e:
+                self.log(f"[Auto-Rebalance] Exception in loop: {e}")
+
+    def panic_stop_all(self) -> list[str]:
+        """
+        Panic switch: stops all active bots and flattens/liquidates 100% of their positions.
+        """
+        self.log("[PANIC] Global panic triggered! Stopping and liquidating all active bots...")
+        with self._lock:
+            bot_ids = list(self.bots.keys())
+        
+        for bid in bot_ids:
+            try:
+                self.stop_bot(bid, close_pct=1.0)
+                self.log(f"[PANIC] Successfully stopped and flattened bot: {bid}")
+            except Exception as e:
+                self.log(f"[PANIC] Error stopping bot {bid}: {e}")
+        return bot_ids
 
     # ------------------------------------------------------------------
     # WebSocket push helper (called from the FastAPI event loop)
