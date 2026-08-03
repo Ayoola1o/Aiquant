@@ -14,6 +14,15 @@ import UserProfile from './components/UserProfile';
 import GlobalNews from './components/GlobalNews';
 import HistoryPage from './components/HistoryPage';
 import HistoryResultPage from './components/HistoryResultPage';
+import MarketIntelligence from './components/MarketIntelligence';
+import CommandPalette from './components/CommandPalette';
+import MarketScanner from './components/MarketScanner';
+import FeatureEngineeringLab from './components/FeatureEngineeringLab';
+import RiskCommandCenter from './components/RiskCommandCenter';
+import AICommandCenter from './components/AICommandCenter';
+import DataManagement from './components/DataManagement';
+
+
 
 import { 
   LayoutDashboard, 
@@ -30,8 +39,13 @@ import {
   Menu,
   X,
   Newspaper,
-  Archive
+  Archive,
+  Search,
+  ShieldAlert,
+  Cpu,
+  Database
 } from 'lucide-react';
+
 
 export default function App() {
   return (
@@ -46,6 +60,19 @@ function QuantApp() {
     return localStorage.getItem('neuroquant_session') || null;
   });
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   
   // Managed Strategy lists persisted via localStorage
   const [strategies, setStrategies] = useState<Array<{ id: string; name: string; code: string }>>(() => {
@@ -488,6 +515,84 @@ function QuantApp() {
               AI Asset Screener
             </button>
  
+            {/* Market Intelligence */}
+            <button
+              onClick={() => navigate('/market')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/market' 
+                  ? 'bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Newspaper className="w-4 h-4" />
+              Market Intelligence
+            </button>
+
+            {/* Global Market Scanner */}
+            <button
+              onClick={() => navigate('/scanner')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/scanner' 
+                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              Global Market Scanner
+            </button>
+
+            {/* Feature Engineering Lab */}
+            <button
+              onClick={() => navigate('/features')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/features' 
+                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              Feature Engineering
+            </button>
+
+            {/* Risk Command Center */}
+            <button
+              onClick={() => navigate('/risk')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/risk' 
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Risk Command Center
+            </button>
+
+            {/* AI Command Center */}
+            <button
+              onClick={() => navigate('/commandcenter')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/commandcenter' 
+                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              AI Command Center
+            </button>
+
+            {/* Data Lake */}
+            <button
+              onClick={() => navigate('/datalake')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                location.pathname === '/datalake' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              Data Lake & Hub
+            </button>
+
             {/* X Social News */}
             <button
               onClick={() => navigate('/news')}
@@ -497,9 +602,11 @@ function QuantApp() {
                   : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
               }`}
             >
-              <Newspaper className="w-4 h-4" />
+              <Activity className="w-4 h-4" />
               X Social News
             </button>
+
+
 
             {/* AI Strategy Lab */}
             <button
@@ -639,11 +746,17 @@ function QuantApp() {
             <h1 className="font-extrabold text-lg tracking-wide uppercase text-white truncate">
               {location.pathname === '/dashboard' && 'Market Dashboard'}
               {location.pathname === '/screener' && 'Quant Signal Matrix / AI Asset Screener'}
+              {location.pathname === '/market' && 'Market Intelligence & Economic Calendar'}
+              {location.pathname === '/scanner' && 'Global Market Scanner'}
+              {location.pathname === '/features' && 'Feature Engineering Laboratory'}
+              {location.pathname === '/risk' && 'Risk Command Center & Stress Testing'}
+              {location.pathname === '/commandcenter' && 'AI Command Center & Multi-Agent Orchestrator'}
+              {location.pathname === '/datalake' && 'Data Lake & Management Hub'}
               {location.pathname === '/news' && 'X Social News Feed'}
               {location.pathname === '/predictor' && 'AI Price Forecasting'}
               {location.pathname === '/strategylab' && 'AI Strategy Playground'}
               {location.pathname === '/backtester' && 'Strategy Backtesting'}
-              {location.pathname === '/live' && 'Live simulated Session'}
+              {location.pathname === '/live' && 'Live Simulated Session'}
               {location.pathname === '/history' && 'Trade History Ledger'}
               {location.pathname === '/portfolio' && 'Portfolio & Risk Diagnostics'}
               {location.pathname === '/settings' && 'Platform Configuration'}
@@ -651,19 +764,40 @@ function QuantApp() {
             </h1>
           </div>
           
-          <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#4D88FF] animate-pulse" />
-            ENVIRONMENT ONLINE: WSS://STREAM.BINANCE.COM
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-gray-800 text-xs text-gray-400 hover:text-white transition-all"
+            >
+              <Search className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Quick Launcher</span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-gray-400">Ctrl+K</span>
+            </button>
+
+            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#00FF9D] animate-pulse" />
+              AI OS ONLINE: STREAM.BINANCE.COM
+            </div>
           </div>
         </header>
 
+
         {/* Content Box */}
         <main className="p-8 flex-1 overflow-y-auto">
+          <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/predictor" element={<AIPredictor />} />
             <Route path="/screener" element={<Screener />} />
+            <Route path="/market" element={<MarketIntelligence />} />
+            <Route path="/scanner" element={<MarketScanner />} />
+            <Route path="/features" element={<FeatureEngineeringLab />} />
+            <Route path="/risk" element={<RiskCommandCenter />} />
+            <Route path="/commandcenter" element={<AICommandCenter />} />
+            <Route path="/datalake" element={<DataManagement />} />
             <Route path="/news" element={<GlobalNews />} />
+
+
             <Route path="/strategylab" element={
               <AIStrategyLab 
                 strategies={strategies} 

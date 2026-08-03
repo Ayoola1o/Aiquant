@@ -53,6 +53,69 @@ export default function AIStrategyLab({
   const [strategyName, setStrategyName] = useState('New Strategy');
   const [workingCode, setWorkingCode] = useState('');
 
+  // AIQOS Strategy Registry state
+  const [activeTab, setActiveTab] = useState<'editor' | 'registry'>('editor');
+  const [registryStrategies, setRegistryStrategies] = useState<any[]>([]);
+  const [loadingRegistry, setLoadingRegistry] = useState(false);
+
+  const fetchRegistry = async () => {
+    setLoadingRegistry(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/strategies');
+      const data = await res.json();
+      if (data.status === 'success') {
+        setRegistryStrategies(data.strategies || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Strategy Registry:', err);
+    } finally {
+      setLoadingRegistry(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegistry();
+  }, []);
+
+  const saveToRegistry = async () => {
+    if (!strategyName.trim() || !workingCode.trim()) return;
+    try {
+      const res = await fetch('http://localhost:8000/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: strategyName,
+          code: workingCode,
+          author: 'User',
+          created_by: 'manual',
+          lifecycle_stage: 'Draft',
+          tags: ['quant', 'aiqos']
+        })
+      });
+      if (res.ok) {
+        alert(`Strategy '${strategyName}' saved to Registry!`);
+        fetchRegistry();
+      }
+    } catch (err) {
+      console.error('Failed to save strategy to registry:', err);
+    }
+  };
+
+  const promoteStrategy = async (stratId: number, nextStage: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/strategies/${stratId}/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lifecycle_stage: nextStage })
+      });
+      if (res.ok) {
+        fetchRegistry();
+      }
+    } catch (err) {
+      console.error('Failed to promote strategy:', err);
+    }
+  };
+
   // Sync with selected strategy
   useEffect(() => {
     const active = strategies.find(s => s.id === selectedStrategyId);
@@ -61,6 +124,7 @@ export default function AIStrategyLab({
       setWorkingCode(active.code);
     }
   }, [selectedStrategyId]);
+
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -279,7 +343,120 @@ export default function AIStrategyLab({
   };
 
   return (
-    <div className="grid md:grid-cols-2 gap-6 h-[calc(100vh-140px)] relative">
+    <div className="space-y-4 select-none text-[#E1E3E8] font-sans">
+      {/* Top Workspace Tab Selector */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab('editor')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'editor'
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 shadow-md'
+              : 'bg-slate-900/60 text-gray-400 hover:text-white border border-gray-800'
+          }`}
+        >
+          Strategy Studio Editor
+        </button>
+        <button
+          onClick={() => { setActiveTab('registry'); fetchRegistry(); }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'registry'
+              ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/50 shadow-md'
+              : 'bg-slate-900/60 text-gray-400 hover:text-white border border-gray-800'
+          }`}
+        >
+          Strategy Registry & Lifecycle Pipeline ({registryStrategies.length})
+        </button>
+        <button
+          onClick={saveToRegistry}
+          className="ml-auto px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs hover:bg-emerald-500/30 transition-all"
+        >
+          + Save Editor Code to Registry
+        </button>
+      </div>
+
+      {/* REGISTRY VIEW */}
+      {activeTab === 'registry' && (
+        <div className="glass-panel p-6 border border-cyan-500/20 bg-slate-950/80 rounded-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-white">Strategy Registry & Lifecycle Pipeline</h2>
+              <p className="text-xs text-gray-400">Track and promote quantitative strategies through research, backtesting, paper trading, and live execution stages.</p>
+            </div>
+          </div>
+
+          {loadingRegistry ? (
+            <div className="text-center text-xs text-gray-400 animate-pulse py-8">Loading registered strategies...</div>
+          ) : registryStrategies.length === 0 ? (
+            <div className="text-center text-xs text-gray-500 py-8">No strategies saved in Registry yet. Click "+ Save Editor Code to Registry" above to register your first strategy.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {registryStrategies.map((strat: any) => {
+                const stages = ['Draft', 'Research', 'Backtested', 'Paper Trading', 'Approved', 'Live'];
+                const currentStageIdx = stages.indexOf(strat.lifecycle_stage) >= 0 ? stages.indexOf(strat.lifecycle_stage) : 0;
+                const nextStage = currentStageIdx < stages.length - 1 ? stages[currentStageIdx + 1] : 'Live';
+
+                return (
+                  <div key={strat.id} className="p-4 rounded-xl bg-slate-900/80 border border-gray-800 hover:border-cyan-500/40 transition-all space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">{strat.name}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        {strat.lifecycle_stage}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-gray-400 font-mono space-y-1">
+                      <div>Author: {strat.author} (v{strat.version})</div>
+                      <div>Created: {strat.created_at}</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-800 text-[11px] font-mono">
+                      <div>
+                        <div className="text-gray-500">Sharpe</div>
+                        <div className="text-emerald-400 font-bold">{strat.best_sharpe ? strat.best_sharpe.toFixed(2) : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Win Rate</div>
+                        <div className="text-cyan-300 font-bold">{strat.win_rate ? `${strat.win_rate.toFixed(1)}%` : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">PF</div>
+                        <div className="text-amber-400 font-bold">{strat.profit_factor ? strat.profit_factor.toFixed(2) : '—'}</div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between gap-2 border-t border-gray-800/60">
+                      <button
+                        onClick={() => {
+                          setWorkingCode(strat.code);
+                          setStrategyName(strat.name);
+                          setActiveTab('editor');
+                        }}
+                        className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-medium text-gray-200"
+                      >
+                        Load Code
+                      </button>
+
+                      {currentStageIdx < stages.length - 1 && (
+                        <button
+                          onClick={() => promoteStrategy(strat.id, nextStage)}
+                          className="px-3 py-1 rounded bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs transition-all shadow-sm"
+                        >
+                          Promote to {nextStage} →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* EDITOR VIEW */}
+      {activeTab === 'editor' && (
+    <div className="grid md:grid-cols-2 gap-6 h-[calc(100vh-180px)] relative">
+
       {/* Left Column: AI Setup & Logs */}
       <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
         
@@ -505,5 +682,8 @@ export default function AIStrategyLab({
         </button>
       </div>
     </div>
+  )}
+</div>
   );
 }
+

@@ -149,9 +149,65 @@ def init_db():
         )
     """)
 
+    # 8. Strategy Registry (AIQOS Lifecycle tracking)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS strategies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
+            author TEXT DEFAULT 'User',
+            created_by TEXT DEFAULT 'manual',
+            code TEXT NOT NULL,
+            symbols_json TEXT DEFAULT '[]',
+            timeframes_json TEXT DEFAULT '[]',
+            tags_json TEXT DEFAULT '[]',
+            lifecycle_stage TEXT DEFAULT 'Draft',
+            notes TEXT DEFAULT '',
+            best_sharpe REAL DEFAULT 0.0,
+            best_sortino REAL DEFAULT 0.0,
+            best_max_dd REAL DEFAULT 0.0,
+            profit_factor REAL DEFAULT 0.0,
+            win_rate REAL DEFAULT 0.0,
+            expectancy REAL DEFAULT 0.0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
+    # 9. Experiment Tracker
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS experiments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            strategy_id INTEGER,
+            strategy_name TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            period TEXT NOT NULL,
+            interval TEXT NOT NULL,
+            starting_capital REAL NOT NULL,
+            commission_pct REAL NOT NULL,
+            slippage_pct REAL DEFAULT 0.0005,
+            spread_pct REAL DEFAULT 0.0002,
+            ai_prompt TEXT DEFAULT '',
+            ai_model TEXT DEFAULT '',
+            pnl REAL DEFAULT 0.0,
+            pnl_pct REAL DEFAULT 0.0,
+            sharpe REAL DEFAULT 0.0,
+            sortino REAL DEFAULT 0.0,
+            max_dd REAL DEFAULT 0.0,
+            win_rate REAL DEFAULT 0.0,
+            profit_factor REAL DEFAULT 0.0,
+            total_trades INTEGER DEFAULT 0,
+            kpis_json TEXT DEFAULT '{}',
+            ai_notes TEXT DEFAULT '',
+            tags TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("Local database initialized successfully.")
+
 
 def save_bot_session(bot_id: str, strategy_name: str, symbol: str, start_time: str, end_time: str, 
                      start_cash: float, end_cash: float, pnl: float, total_trades: int, 
@@ -444,3 +500,140 @@ def get_active_bots() -> list:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+# ── Strategy Registry CRUD ───────────────────────────────────────────────────
+
+def save_strategy(
+    name: str, code: str, author: str = "User", created_by: str = "manual",
+    symbols_json: str = "[]", timeframes_json: str = "[]", tags_json: str = "[]",
+    lifecycle_stage: str = "Draft", notes: str = "", best_sharpe: float = 0.0,
+    best_sortino: float = 0.0, best_max_dd: float = 0.0, profit_factor: float = 0.0,
+    win_rate: float = 0.0, expectancy: float = 0.0
+) -> int:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO strategies (
+                name, version, author, created_by, code, symbols_json, timeframes_json,
+                tags_json, lifecycle_stage, notes, best_sharpe, best_sortino, best_max_dd,
+                profit_factor, win_rate, expectancy, created_at, updated_at
+            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            name, author, created_by, code, symbols_json, timeframes_json,
+            tags_json, lifecycle_stage, notes, best_sharpe, best_sortino, best_max_dd,
+            profit_factor, win_rate, expectancy, now_str, now_str
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def get_strategies() -> list:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM strategies ORDER BY id DESC")
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def get_strategy_by_id(strat_id: int) -> dict:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM strategies WHERE id = ?", (strat_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def update_strategy_lifecycle(strat_id: int, new_stage: str) -> bool:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            UPDATE strategies SET lifecycle_stage = ?, updated_at = ? WHERE id = ?
+        """, (new_stage, now_str, strat_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def delete_strategy(strat_id: int) -> bool:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM strategies WHERE id = ?", (strat_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ── Experiment Tracker CRUD ─────────────────────────────────────────────────
+
+def save_experiment(
+    strategy_name: str, ticker: str, period: str, interval: str,
+    starting_capital: float, commission_pct: float, slippage_pct: float, spread_pct: float,
+    ai_prompt: str, ai_model: str, pnl: float, pnl_pct: float, sharpe: float,
+    sortino: float, max_dd: float, win_rate: float, profit_factor: float,
+    total_trades: int, kpis_json: str = "{}", ai_notes: str = "", tags: str = "",
+    strategy_id: int = None
+) -> int:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO experiments (
+                strategy_id, strategy_name, ticker, period, interval,
+                starting_capital, commission_pct, slippage_pct, spread_pct,
+                ai_prompt, ai_model, pnl, pnl_pct, sharpe, sortino, max_dd,
+                win_rate, profit_factor, total_trades, kpis_json, ai_notes, tags, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            strategy_id, strategy_name, ticker, period, interval,
+            starting_capital, commission_pct, slippage_pct, spread_pct,
+            ai_prompt, ai_model, pnl, pnl_pct, sharpe, sortino, max_dd,
+            win_rate, profit_factor, total_trades, kpis_json, ai_notes, tags, now_str
+        ))
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+def get_experiments(limit: int = 100) -> list:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM experiments ORDER BY id DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def get_experiment_by_id(exp_id: int) -> dict:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM experiments WHERE id = ?", (exp_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def update_experiment_notes(exp_id: int, ai_notes: str) -> bool:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE experiments SET ai_notes = ? WHERE id = ?", (ai_notes, exp_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+

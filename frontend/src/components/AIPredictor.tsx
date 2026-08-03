@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Bar, Line, Area } from 'recharts';
 import { BrainCircuit, RefreshCcw } from 'lucide-react';
+import FeatureInspector from './FeatureInspector';
+import AIDebatePanel from './AIDebatePanel';
+
 
 interface PredictResponse {
   ticker: string;
@@ -337,6 +340,15 @@ export default function AIPredictor() {
           </div>
         </div>
       </div>
+
+      {/* Feature Inspector & Multi-Agent Debate Team */}
+      <div className="space-y-6 pt-4">
+        <FeatureInspector ticker={ticker} period={period} interval="1h" />
+        <AIDebatePanel ticker={ticker} />
+      </div>
+
+
     </div>
   );
 }
+

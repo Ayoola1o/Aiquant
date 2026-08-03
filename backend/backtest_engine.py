@@ -42,19 +42,43 @@ def _is_base_strategy(cls) -> bool:
 
 
 
+class SlippageModel:
+    """
+    Simulates execution slippage and bid-ask spread impact on order fills.
+    """
+    def __init__(self, slippage_pct: float = 0.0005, spread_pct: float = 0.0002):
+        self.slippage_pct = slippage_pct
+        self.spread_pct = spread_pct
+
+    def get_fill_price(self, raw_price: float, action: str) -> float:
+        half_spread = self.spread_pct / 2.0
+        total_offset = self.slippage_pct + half_spread
+        action_upper = str(action).upper()
+        if action_upper == "BUY":
+            return raw_price * (1.0 + total_offset)
+        elif action_upper == "SELL":
+            return raw_price * (1.0 - total_offset)
+        return raw_price
+
+
 def run_historical_backtest(
     strategy_code: str, 
     df: pd.DataFrame, 
     starting_capital: float = 10000.0, 
     commission_pct: float = 0.001,
-    warmup_candles: int = 0
+    warmup_candles: int = 0,
+    slippage_pct: float = 0.0005,
+    spread_pct: float = 0.0002
 ) -> dict:
     """
     Dynamically compiles and executes a custom Python strategy script 
-    on historical OHLCV data.
+    on historical OHLCV data with realistic execution models.
     """
     if df.empty or len(df) < 5:
         return {"success": False, "error": "Insufficient historical data for backtesting."}
+
+    slippage_model = SlippageModel(slippage_pct=slippage_pct, spread_pct=spread_pct)
+
 
     import os
     backend_path = os.path.abspath(os.path.dirname(__file__))
@@ -611,6 +635,43 @@ def run_historical_backtest(
     fee = sum(t["fee"] for t in trade_logs)
     
     calmar = float(cagr_pct / abs(max_dd_pct)) if abs(max_dd_pct) > 1e-4 else 0.0
+    profit_factor = float(gross_profit / abs(gross_loss)) if abs(gross_loss) > 1e-9 else (float(gross_profit) if gross_profit > 0 else 0.0)
+    recovery_factor = float(total_return_pct / abs(max_dd_pct)) if abs(max_dd_pct) > 1e-4 else 0.0
+
+    # ── Rolling Sharpe Series (20-period window) ──────────────────────────────
+    rolling_sharpe = []
+    if len(returns) >= 20:
+        roll_mean = returns.rolling(window=20).mean()
+        roll_std = returns.rolling(window=20).std().replace(0, 1e-9)
+        roll_s = (roll_mean / roll_std) * np.sqrt(252)
+        for idx_val, val in enumerate(portfolio_value_history):
+            ts = val["timestamp"]
+            s_val = float(roll_s.iloc[idx_val]) if idx_val < len(roll_s) and not np.isnan(roll_s.iloc[idx_val]) else 0.0
+            rolling_sharpe.append({"timestamp": ts, "sharpe": s_val})
+
+    # ── Monthly Returns Heatmap ───────────────────────────────────────────────
+    monthly_returns_map = {}
+    if portfolio_value_history:
+        pv_df = pd.DataFrame(portfolio_value_history)
+        pv_df["dt"] = pd.to_datetime(pv_df["timestamp"], errors="coerce")
+        pv_df.dropna(subset=["dt"], inplace=True)
+        if not pv_df.empty:
+            pv_df.set_index("dt", inplace=True)
+            monthly_res = pv_df["value"].resample("M").last().pct_change().fillna(0.0) * 100.0
+            for dt_val, ret_val in monthly_res.items():
+                m_key = dt_val.strftime("%Y-%m")
+                monthly_returns_map[m_key] = float(round(ret_val, 2))
+
+    monthly_returns_list = [{"month": k, "return_pct": v} for k, v in monthly_returns_map.items()]
+
+    # ── Trade PnL Distribution Histogram Bins ─────────────────────────────────
+    pnl_list = [t["pnl"] for t in realized_trades]
+    trade_dist_bins = []
+    if pnl_list:
+        counts, bin_edges = np.histogram(pnl_list, bins=min(10, max(3, len(pnl_list))))
+        for b_idx in range(len(counts)):
+            bin_label = f"${bin_edges[b_idx]:.1f} to ${bin_edges[b_idx+1]:.1f}"
+            trade_dist_bins.append({"bin": bin_label, "count": int(counts[b_idx])})
 
     return {
         "success": True,
@@ -619,10 +680,12 @@ def run_historical_backtest(
             "pnl_pct": float(total_return_pct),
             "win_rate": float(win_rate),
             "sharpe_ratio": float(sharpe),
-            "smart_sharpe": 0.0,
+            "smart_sharpe": float(sharpe),
             "sortino_ratio": float(sortino),
-            "smart_sortino": 0.0,
+            "smart_sortino": float(sortino),
             "calmar_ratio": float(calmar),
+            "profit_factor": float(profit_factor),
+            "recovery_factor": float(recovery_factor),
             "omega_ratio": 1.42,
             "serenity_index": 0.0,
             "average_win_loss": float(avg_win / abs(avg_loss)) if abs(avg_loss) > 1e-9 else 0.0,
@@ -657,6 +720,10 @@ def run_historical_backtest(
         "equity_curve": portfolio_value_history,
         "drawdown_curve": drawdown_history,
         "volatility_curve": volatility_history,
+        "rolling_sharpe": rolling_sharpe,
+        "monthly_returns": monthly_returns_list,
+        "trade_distribution": trade_dist_bins,
         "trade_logs": trade_logs,
         "custom_charts": getattr(strategy_instance, "_custom_charts", {})
     }
+

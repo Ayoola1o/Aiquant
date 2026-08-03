@@ -22,6 +22,9 @@ from backtest_engine import run_historical_backtest
 from trading_engine import live_session
 from social_scraper import scraper
 import database as db
+from feature_engine import FeatureEngine
+from montecarlo import run_monte_carlo_simulation
+import market_data as md
 
 app = FastAPI(
     title="Aiquant API",
@@ -29,7 +32,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend connection (port 5173 by default)
+# Enable CORS for frontend connection
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,7 +40,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
- 
+
 @app.on_event("startup")
 def startup_event():
     import database as db
@@ -46,7 +49,7 @@ def startup_event():
         live_session.restore_previous_active_bots()
     except Exception as e:
         print(f"[Startup Error] Failed to restore active bots: {e}", flush=True)
- 
+
 # --- Pydantic Schemes for API Validation ---
 
 class PredictRequest(BaseModel):
@@ -62,9 +65,37 @@ class BacktestRequest(BaseModel):
     interval: str = "1d"
     starting_capital: float = 10000.0
     commission_pct: float = 0.001
+    slippage_pct: Optional[float] = 0.0005
+    spread_pct: Optional[float] = 0.0002
+    strategy_name: Optional[str] = "Custom Strategy"
+    ai_prompt: Optional[str] = ""
+    ai_model: Optional[str] = ""
     alpaca_key_id: Optional[str] = ""
     alpaca_secret_key: Optional[str] = ""
     exchange: Optional[str] = "yfinance"
+
+class MonteCarloRequest(BaseModel):
+    trade_pnls: List[float]
+    starting_capital: float = 10000.0
+    n_paths: int = 1000
+
+class StrategySaveRequest(BaseModel):
+    name: str
+    code: str
+    author: Optional[str] = "User"
+    created_by: Optional[str] = "manual"
+    symbols: Optional[List[str]] = []
+    timeframes: Optional[List[str]] = []
+    tags: Optional[List[str]] = []
+    lifecycle_stage: Optional[str] = "Draft"
+    notes: Optional[str] = ""
+
+class PromoteStrategyRequest(BaseModel):
+    lifecycle_stage: str
+
+class UpdateExperimentNotesRequest(BaseModel):
+    ai_notes: str
+
 
 class OptimizeRequest(BaseModel):
     symbols: List[str]
@@ -301,9 +332,155 @@ def run_backtest(req: BacktestRequest):
         df=df,
         starting_capital=req.starting_capital,
         commission_pct=req.commission_pct,
-        warmup_candles=warmup_candles
+        warmup_candles=warmup_candles,
+        slippage_pct=req.slippage_pct or 0.0005,
+        spread_pct=req.spread_pct or 0.0002
+    )
+
+    # Auto-log experiment to database if backtest succeeded
+    if res.get("success") and "kpis" in res:
+        try:
+            kpis = res["kpis"]
+            db.save_experiment(
+                strategy_name=req.strategy_name or "Custom Strategy",
+                ticker=req.ticker,
+                period=req.period,
+                interval=req.interval,
+                starting_capital=req.starting_capital,
+                commission_pct=req.commission_pct,
+                slippage_pct=req.slippage_pct or 0.0005,
+                spread_pct=req.spread_pct or 0.0002,
+                ai_prompt=req.ai_prompt or "",
+                ai_model=req.ai_model or "",
+                pnl=kpis.get("pnl", 0.0),
+                pnl_pct=kpis.get("pnl_pct", 0.0),
+                sharpe=kpis.get("sharpe_ratio", 0.0),
+                sortino=kpis.get("sortino_ratio", 0.0),
+                max_dd=kpis.get("max_drawdown_pct", 0.0),
+                win_rate=kpis.get("win_rate", 0.0),
+                profit_factor=kpis.get("profit_factor", 0.0),
+                total_trades=kpis.get("total_trades", 0),
+                kpis_json=json.dumps(kpis)
+            )
+        except Exception as e:
+            print(f"[Experiment Tracker Error] Failed to log experiment: {e}", flush=True)
+
+    return res
+
+@app.post("/api/backtest/montecarlo")
+def run_monte_carlo_endpoint(req: MonteCarloRequest):
+    """
+    Runs Monte Carlo resamplings on trade PnLs to generate percentile curves & ruin probability.
+    """
+    res = run_monte_carlo_simulation(
+        trade_pnls=req.trade_pnls,
+        starting_capital=req.starting_capital,
+        n_paths=req.n_paths
     )
     return res
+
+@app.get("/api/features/inspect")
+def inspect_features(ticker: str = "BTC-USD", period: str = "1mo", interval: str = "1h", index: int = -1):
+    """
+    Returns feature inspection snapshot (Technicals, Volatility, Momentum, Volume, Structure, Statistical)
+    for a specific candle timestamp index (used by AIQOS Feature Inspector panel).
+    """
+    df = qe.fetch_historical_data(ticker=ticker, period=period, interval=interval)
+    if df.empty:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch data for {ticker}")
+
+    df = qe.compute_indicators(df)
+    snapshot = FeatureEngine.get_feature_inspector_snapshot(df, index=index)
+    return {"status": "success", "ticker": ticker, "snapshot": snapshot}
+
+# --- Strategy Registry API Endpoints ---
+
+@app.get("/api/strategies")
+def list_strategies():
+    """Returns all strategies from the Strategy Registry with lifecycle stage metadata."""
+    strategies = db.get_strategies()
+    return {"status": "success", "strategies": strategies}
+
+@app.post("/api/strategies")
+def create_strategy(req: StrategySaveRequest):
+    """Saves a new strategy script into the Strategy Registry."""
+    strat_id = db.save_strategy(
+        name=req.name,
+        code=req.code,
+        author=req.author or "User",
+        created_by=req.created_by or "manual",
+        symbols_json=json.dumps(req.symbols or []),
+        timeframes_json=json.dumps(req.timeframes or []),
+        tags_json=json.dumps(req.tags or []),
+        lifecycle_stage=req.lifecycle_stage or "Draft",
+        notes=req.notes or ""
+    )
+    return {"status": "success", "id": strat_id, "message": f"Strategy '{req.name}' saved to Registry."}
+
+@app.post("/api/strategies/{strat_id}/promote")
+def promote_strategy(strat_id: int, req: PromoteStrategyRequest):
+    """Promotes strategy lifecycle stage (Draft -> Research -> Backtested -> Paper Trading -> Approved -> Live)."""
+    success = db.update_strategy_lifecycle(strat_id, req.lifecycle_stage)
+    if not success:
+        raise HTTPException(status_code=404, detail="Strategy not found.")
+    return {"status": "success", "message": f"Strategy #{strat_id} promoted to '{req.lifecycle_stage}' stage."}
+
+@app.delete("/api/strategies/{strat_id}")
+def delete_strategy_endpoint(strat_id: int):
+    """Deletes a strategy from the Registry."""
+    success = db.delete_strategy(strat_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Strategy not found.")
+    return {"status": "success", "message": f"Strategy #{strat_id} deleted."}
+
+# --- Experiment Tracker API Endpoints ---
+
+@app.get("/api/experiments")
+def list_experiments(limit: int = 100):
+    """Returns backtest experiment history logs."""
+    experiments = db.get_experiments(limit=limit)
+    return {"status": "success", "experiments": experiments}
+
+@app.put("/api/experiments/{exp_id}/notes")
+def update_experiment_notes_endpoint(exp_id: int, req: UpdateExperimentNotesRequest):
+    """Updates AI notes on an experiment log."""
+    success = db.update_experiment_notes(exp_id, req.ai_notes)
+    if not success:
+        raise HTTPException(status_code=404, detail="Experiment log not found.")
+    return {"status": "success", "message": "Experiment notes updated."}
+
+# --- Market Intelligence Endpoints ---
+
+@app.get("/api/market/feargreed")
+def get_fear_and_greed():
+    """Returns Crypto Fear & Greed Index history."""
+    data = md.get_fear_and_greed_index()
+    return {"status": "success", "data": data}
+
+@app.get("/api/market/funding")
+def get_funding_rates(symbol: str = "BTCUSDT"):
+    """Returns Binance Futures funding rate history."""
+    data = md.get_binance_funding_rates(symbol=symbol)
+    return {"status": "success", "symbol": symbol, "data": data}
+
+@app.get("/api/market/openinterest")
+def get_open_interest(symbol: str = "BTCUSDT"):
+    """Returns Binance Futures current open interest."""
+    data = md.get_binance_open_interest(symbol=symbol)
+    return {"status": "success", "data": data}
+
+@app.get("/api/market/macro")
+def get_macro_data(symbol: str = "^VIX", period: str = "1mo"):
+    """Returns historical macro indicator bars (^VIX, DX-Y.NYB, ^TNX)."""
+    data = md.get_macro_indicator(ticker_symbol=symbol, period=period)
+    return {"status": "success", "symbol": symbol, "data": data}
+
+@app.get("/api/market/calendar")
+def get_economic_calendar_events():
+    """Returns economic calendar events."""
+    events = md.get_economic_calendar()
+    return {"status": "success", "events": events}
+
 
 @app.post("/api/optimize")
 def optimize_portfolio_endpoint(req: OptimizeRequest):

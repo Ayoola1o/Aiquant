@@ -1,0 +1,738 @@
+I think this is the right time to stop thinking of the application as "an AI trading app" and start thinking of it as an **AI Quant Operating System (AIQOS)**. The four workspaces shouldn't be separate applications—they should share the same data, strategies, portfolio state, AI agents, and execution engine. A strategy should move seamlessly from research to backtesting, then to paper trading, and finally to live trading without being rewritten.
+
+Here's the architecture I'd recommend.
+
+# AI Quant Operating System (AIQOS)
+
+```
++--------------------------------------------------------------+
+|                     AI QUANT OPERATING SYSTEM                 |
++--------------------------------------------------------------+
+
+            Research Workspace
+                    │
+                    ▼
+           Backtesting Workspace
+                    │
+                    ▼
+          Paper Trading Workspace
+                    │
+                    ▼
+           Live Trading Workspace
+
+---------------------------------------------------------------
+
+Shared Services
+
+AI Agents
+Feature Engine
+Data Lake
+Strategy Registry
+Portfolio Engine
+Risk Engine
+Broker Layer
+Experiment Tracking
+Notification Service
+Authentication
+```
+
+Every workspace uses the same underlying services.
+
+---
+
+# Workspace 1 — Research Lab (100%)
+
+This is where new ideas are born.
+
+```
+Research
+
+├── AI Research Assistant
+├── Dataset Explorer
+├── Feature Engineering
+├── Indicator Builder
+├── Strategy Generator
+├── Strategy Comparison
+├── Market Scanner
+├── Pattern Discovery
+├── Notebook
+├── Experiment Tracking
+└── Reports
+```
+
+## Purpose
+
+Instead of asking:
+
+> "Generate a strategy."
+
+The user should ask:
+
+> Find profitable BTC mean reversion ideas over the last five years.
+
+The AI should:
+
+```
+Research Request
+
+↓
+
+Collect data
+
+↓
+
+Build features
+
+↓
+
+Generate hypotheses
+
+↓
+
+Compare historical occurrences
+
+↓
+
+Recommend strategies
+
+↓
+
+Store research
+```
+
+---
+
+## Dataset Explorer
+
+Professional researchers spend most of their time here.
+
+```
+OHLCV
+
+Tick Data
+
+Funding
+
+Open Interest
+
+Liquidations
+
+Options
+
+Order Book
+
+News
+
+Economic Calendar
+
+Fear & Greed
+
+Custom CSV
+
+SQL
+```
+
+The user should never need SQL.
+
+Instead:
+
+```
+Show ETH days where
+
+RSI <20
+
+Funding positive
+
+OI increasing
+
+Volume above average
+```
+
+---
+
+## AI Research Assistant
+
+The assistant becomes an actual quant analyst.
+
+Examples:
+
+```
+Find anomalies.
+
+Find seasonal effects.
+
+Find profitable patterns.
+
+Compare bull vs bear markets.
+
+Explain why strategy failed.
+
+Generate new hypothesis.
+```
+
+---
+
+## Feature Engineering
+
+Professional feature library.
+
+```
+Technical
+
+Statistical
+
+Volume
+
+Momentum
+
+Volatility
+
+Order Flow
+
+Market Structure
+
+On-chain
+
+Sentiment
+
+Custom Python Features
+```
+
+---
+
+## Strategy Builder
+
+Visual strategy editor.
+
+```
+IF
+
+RSI <25
+
+AND
+
+Volume Spike
+
+AND
+
+ADX >30
+
+THEN BUY
+
+Risk
+
+1%
+```
+
+No coding required.
+
+---
+
+# Workspace 2 — Backtesting Lab
+
+Research produces ideas.
+
+Backtesting validates them.
+
+```
+Backtesting
+
+├── Strategy Runner
+├── Optimization
+├── Walk Forward
+├── Monte Carlo
+├── Parameter Search
+├── Portfolio Testing
+├── Benchmark Comparison
+├── Stress Testing
+└── Report Generator
+```
+
+---
+
+## Professional Metrics
+
+```
+Sharpe
+
+Sortino
+
+Calmar
+
+Omega
+
+Recovery
+
+Profit Factor
+
+Expectancy
+
+Kelly
+
+Win Rate
+
+Payoff Ratio
+```
+
+---
+
+## Visual Analytics
+
+```
+Equity Curve
+
+Drawdown
+
+Trade Distribution
+
+Heatmap
+
+Monthly Returns
+
+Rolling Sharpe
+
+Exposure
+
+Correlation
+
+Performance Attribution
+```
+
+---
+
+## Walk Forward
+
+```
+Train
+
+↓
+
+Test
+
+↓
+
+Train
+
+↓
+
+Test
+
+↓
+
+Train
+
+↓
+
+Test
+```
+
+Avoid overfitting.
+
+---
+
+## Monte Carlo
+
+Generate
+
+10,000
+
+randomized trade sequences.
+
+Estimate:
+
+```
+Worst DD
+
+Best DD
+
+Confidence Interval
+
+Probability of Ruin
+```
+
+---
+
+# Workspace 3 — Paper Trading Lab (95–98%)
+
+Exactly like live.
+
+No real money.
+
+```
+Paper Trading
+
+├── Dashboard
+├── Portfolio
+├── Positions
+├── Orders
+├── Signals
+├── Execution Simulator
+├── AI Coach
+├── Risk Monitor
+├── Journal
+└── Performance
+```
+
+---
+
+## Live Dashboard
+
+```
+Portfolio
+
+Today's PnL
+
+Open Trades
+
+Exposure
+
+Leverage
+
+Cash
+
+Margin
+
+Risk
+
+AI Opinion
+```
+
+---
+
+## Execution Simulator
+
+Simulate:
+
+```
+Spread
+
+Latency
+
+Slippage
+
+Queue
+
+Liquidity
+
+Maker/Taker
+
+Funding
+
+Partial Fill
+```
+
+This is what makes paper trading realistic.
+
+---
+
+## AI Coach
+
+Every trade gets reviewed.
+
+```
+Why entered
+
+Why exited
+
+Was timing good?
+
+Was RR acceptable?
+
+Was risk acceptable?
+
+How to improve?
+```
+
+---
+
+## Risk Center
+
+Live monitoring.
+
+```
+Daily Loss
+
+Weekly Loss
+
+Portfolio Exposure
+
+Sector Exposure
+
+Volatility
+
+Leverage
+
+Margin
+
+Correlation
+
+Kill Switch
+```
+
+---
+
+# Workspace 4 — Live Trading Lab
+
+This is the smallest workspace.
+
+Almost everything has already been validated.
+
+```
+Live
+
+├── Brokers
+├── Accounts
+├── Live Positions
+├── Orders
+├── Monitoring
+├── Alerts
+├── Risk
+├── AI Monitor
+├── Logs
+└── Emergency Controls
+```
+
+---
+
+## Broker Layer
+
+```
+Binance
+
+Bybit
+
+Kraken
+
+Coinbase
+
+IBKR
+
+Alpaca
+
+MT5
+
+Custom REST
+
+FIX
+```
+
+The strategy never changes.
+
+Only the broker changes.
+
+---
+
+## Live Monitoring
+
+```
+CPU
+
+RAM
+
+API
+
+Latency
+
+Network
+
+Exchange
+
+Order Queue
+
+Broker Status
+```
+
+---
+
+## Emergency Center
+
+One click:
+
+```
+Close All
+
+Disable Strategy
+
+Disable Symbol
+
+Reduce Exposure
+
+Pause Trading
+
+Switch Paper Mode
+```
+
+---
+
+# Shared Core Services
+
+These power every workspace.
+
+```
+Core/
+
+├── Authentication
+├── RBAC
+├── Notifications
+├── Logging
+├── Config
+├── Scheduler
+├── Cache
+├── Event Bus
+├── Plugin Manager
+└── Audit Logs
+```
+
+---
+
+## AI Engine
+
+```
+AI
+
+├── Strategy Generator
+├── Market Analyst
+├── Risk Analyst
+├── Portfolio Analyst
+├── Trade Reviewer
+├── Research Agent
+├── News Analyst
+├── Optimization Agent
+├── Debate Engine
+└── Report Writer
+```
+
+---
+
+## Data Layer
+
+```
+Data
+
+├── Market
+├── Tick
+├── News
+├── Economic
+├── On-chain
+├── Sentiment
+├── Features
+├── Indicators
+├── Experiments
+├── Strategies
+└── Trades
+```
+
+---
+
+## Strategy Registry
+
+Every strategy is versioned.
+
+```
+Strategy
+
+↓
+
+Metadata
+
+↓
+
+Versions
+
+↓
+
+Performance
+
+↓
+
+Paper Results
+
+↓
+
+Live Results
+
+↓
+
+Approval Status
+```
+
+A strategy might move through these stages:
+
+```
+Draft
+
+↓
+
+Research
+
+↓
+
+Backtested
+
+↓
+
+Paper Trading
+
+↓
+
+Approved
+
+↓
+
+Live
+
+↓
+
+Archived
+```
+
+No strategy reaches live without meeting predefined criteria.
+
+---
+
+# Unified User Workflow
+
+This is where the platform becomes truly powerful.
+
+```
+Research Idea
+      │
+      ▼
+AI Generates Hypotheses
+      │
+      ▼
+Feature Engineering
+      │
+      ▼
+Backtesting
+      │
+      ▼
+Walk-Forward Validation
+      │
+      ▼
+Monte Carlo Analysis
+      │
+      ▼
+Risk Review
+      │
+      ▼
+Paper Trading
+      │
+      ▼
+AI Trade Review
+      │
+      ▼
+Performance Threshold Met?
+      │
+ ┌────┴────┐
+ │         │
+No        Yes
+ │         │
+ ▼         ▼
+Refine   Live Trading
+Strategy
+```
+
+## Vision: A Professional Quant Research Platform
+
+If executed well, your application will no longer resemble a retail trading bot. It will resemble the workflow used by quantitative research teams: a strategy is conceived in the **Research Lab**, rigorously validated in the **Backtesting Lab**, proven under realistic market conditions in the **Paper Trading Lab**, and only then promoted to the **Live Trading Lab**. Every promotion is backed by measurable evidence—performance metrics, risk analysis, and AI-generated review reports—creating a disciplined research-to-production pipeline. That architecture is what will differentiate your platform from most AI trading applications.
