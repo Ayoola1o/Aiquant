@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Search, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 
-
 interface ScannerResult {
   symbol: string;
   name: string;

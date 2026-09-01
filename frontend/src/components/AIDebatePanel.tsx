@@ -46,15 +46,44 @@ export default function AIDebatePanel({ ticker }: AIDebatePanelProps) {
     moderatorSummary: 'Consensus achieved across Technical, Macro, and Risk agents. Recommended entry on minor dip near $64,250 with target $66,800.'
   });
 
-  const triggerDebate = () => {
+  const triggerDebate = async () => {
     setDebating(true);
-    setTimeout(() => {
-      setDebateResult((prev: any) => ({
-        ...prev,
-        confidence: Number((0.75 + Math.random() * 0.2).toFixed(2)),
-      }));
+    try {
+      const res = await fetch('/api/agent/consensus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: ticker, timeframe: '1h' })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.status === 'success' && json.data) {
+          const d = json.data;
+          setDebateResult({
+            ticker: d.symbol || ticker,
+            confidence: d.confidence_score || 0.79,
+            consensus: (d.consensus_direction || 'BULLISH').toUpperCase(),
+            recommendation: d.consensus_direction === 'Bullish' ? 'BUY' : 'NEUTRAL',
+            entryPrice: 64250,
+            stopLoss: 63100,
+            takeProfit: 66800,
+            maxAllocationPct: 15.0,
+            agents: (d.analyst_signals || []).map((s: any) => ({
+              role: s.source,
+              avatar: s.source.includes('Technical') ? '📊' : (s.source.includes('Fundamental') ? '🌐' : '🗣️'),
+              signal: (s.signal_type || 'BULLISH').toUpperCase(),
+              confidence: s.confidence || 0.8,
+              thesis: s.summary || '',
+              keyMetrics: s.key_metrics || {}
+            })),
+            moderatorSummary: `Risk Supervisor Verdict: ${d.supervisor_verdict}. ${d.risk_notes} Bull Thesis: ${d.debate?.bull_thesis}`
+          });
+        }
+      }
+    } catch (e) {
+      // Fallback gracefully if backend is offline
+    } finally {
       setDebating(false);
-    }, 1500);
+    }
   };
 
   return (

@@ -637,3 +637,60 @@ def update_experiment_notes(exp_id: int, ai_notes: str) -> bool:
     finally:
         conn.close()
 
+# ── Active Bots Persistence CRUD ─────────────────────────────────────────────
+
+def get_active_bots() -> list:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM active_bots")
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def save_active_bot(
+    bot_id: str, name: str, symbol: str, strategy_code: str, timeframe: str,
+    starting_cash: float, feed_source: str, alpaca_key_id: str = "", alpaca_secret_key: str = "",
+    hyperliquid_private_key: str = "", risk_profile_json: str = "{}", agentic_mode: int = 0,
+    agent_attitude: str = "balanced", gemini_api_key: str = "", tech_agent_key: str = "",
+    sentiment_agent_key: str = "", tradingview_agent_key: str = "", hyperliquid_agent_key: str = "",
+    firecrawl_agent_key: str = "", leverage_limit: float = 1.0, current_cash: float = None,
+    positions_json: str = "{}", trades_json: str = "[]", avg_cost: float = 0.0,
+    realized_pnl: float = 0.0, start_time: str = ""
+):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO active_bots (
+                bot_id, name, symbol, strategy_code, timeframe, starting_cash, feed_source,
+                alpaca_key_id, alpaca_secret_key, hyperliquid_private_key, risk_profile_json,
+                agentic_mode, agent_attitude, gemini_api_key, tech_agent_key, sentiment_agent_key,
+                tradingview_agent_key, hyperliquid_agent_key, firecrawl_agent_key, leverage_limit,
+                current_cash, positions_json, trades_json, avg_cost, realized_pnl, start_time
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            bot_id, name, symbol, strategy_code, timeframe, starting_cash, feed_source,
+            alpaca_key_id, alpaca_secret_key, hyperliquid_private_key, risk_profile_json,
+            agentic_mode, agent_attitude, gemini_api_key, tech_agent_key, sentiment_agent_key,
+            tradingview_agent_key, hyperliquid_agent_key, firecrawl_agent_key, leverage_limit,
+            current_cash if current_cash is not None else starting_cash,
+            positions_json, trades_json, avg_cost, realized_pnl,
+            start_time or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+        conn.commit()
+    finally:
+        conn.close()
+
+def delete_active_bot(bot_id: str) -> bool:
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM active_bots WHERE bot_id = ?", (bot_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+

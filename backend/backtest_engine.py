@@ -172,27 +172,31 @@ def run_historical_backtest(
         si._balance = starting_capital
         si._available_margin = starting_capital
 
+        # Pre-build full Jesse candle matrix: shape (N, 6)
+        # Jesse matrix column layout: [ts_ms, open, close, high, low, volume]
+        try:
+            ts_series = pd.to_datetime(df["timestamp"], utc=True)
+            ts_ms_array = ts_series.astype("int64").to_numpy() / 1_000_000.0
+        except Exception:
+            ts_ms_array = np.arange(len(df), dtype=np.float64)
+
+        all_jesse_matrix = np.column_stack([
+            ts_ms_array,
+            df["open"].to_numpy(dtype=np.float64),
+            df["close"].to_numpy(dtype=np.float64),
+            df["high"].to_numpy(dtype=np.float64),
+            df["low"].to_numpy(dtype=np.float64),
+            df["volume"].to_numpy(dtype=np.float64),
+        ])
+
         try:
             for idx in range(len(df)):
                 row = df.iloc[idx]
                 close = float(row["close"])
                 timestamp = str(pd.to_datetime(row["timestamp"], utc=True))
 
-                # Build Jesse-format candle row: [ts, open, CLOSE, high, low, volume]
-                try:
-                    ts_ms = pd.to_datetime(row["timestamp"], utc=True).timestamp() * 1000.0
-                except Exception:
-                    ts_ms = float(idx)
-
-                jesse_row = np.array([[
-                    ts_ms,
-                    float(row["open"]),
-                    float(row["close"]),   # ← index 2 = close (Jesse layout)
-                    float(row["high"]),    # ← index 3 = high
-                    float(row["low"]),     # ← index 4 = low
-                    float(row["volume"])
-                ]])
-                si._candles = np.vstack([si._candles, jesse_row])
+                # Slice matrix up to current index (O(1) view creation)
+                si._candles = all_jesse_matrix[:idx + 1]
 
                 # ── Skip execution logic if we are still in the warmup period ──
                 if idx < warmup_candles:
@@ -376,26 +380,28 @@ def run_historical_backtest(
         # 4B.  ORIGINAL on_candle-style simulation loop
         # ══════════════════════════════════════════════════════════════════════
         try:
+          try:
+              ts_series_b = pd.to_datetime(df["timestamp"])
+              ts_ms_base = ts_series_b.astype("int64").to_numpy() / 1_000_000.0
+          except Exception:
+              ts_ms_base = np.zeros(len(df), dtype=np.float64)
+
+          all_base_matrix = np.column_stack([
+              ts_ms_base,
+              df["open"].to_numpy(dtype=np.float64),
+              df["high"].to_numpy(dtype=np.float64),
+              df["low"].to_numpy(dtype=np.float64),
+              df["close"].to_numpy(dtype=np.float64),
+              df["volume"].to_numpy(dtype=np.float64),
+          ])
+
           for idx in range(len(df)):
             row = df.iloc[idx]
             close = float(row["close"])
             timestamp = str(row["timestamp"])
             
-            # Populate strategy_instance.candles with new candle tick for indicators
-            try:
-                ts_ms = pd.to_datetime(row["timestamp"]).timestamp() * 1000.0
-            except Exception:
-                ts_ms = 0.0
-            
-            current_row = np.array([[
-                ts_ms,
-                float(row["open"]),
-                float(row["high"]),
-                float(row["low"]),
-                float(row["close"]),
-                float(row["volume"])
-            ]])
-            strategy_instance.candles = np.vstack([strategy_instance.candles, current_row])
+            # Slice matrix up to current index (O(1) view creation)
+            strategy_instance.candles = all_base_matrix[:idx + 1]
             
             # Map candle row to standard dictionary format for strategy
             candle = {
@@ -657,7 +663,10 @@ def run_historical_backtest(
         pv_df.dropna(subset=["dt"], inplace=True)
         if not pv_df.empty:
             pv_df.set_index("dt", inplace=True)
-            monthly_res = pv_df["value"].resample("M").last().pct_change().fillna(0.0) * 100.0
+            try:
+                monthly_res = pv_df["value"].resample("ME").last().pct_change().fillna(0.0) * 100.0
+            except Exception:
+                monthly_res = pv_df["value"].resample("M").last().pct_change().fillna(0.0) * 100.0
             for dt_val, ret_val in monthly_res.items():
                 m_key = dt_val.strftime("%Y-%m")
                 monthly_returns_map[m_key] = float(round(ret_val, 2))

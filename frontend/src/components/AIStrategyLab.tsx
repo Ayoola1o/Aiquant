@@ -61,7 +61,7 @@ export default function AIStrategyLab({
   const fetchRegistry = async () => {
     setLoadingRegistry(true);
     try {
-      const res = await fetch('http://localhost:8000/api/strategies');
+      const res = await fetch('/api/strategies');
       const data = await res.json();
       if (data.status === 'success') {
         setRegistryStrategies(data.strategies || []);
@@ -80,7 +80,7 @@ export default function AIStrategyLab({
   const saveToRegistry = async () => {
     if (!strategyName.trim() || !workingCode.trim()) return;
     try {
-      const res = await fetch('http://localhost:8000/api/strategies', {
+      const res = await fetch('/api/strategies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,7 +103,7 @@ export default function AIStrategyLab({
 
   const promoteStrategy = async (stratId: number, nextStage: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/strategies/${stratId}/promote`, {
+      const res = await fetch(`/api/strategies/${stratId}/promote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lifecycle_stage: nextStage })

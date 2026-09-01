@@ -250,6 +250,39 @@ class RiskManager:
 
         return True, qty, "PASSED"
 
+    def get_telemetry_snapshot(self, bot=None) -> dict:
+        """
+        Returns a structured real-time risk telemetry snapshot dict.
+        """
+        now = time.time()
+        portfolio_val = 10000.0
+        active_pos_count = 0
+        heartbeat_ok = True
+
+        if bot is not None:
+            price = getattr(bot, "last_price", 100.0) or 100.0
+            portfolio_val = bot.cash + sum(bot.positions.get(s, 0.0) * price for s in bot.positions)
+            active_pos_count = sum(1 for s, q in bot.positions.items() if abs(q) > 0)
+            last_tick = getattr(bot, "last_tick_time", None)
+            if last_tick and (now - last_tick) > self.profile.get("max_heartbeat_stale_seconds", 30):
+                heartbeat_ok = False
+
+        start_eq = self.daily_starting_equity or portfolio_val
+        drawdown_pct = round(max(0.0, (start_eq - portfolio_val) / (start_eq or 1.0) * 100.0), 2)
+
+        return {
+            "paused": self.paused,
+            "portfolio_value": round(portfolio_val, 2),
+            "daily_starting_equity": round(start_eq, 2),
+            "current_drawdown_pct": drawdown_pct,
+            "max_drawdown_limit_pct": float(self.profile.get("max_drawdown_percent", 3.0)),
+            "active_positions_count": active_pos_count,
+            "max_simultaneous_trades": int(self.profile.get("max_simultaneous_trades", 5)),
+            "heartbeat_ok": heartbeat_ok,
+            "profile": self.profile,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+        }
+
 
 class TradingBot:
     """
@@ -283,6 +316,7 @@ class TradingBot:
         self.last_tick_time = time.time()
 
         self.is_active = False
+        self.is_paused = False
         self.start_time = None
         self.cash = starting_cash
         self.starting_cash = starting_cash
@@ -300,6 +334,7 @@ class TradingBot:
         self.stop_loss = 0.0
         self.take_profit = 0.0
         self.position_opened_at = None
+        self.daily_pnl_store = {}  # Map: "YYYY-MM-DD" -> {"date": str, "realized_pnl": float, "trades_count": int, "wins": int, "win_rate": float}
 
         self.candle_duration = self.DURATION_MAP.get(timeframe, 10)
 
@@ -586,20 +621,21 @@ class TradingBot:
             return
         try:
             r = requests.get("https://paper-api.alpaca.markets/v2/account",
-                             headers=self._alpaca_headers(), timeout=5)
+                             headers=self._alpaca_headers(), timeout=15)
             if r.status_code == 200:
                 self.alpaca_account_cash = float(r.json().get("cash", 0.0))
                 self.log(f"[Alpaca] Account synced — Total Account Cash: ${self.alpaca_account_cash:,.2f} | Bot Allocated Cash: ${self.cash:,.2f}")
             else:
-                self.log(f"[Alpaca] Account sync error: {r.text}")
+                self.log(f"[Alpaca] Account sync warning ({r.status_code}): {r.text[:120]}")
         except Exception as e:
-            self.log(f"[Alpaca] Account sync exception: {e}")
+            self.log(f"[Alpaca] Account sync timeout/retry: {e}")
+
     def sync_alpaca_positions(self):
         if not (self.alpaca_key_id and self.alpaca_secret_key):
             return
         try:
             r = requests.get("https://paper-api.alpaca.markets/v2/positions",
-                             headers=self._alpaca_headers(), timeout=5)
+                             headers=self._alpaca_headers(), timeout=15)
             if r.status_code == 200:
                 self.positions = {}
                 alpaca_target = self.symbol.replace("USDT", "USD").upper()
@@ -610,9 +646,9 @@ class TradingBot:
                         self.positions[self.symbol] = float(p.get("qty", 0.0))
                         self.avg_cost = float(p.get("avg_entry_price", 0.0))
             else:
-                self.log(f"[Alpaca] Positions sync error: {r.text}")
+                self.log(f"[Alpaca] Positions sync warning ({r.status_code}): {r.text[:120]}")
         except Exception as e:
-            self.log(f"[Alpaca] Positions sync exception: {e}")
+            self.log(f"[Alpaca] Positions sync timeout/retry: {e}")
         self._update_position_tracking()
 
     def _update_position_tracking(self):
@@ -718,7 +754,7 @@ class TradingBot:
             # 1. Validate Account State & Available Buying Power
             shorting_enabled = False
             try:
-                acc_res = requests.get("https://paper-api.alpaca.markets/v2/account", headers=self._alpaca_headers(), timeout=5)
+                acc_res = requests.get("https://paper-api.alpaca.markets/v2/account", headers=self._alpaca_headers(), timeout=15)
                 if acc_res.status_code == 200:
                     acc_info = acc_res.json()
                     shorting_enabled = acc_info.get("shorting_enabled", False)
@@ -750,7 +786,7 @@ class TradingBot:
             # 2. Validate Position Size (for SELL — allow short if account permits)
             if action == "SELL" and notional <= 0:
                 try:
-                    pos_res = requests.get("https://paper-api.alpaca.markets/v2/positions", headers=self._alpaca_headers(), timeout=5)
+                    pos_res = requests.get("https://paper-api.alpaca.markets/v2/positions", headers=self._alpaca_headers(), timeout=15)
                     if pos_res.status_code == 200:
                         positions_info = pos_res.json()
                         held_qty = 0.0
@@ -795,29 +831,47 @@ class TradingBot:
                     )
 
             # 4. Build payload — notional (fractional $) or qty
+            # Determine exact Alpaca order symbol format (e.g., LTC/USD for crypto)
+            alpaca_sym = self.symbol.replace("USDT", "USD")
+            if any(c in alpaca_sym.upper() for c in ["BTC", "ETH", "SOL", "LTC", "AVAX", "UNI", "DOGE", "LINK"]) and "/" not in alpaca_sym and alpaca_sym.endswith("USD"):
+                alpaca_order_sym = f"{alpaca_sym[:-3]}/USD"
+            else:
+                alpaca_order_sym = alpaca_sym
+
             if notional > 0:
+                client_oid = f"{self.bot_id}_{int(time.time() * 1000)}"
                 payload = {
-                    "symbol": alpaca_sym,
+                    "symbol": alpaca_order_sym,
                     "notional": str(round(notional, 2)),
                     "side": action.lower(),
                     "type": "market",
                     "time_in_force": "day",  # notional orders require TIF=day
+                    "client_order_id": client_oid,
                 }
-                self.log(f"[Alpaca] Sending FRACTIONAL MARKET {action} ${notional:.2f} of {alpaca_sym}…")
+                self.log(f"[Alpaca] Sending FRACTIONAL MARKET {action} ${notional:.2f} of {alpaca_order_sym} (Client Order ID: {client_oid})…")
             else:
+                client_oid = f"{self.bot_id}_{int(time.time() * 1000)}"
                 payload = {
-                    "symbol": alpaca_sym,
+                    "symbol": alpaca_order_sym,
                     "qty": str(qty),
                     "side": action.lower(),
                     "type": "market",
                     "time_in_force": "gtc",
+                    "client_order_id": client_oid,
                 }
-                self.log(f"[Alpaca] Sending MARKET {action} {qty} {alpaca_sym}…")
+                self.log(f"[Alpaca] Sending MARKET {action} {qty} {alpaca_order_sym} (Client Order ID: {client_oid})…")
 
             try:
                 r = requests.post("https://paper-api.alpaca.markets/v2/orders",
                                   headers={**self._alpaca_headers(), "Content-Type": "application/json"},
-                                  json=payload, timeout=6)
+                                  json=payload, timeout=15)
+                # Fallback retry with unformatted symbol if Alpaca expects alternative format
+                if r.status_code not in (200, 201) and alpaca_order_sym != alpaca_sym:
+                    payload["symbol"] = alpaca_sym
+                    r = requests.post("https://paper-api.alpaca.markets/v2/orders",
+                                      headers={**self._alpaca_headers(), "Content-Type": "application/json"},
+                                      json=payload, timeout=15)
+
                 if r.status_code in (200, 201):
                     order = r.json()
                     
@@ -847,19 +901,29 @@ class TradingBot:
                         except (ValueError, TypeError):
                             actual_qty = float(qty)
                             
-                    self.log(f"[Alpaca] Order accepted — id: {order.get('id')} | status: {order.get('status')}")
+                    self.log(f"[Alpaca] Order accepted — id: {order.get('id')} | client_oid: {client_oid} | status: {order.get('status')}")
                     time.sleep(1)
                     old_cost = self.avg_cost
-                    # Update local cash allocation for Alpaca bot
+                    # Update local cash allocation and bot-isolated position
                     cost = actual_qty * fill_price
                     fee = cost * 0.001
-                    if action == "BUY":
-                        self.cash -= (cost + fee)
-                    else:
-                        self.cash += (cost - fee)
+                    with self._lock:
+                        if action == "BUY":
+                            self.cash -= (cost + fee)
+                            prev_qty = self.positions.get(self.symbol, 0.0)
+                            new_qty = prev_qty + actual_qty
+                            self.avg_cost = ((prev_qty * self.avg_cost) + (actual_qty * fill_price)) / new_qty if new_qty > 0 else fill_price
+                            self.positions[self.symbol] = new_qty
+                        else:
+                            self.cash += (cost - fee)
+                            prev_qty = self.positions.get(self.symbol, 0.0)
+                            new_qty = prev_qty - actual_qty
+                            self.positions[self.symbol] = new_qty
+                            if abs(new_qty) < 1e-8:
+                                self.positions[self.symbol] = 0.0
+                                self.avg_cost = 0.0
+                        self._update_position_tracking()
 
-                    self.sync_alpaca_account()
-                    self.sync_alpaca_positions()
                     pnl = (fill_price - old_cost) * actual_qty if action == "SELL" and old_cost else 0.0
                     self.realized_pnl += pnl
                     self._record_trade(action, fill_price, actual_qty, fee, pnl)
@@ -1066,6 +1130,24 @@ class TradingBot:
                 return False
 
     def _record_trade(self, action, price, qty, fee, pnl):
+        now_date_str = time.strftime("%Y-%m-%d")
+        if now_date_str not in self.daily_pnl_store:
+            self.daily_pnl_store[now_date_str] = {
+                "date": now_date_str,
+                "realized_pnl": 0.0,
+                "trades_count": 0,
+                "wins": 0,
+                "win_rate": 0.0
+            }
+        if action == "SELL":
+            self.daily_pnl_store[now_date_str]["realized_pnl"] += float(pnl)
+            self.daily_pnl_store[now_date_str]["trades_count"] += 1
+            if float(pnl) > 0:
+                self.daily_pnl_store[now_date_str]["wins"] += 1
+            cnt = self.daily_pnl_store[now_date_str]["trades_count"]
+            wns = self.daily_pnl_store[now_date_str]["wins"]
+            self.daily_pnl_store[now_date_str]["win_rate"] = round((wns / cnt) * 100.0, 1) if cnt > 0 else 0.0
+
         self.trades.append({
             "id": len(self.trades) + 1,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1077,6 +1159,29 @@ class TradingBot:
         })
         self._update_position_tracking()
         self.persist_active_state()
+
+        # Broadcast instant trade alert to Telegram Command & Control Center
+        try:
+            from telegram_bot import telegram_manager
+            action_icon = "🟢 BUY" if action == "BUY" else "🔴 SELL"
+            pnl_info = f"\n💵 <b>Realized P&L:</b> <code>{('+' if pnl>=0 else '')}${pnl:,.2f}</code>" if action == "SELL" else ""
+            msg = (
+                f"🚀 <b>TRADE EXECUTION ALERT</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🤖 <b>Bot:</b> {self.name} [<code>{self.bot_id}</code>]\n"
+                f"⚡ <b>Action:</b> {action_icon} <code>{qty} {self.symbol}</code>\n"
+                f"💵 <b>Fill Price:</b> <code>${price:,.2f}</code>\n"
+                f"💳 <b>Notional:</b> <code>${(qty * price):,.2f} USD</code>{pnl_info}\n"
+                f"⏱ <b>Timestamp:</b> <code>{time.strftime('%H:%M:%S UTC', time.gmtime())}</code>"
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "📊 Fleet Status", "callback_data": "cmd_status"}, {"text": "📦 Positions", "callback_data": "cmd_positions"}]
+                ]
+            }
+            telegram_manager.broadcast_alert(msg, reply_markup=markup)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # State snapshot (called frequently — keep fast)
@@ -1105,10 +1210,25 @@ class TradingBot:
             total_pnl = self.realized_pnl + unrealized
             pnl_pct = (total_pnl / self.starting_cash) * 100 if self.starting_cash else 0.0
 
+            today_str = time.strftime("%Y-%m-%d")
+            daily_today = round(self.daily_pnl_store.get(today_str, {}).get("realized_pnl", 0.0), 2)
+            daily_pnl_list = sorted(list(self.daily_pnl_store.values()), key=lambda x: x["date"], reverse=True)
+
+            is_paused_val = getattr(self, "is_paused", False)
+            if not self.is_active:
+                bot_status_str = "stopped"
+            elif is_paused_val:
+                bot_status_str = "paused"
+            else:
+                bot_status_str = "active"
+
             return {
                 "bot_id": self.bot_id,
                 "name": self.name,
                 "is_active": self.is_active,
+                "is_running": self.is_active and not is_paused_val,
+                "is_paused": is_paused_val,
+                "status": bot_status_str,
                 "symbol": self.symbol,
                 "timeframe": self.timeframe,
                 "feed_source": self.feed_source,
@@ -1122,6 +1242,9 @@ class TradingBot:
                 "total_pnl": total_pnl,
                 "pnl_pct": pnl_pct,
                 "win_rate": win_rate,
+                "daily_pnl_today": daily_today,
+                "daily_pnl_by_date": self.daily_pnl_store,
+                "daily_pnl_list": daily_pnl_list,
                 "running_time": running_time,
                 "trade_count": len(self.trades),
                 "trades": self.trades[-50:],
@@ -1255,6 +1378,9 @@ class TradingBot:
             self.active_candle = None
 
         if candle_enriched is None:
+            return
+
+        if getattr(self, "is_paused", False) or not self.is_active:
             return
 
         # ── Strategy signal evaluation (outside lock) ────────────────────
@@ -1582,110 +1708,127 @@ class TradingBot:
         self.log(f"Bot started — feed: {self.feed_source}, symbol: {self.symbol}, tf: {self.timeframe}")
         self.persist_active_state()
 
+    def pause(self):
+        with self._lock:
+            self.is_paused = True
+            self.log("⏸ Bot paused by user.")
+        self.persist_active_state()
+
+    def resume(self):
+        with self._lock:
+            self.is_paused = False
+            self.log("▶ Bot resumed by user.")
+        self.persist_active_state()
+
     def stop(self, close_pct: float = 1.0):
         with self._lock:
             if not self.is_active:
                 return
-            
-            # Remove from active bots database on shutdown
-            try:
-                from database import delete_active_bot
-                delete_active_bot(self.bot_id)
-            except Exception as e:
-                self.log(f"Failed to delete active bot from DB: {e}")
-            
-            # --- Flatten Book on Stop ---
-            try:
-                pos_qty = self.positions.get(self.symbol, 0.0)
-                qty_to_close = pos_qty * close_pct
-                if qty_to_close > 0.0001:
-                    self.log(f"Closing open position of {qty_to_close} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
-                    self.place_market_order("SELL", qty_to_close)
-                elif qty_to_close < -0.0001:
-                    self.log(f"Closing short position of {abs(qty_to_close)} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
-                    self.place_market_order("BUY", abs(qty_to_close))
-            except Exception as e:
-                self.log(f"Failed to close position on shutdown: {e}")
-            # ---------------------------
-
-            # Save session to history ledger
-            try:
-                from database import save_bot_session
-                import json
-                
-                if isinstance(self.start_time, (int, float)):
-                    start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time))
-                else:
-                    start_str = str(self.start_time) if self.start_time else "Unknown"
-                    
-                end_str = time.strftime('%Y-%m-%d %H:%M:%S')
-                
-                trades_json = []
-                wins = 0
-                losses = 0
-                
-                for t in self.trades:
-                    net_pnl = t.get("pnl", 0.0) - t.get("fee", 0.0)
-                    if t["action"] == "SELL" and t.get("pnl", 0.0) != 0.0:
-                        if net_pnl > 0:
-                            wins += 1
-                        else:
-                            losses += 1
-                            
-                    ts = t.get("timestamp")
-                    if isinstance(ts, (int, float)):
-                        t_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))
-                    else:
-                        t_time = str(ts)
-                    
-                    trades_json.append({
-                        "symbol": self.symbol,
-                        "side": t["action"],
-                        "qty": t["qty"],
-                        "entry_price": t["price"],
-                        "exit_price": t["price"],
-                        "entry_date": t_time,
-                        "exit_date": t_time,
-                        "pnl": t.get("pnl", 0.0),
-                        "r_multiple": 0.0,
-                        "fees": t.get("fee", 0.0),
-                        "net_pnl": net_pnl
-                    })
-                
-                pnl = self.cash - self.starting_cash
-                if len(self.trades) > 0:
-                    pnl = sum(t.get("pnl", 0.0) - t.get("fee", 0.0) for t in self.trades)
-                
-                bot_name = getattr(self, "name", None) or getattr(self, "strategy_name", None) or f"AI Agent ({self.timeframe})"
-                
-                custom_charts_json = "{}"
-                if getattr(self, "strategy_instance", None) and hasattr(self.strategy_instance, "_custom_charts"):
-                    custom_charts_json = json.dumps(self.strategy_instance._custom_charts)
-
-                save_bot_session(
-                    bot_id=self.bot_id,
-                    strategy_name=bot_name,
-                    symbol=self.symbol,
-                    start_time=start_str,
-                    end_time=end_str,
-                    start_cash=self.starting_cash,
-                    end_cash=self.cash,
-                    pnl=pnl,
-                    total_trades=len(self.trades),
-                    wins=wins,
-                    losses=losses,
-                    trades_json=json.dumps(trades_json),
-                    last_alpha_rationale=self.last_alpha_rationale or "",
-                    custom_charts_json=custom_charts_json
-                )
-                self.log("Session saved to History Ledger.")
-            except Exception as e:
-                self.log(f"Failed to save session history: {e}")
-                
             self.is_active = False
+            self.is_paused = False
+            start_time = self.start_time
             self.start_time = None
+            pos_qty = self.positions.get(self.symbol, 0.0)
+            trades_snapshot = list(self.trades)
+            cash_snapshot = self.cash
+            starting_cash_snapshot = self.starting_cash
+            bot_name = getattr(self, "name", None) or getattr(self, "strategy_name", None) or f"AI Agent ({self.timeframe})"
+            last_alpha = self.last_alpha_rationale or ""
+            custom_charts = {}
+            if getattr(self, "strategy_instance", None) and hasattr(self.strategy_instance, "_custom_charts"):
+                custom_charts = self.strategy_instance._custom_charts
+
+        # Stop event loop immediately
         if self.loop and not self.loop.is_closed():
             self.loop.call_soon_threadsafe(self.loop.stop)
+
+        # Remove from active bots database
+        try:
+            from database import delete_active_bot
+            delete_active_bot(self.bot_id)
+        except Exception as e:
+            self.log(f"Failed to delete active bot from DB: {e}")
+
+        # Flatten Book on Stop (OUTSIDE LOCK so it does not block state queries)
+        try:
+            qty_to_close = pos_qty * close_pct
+            if qty_to_close > 0.0001:
+                self.log(f"Closing open position of {qty_to_close} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
+                self.place_market_order("SELL", qty_to_close)
+            elif qty_to_close < -0.0001:
+                self.log(f"Closing short position of {abs(qty_to_close)} ({(close_pct*100):.1f}%) {self.symbol} before shutting down...")
+                self.place_market_order("BUY", abs(qty_to_close))
+        except Exception as e:
+            self.log(f"Failed to close position on shutdown: {e}")
+
+        # Save session to history ledger (OUTSIDE LOCK)
+        try:
+            from database import save_bot_session
+            import json
+            
+            if isinstance(start_time, (int, float)):
+                start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))
+            else:
+                start_str = str(start_time) if start_time else "Unknown"
+                
+            end_str = time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            trades_json = []
+            wins = 0
+            losses = 0
+            
+            for t in trades_snapshot:
+                net_pnl = t.get("pnl", 0.0) - t.get("fee", 0.0)
+                if t["action"] == "SELL" and t.get("pnl", 0.0) != 0.0:
+                    if net_pnl > 0:
+                        wins += 1
+                    else:
+                        losses += 1
+                        
+                ts = t.get("timestamp")
+                if isinstance(ts, (int, float)):
+                    t_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))
+                else:
+                    t_time = str(ts)
+                
+                trades_json.append({
+                    "symbol": self.symbol,
+                    "side": t["action"],
+                    "qty": t["qty"],
+                    "entry_price": t["price"],
+                    "exit_price": t["price"],
+                    "entry_date": t_time,
+                    "exit_date": t_time,
+                    "pnl": t.get("pnl", 0.0),
+                    "r_multiple": 0.0,
+                    "fees": t.get("fee", 0.0),
+                    "net_pnl": net_pnl
+                })
+            
+            pnl = cash_snapshot - starting_cash_snapshot
+            if len(trades_snapshot) > 0:
+                pnl = sum(t.get("pnl", 0.0) - t.get("fee", 0.0) for t in trades_snapshot)
+
+            save_bot_session(
+                bot_id=self.bot_id,
+                strategy_name=bot_name,
+                symbol=self.symbol,
+                start_time=start_str,
+                end_time=end_str,
+                start_cash=starting_cash_snapshot,
+                end_cash=cash_snapshot,
+                pnl=pnl,
+                total_trades=len(trades_snapshot),
+                wins=wins,
+                losses=losses,
+                trades_json=json.dumps(trades_json),
+                last_alpha_rationale=last_alpha,
+                custom_charts_json=json.dumps(custom_charts)
+            )
+            self.log("Session saved to History Ledger.")
+        except Exception as e:
+            self.log(f"Failed to save session history: {e}")
+            
         self.log("Bot stopped and positions flattened.")
 
 # ======================================================================
@@ -1744,25 +1887,44 @@ class AgenticLiveBot(TradingBot):
         poll_interval = 90
         min_interval = 90
         max_interval = 300
+        first_run = True
         
         while self.is_active:
-            await asyncio.sleep(poll_interval)
+            if first_run:
+                await asyncio.sleep(5)  # Quick 5-second initial warmup
+                first_run = False
+            else:
+                await asyncio.sleep(poll_interval)
+
+            if getattr(self, "is_paused", False) or not self.is_active:
+                continue
+
             self.log(f"Triggering ADK Daily Alpha Brief for {self.symbol}...")
             
             try:
                 pos_qty = self.positions.get(self.symbol, 0.0)
-                price = self.active_candle['close'] if self.active_candle else 0.0
+                price = self.active_candle['close'] if self.active_candle else (
+                    self.candles[-1]['close'] if self.candles else _get_fallback_crypto_price(self.symbol)
+                )
+                if price <= 0.0:
+                    price = 50000.0 if "BTC" in self.symbol else (3000.0 if "ETH" in self.symbol else 150.0)
+
                 port_val = self.cash + (pos_qty * price)
                 
                 account_profile = {
                     "balance": self.cash,
                     "positions": {self.symbol: pos_qty},
-                    "unrealized_pnl": (pos_qty * price) - (pos_qty * getattr(self, 'entry_price', price)),
+                    "unrealized_pnl": (pos_qty * price) - (pos_qty * getattr(self, 'avg_cost', price)),
                     "drawdown_limit": getattr(self.risk_manager, 'max_drawdown_pct', 5.0) if hasattr(self, 'risk_manager') else 5.0,
                     "max_allocation_pct": getattr(self.risk_manager, 'max_position_pct', 2.0) if hasattr(self, 'risk_manager') else 2.0
                 }
                 
-                res = await run_adk_validation(self.symbol, self.agent_keys, account_profile, self.agent_attitude)
+                # Ensure Gemini key fallback from env
+                effective_keys = dict(self.agent_keys)
+                if not effective_keys.get("gemini"):
+                    effective_keys["gemini"] = os.environ.get("GEMINI_API_KEY", "")
+
+                res = await run_adk_validation(self.symbol, effective_keys, account_profile, self.agent_attitude)
                 
                 final_action = res.get("final_action", "ABORT")
                 status = "APPROVED" if final_action == "EXECUTE" else "REJECTED"
@@ -1775,10 +1937,9 @@ class AgenticLiveBot(TradingBot):
                     poll_interval = min(poll_interval * 2, max_interval)
                     self.log(f"[Agentic] Rate limit detected — backing off to {poll_interval}s polling interval.")
                 else:
-                    # Success or non-rate-limit failure — reset to normal
                     poll_interval = min_interval
                 
-                # Append raw tool thoughts (Senpi/Hyperliquid actions) to the Alpha Brief
+                # Append raw tool thoughts to the Alpha Brief
                 thoughts = res.get("thoughts", [])
                 if thoughts:
                     thoughts_str = "\n".join(f"- {t}" for t in thoughts if t.strip())
@@ -1807,11 +1968,10 @@ class AgenticLiveBot(TradingBot):
                         self.log(f"[Agentic->SELL] Executing autonomously based on Alpha Brief. Qty: {qty_to_sell:.4f} ({exit_pct}% exit)")
                         self.place_market_order("SELL", qty_to_sell)
                     else:
-                        self.log(f"[Agentic] Signal '{direction}' ignored: already in desired state (pos={pos_qty}).")
+                        self.log(f"[Agentic] Signal '{direction}' evaluated: already in desired state (pos={pos_qty}).")
                         
             except Exception as e:
                 self.log(f"[Agentic Error] Failed to run ADK evaluation: {e}")
-                # Back off on any exception too
                 poll_interval = min(poll_interval * 2, max_interval)
 
 # ======================================================================
@@ -1981,11 +2141,31 @@ class LiveSessionManager:
         bot.start()
         return True
 
+    def pause_bot(self, bot_id: str) -> bool:
+        bot = self.get_bot(bot_id)
+        if bot:
+            bot.pause()
+            return True
+        return False
+
+    def resume_bot(self, bot_id: str) -> bool:
+        bot = self.get_bot(bot_id)
+        if bot:
+            bot.resume()
+            return True
+        return False
+
     def stop_bot(self, bot_id: str, close_pct: float = 1.0):
-        with self._lock:
-            bot = self.bots.pop(bot_id, None)
+        bot = self.get_bot(bot_id)
         if bot:
             bot.stop(close_pct=close_pct)
+
+    def delete_bot(self, bot_id: str) -> bool:
+        with self._lock:
+            bot = self.bots.pop(bot_id, None)
+        if bot and bot.is_active:
+            bot.stop(close_pct=1.0)
+        return True
 
     def get_bot(self, bot_id: str):
         with self._lock:

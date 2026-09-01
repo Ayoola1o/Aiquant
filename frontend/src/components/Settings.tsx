@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff } from 'lucide-react';
+import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff, RefreshCw } from 'lucide-react';
 
 interface SettingsProps {
   alpacaKeyId: string;
@@ -189,6 +189,53 @@ export default function Settings({
     return Number(localStorage.getItem('adk_latency_threshold') || '3000');
   });
 
+  // Telegram Command & Control Center State
+  const [telegramToken, setTelegramToken] = useState(() => {
+    return localStorage.getItem('neuroquant_telegram_token') || '';
+  });
+  const [telegramChatId, setTelegramChatId] = useState(() => {
+    return localStorage.getItem('neuroquant_telegram_chat_id') || '8961634909';
+  });
+  const [telegramBotUsername, setTelegramBotUsername] = useState(() => {
+    return localStorage.getItem('neuroquant_telegram_username') || 'Aiquantappbot';
+  });
+  const [telegramNotificationsEnabled, setTelegramNotificationsEnabled] = useState(() => {
+    return localStorage.getItem('neuroquant_telegram_notifications') !== 'false';
+  });
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTestTelegram = async () => {
+    if (!telegramToken || !telegramChatId) {
+      setTelegramTestResult({ success: false, message: 'Please enter both Telegram Bot Token and Chat ID.' });
+      return;
+    }
+    setTelegramTesting(true);
+    setTelegramTestResult(null);
+    try {
+      const res = await fetch('/api/telegram/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bot_token: telegramToken,
+          chat_id: telegramChatId,
+          bot_username: telegramBotUsername,
+          notifications_enabled: telegramNotificationsEnabled
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTelegramTestResult({ success: true, message: 'Connected! Test ping delivered to your Telegram.' });
+      } else {
+        setTelegramTestResult({ success: false, message: data.detail || 'Failed to send test message.' });
+      }
+    } catch (e) {
+      setTelegramTestResult({ success: false, message: 'Network error connecting to Telegram API.' });
+    } finally {
+      setTelegramTesting(false);
+    }
+  };
+
   const fetchXHandles = async () => {
     setLoadingHandles(true);
     try {
@@ -288,6 +335,38 @@ export default function Settings({
   };
 
   const alpacaConnected = alpacaKeyId.length > 4 && alpacaSecretKey.length > 4;
+  const [alpacaVerifying, setAlpacaVerifying] = useState(false);
+  const [alpacaVerifyResult, setAlpacaVerifyResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
+
+  const testAlpacaConnection = async () => {
+    if (!alpacaKeyId || !alpacaSecretKey) {
+      setAlpacaVerifyResult({ success: false, message: 'Please enter both Alpaca Key ID and Secret Key.' });
+      return;
+    }
+    setAlpacaVerifying(true);
+    setAlpacaVerifyResult(null);
+    try {
+      const res = await fetch('/api/alpaca/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alpaca_key_id: alpacaKeyId, alpaca_secret_key: alpacaSecretKey })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAlpacaVerifyResult({
+          success: true,
+          message: `Connected! Account #${data.account_number} • Equity: $${Number(data.portfolio_value).toLocaleString(undefined, { minimumFractionDigits: 2 })} • Buying Power: $${Number(data.buying_power).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          details: data
+        });
+      } else {
+        setAlpacaVerifyResult({ success: false, message: data.detail || 'Verification failed. Please check credentials.' });
+      }
+    } catch (e) {
+      setAlpacaVerifyResult({ success: false, message: 'Network error communicating with server.' });
+    } finally {
+      setAlpacaVerifying(false);
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,6 +376,27 @@ export default function Settings({
     localStorage.setItem('adk_supervision_enabled', adkSupervisionEnabled.toString());
     localStorage.setItem('adk_temperature', adkTemp.toString());
     localStorage.setItem('adk_latency_threshold', adkLatencyThreshold.toString());
+
+    // Save Telegram Settings locally and sync to backend
+    localStorage.setItem('neuroquant_telegram_token', telegramToken);
+    localStorage.setItem('neuroquant_telegram_chat_id', telegramChatId);
+    localStorage.setItem('neuroquant_telegram_username', telegramBotUsername);
+    localStorage.setItem('neuroquant_telegram_notifications', telegramNotificationsEnabled.toString());
+
+    try {
+      await fetch('/api/telegram/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bot_token: telegramToken,
+          chat_id: telegramChatId,
+          bot_username: telegramBotUsername,
+          notifications_enabled: telegramNotificationsEnabled
+        })
+      });
+    } catch (err) {
+      console.error("Failed to sync Telegram config to engine:", err);
+    }
 
     try {
       await fetch('/api/live/risk_profile', {
@@ -340,15 +440,41 @@ export default function Settings({
             External API Key Settings
           </h3>
 
-          {/* Live Alpaca connection status pill */}
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border ${
-            alpacaConnected
-              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
-              : 'bg-slate-900/50 border-slate-800 text-slate-500'
-          }`}>
-            {alpacaConnected
-              ? <><CheckCircle2 className="w-3.5 h-3.5" /> Alpaca Paper API — Credentials Saved &amp; Active</>  
-              : <><Circle className="w-3.5 h-3.5" /> Alpaca Paper API — Not Configured</>}
+          {/* Live Alpaca connection status pill & Test button */}
+          <div className="space-y-2">
+            <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border ${
+              alpacaConnected
+                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                : 'bg-slate-900/50 border-slate-800 text-slate-500'
+            }`}>
+              <div className="flex items-center gap-2">
+                {alpacaConnected
+                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Alpaca Paper API — Credentials Active</>  
+                  : <><Circle className="w-3.5 h-3.5" /> Alpaca Paper API — Not Configured</>}
+              </div>
+
+              {alpacaConnected && (
+                <button
+                  type="button"
+                  onClick={testAlpacaConnection}
+                  disabled={alpacaVerifying}
+                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${alpacaVerifying ? 'animate-spin' : ''}`} />
+                  <span>{alpacaVerifying ? 'Verifying...' : 'Test Connection'}</span>
+                </button>
+              )}
+            </div>
+
+            {alpacaVerifyResult && (
+              <div className={`p-2.5 rounded-xl text-xs font-medium border animate-fadeIn ${
+                alpacaVerifyResult.success 
+                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 font-mono text-[11px]' 
+                  : 'bg-rose-950/40 border-rose-500/30 text-rose-300 text-[11px]'
+              }`}>
+                {alpacaVerifyResult.message}
+              </div>
+            )}
           </div>
 
           <div>
@@ -372,7 +498,7 @@ export default function Settings({
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
               placeholder="••••••••••••••••••••••••••••••••"
             />
-            <p className="text-[10px] text-slate-600 mt-1">Stored in browser localStorage — never sent to external servers.</p>
+            <p className="text-[10px] text-slate-600 mt-1">Stored in browser localStorage — used for live account balance & order execution.</p>
           </div>
 
           <div>
@@ -506,6 +632,119 @@ export default function Settings({
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Telegram Command & Control Center Remote Terminal */}
+        <div className="glass-panel p-6 space-y-4 md:col-span-2 bg-gradient-to-br from-[#0c1222] to-[#080d19] border border-sky-500/20 rounded-2xl shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 p-0.5 flex items-center justify-center shadow-lg shadow-sky-500/20 shrink-0">
+                <div className="w-full h-full bg-[#080d19] rounded-[10px] flex items-center justify-center">
+                  <svg className="w-5 h-5 text-sky-400 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-extrabold text-white text-base tracking-tight flex items-center gap-2">
+                  Telegram Command &amp; Control Center
+                  <span className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-bold">
+                    24/7 REMOTE TERMINAL
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Control active bots, monitor P&amp;L, execute panic close, and receive 30-min AI intelligence briefs on Telegram.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={`https://t.me/${telegramBotUsername || 'Aitraderheartbeatbot'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <span>Open @{telegramBotUsername || 'Aitraderheartbeatbot'}</span>
+                <Globe className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Telegram Bot Token</label>
+              <input
+                type={showKeys ? "text" : "password"}
+                value={telegramToken}
+                onChange={(e) => setTelegramToken(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-sky-500/50 rounded-xl text-xs font-mono outline-none text-white"
+                placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Obtained from @BotFather on Telegram.</p>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Authorized Chat ID / User ID</label>
+              <input
+                type="text"
+                value={telegramChatId}
+                onChange={(e) => setTelegramChatId(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-sky-500/50 rounded-xl text-xs font-mono outline-none text-white"
+                placeholder="e.g. 123456789 (or send /auth to bot)"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Restricts trading commands strictly to your Telegram account.</p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Telegram Bot Username</label>
+              <input
+                type="text"
+                value={telegramBotUsername}
+                onChange={(e) => setTelegramBotUsername(e.target.value.replace('@', ''))}
+                className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-sky-500/50 rounded-xl text-xs font-mono outline-none text-white"
+                placeholder="Aitraderheartbeatbot"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-800/80">
+              <div>
+                <span className="text-xs font-semibold text-slate-300 block">Automated Telemetry &amp; 30-min AI Briefs</span>
+                <span className="text-[10px] text-slate-500 font-light block">Push trade execution alerts &amp; AI briefings to Telegram</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={telegramNotificationsEnabled}
+                onChange={(e) => setTelegramNotificationsEnabled(e.target.checked)}
+                className="rounded border-slate-800 text-sky-500 bg-slate-950/60 focus:ring-sky-500"
+              />
+            </div>
+          </div>
+
+          {/* Test connection row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
+            <button
+              type="button"
+              onClick={handleTestTelegram}
+              disabled={telegramTesting}
+              className="px-4 py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${telegramTesting ? 'animate-spin' : ''}`} />
+              <span>{telegramTesting ? 'Sending Test Ping...' : 'Test Telegram Connection'}</span>
+            </button>
+
+            {telegramTestResult && (
+              <div className={`px-3 py-1.5 rounded-xl text-xs font-medium border ${
+                telegramTestResult.success 
+                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 font-mono text-[11px]' 
+                  : 'bg-rose-950/40 border-rose-500/30 text-rose-300 text-[11px]'
+              }`}>
+                {telegramTestResult.message}
+              </div>
+            )}
           </div>
         </div>
 

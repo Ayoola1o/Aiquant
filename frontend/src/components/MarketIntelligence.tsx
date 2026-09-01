@@ -15,11 +15,11 @@ export default function MarketIntelligence() {
     setLoading(true);
     try {
       const [fgRes, fundRes, oiRes, vixRes, calRes] = await Promise.all([
-        fetch('http://localhost:8000/api/market/feargreed').then(r => r.json()),
-        fetch(`http://localhost:8000/api/market/funding?symbol=${selectedSymbol}`).then(r => r.json()),
-        fetch(`http://localhost:8000/api/market/openinterest?symbol=${selectedSymbol}`).then(r => r.json()),
-        fetch('http://localhost:8000/api/market/macro?symbol=^VIX&period=1mo').then(r => r.json()),
-        fetch('http://localhost:8000/api/market/calendar').then(r => r.json())
+        fetch('/api/market/feargreed').then(r => r.json()),
+        fetch(`/api/market/funding?symbol=${selectedSymbol}`).then(r => r.json()),
+        fetch(`/api/market/openinterest?symbol=${selectedSymbol}`).then(r => r.json()),
+        fetch('/api/market/macro?symbol=^VIX&period=1mo').then(r => r.json()),
+        fetch('/api/market/calendar').then(r => r.json())
       ]);
 
       if (fgRes.status === 'success') setFearGreed(fgRes.data || []);

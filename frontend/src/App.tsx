@@ -26,24 +26,32 @@ import DataManagement from './components/DataManagement';
 
 import { 
   LayoutDashboard, 
-  BrainCircuit, 
-  Terminal, 
-  Activity, 
+  SlidersHorizontal,
+  Sparkles,
+  Compass,
+  Layers,
+  ShieldAlert,
+  Bot,
+  FlaskConical,
   TrendingUp, 
+  Radio,
+  Clock,
   Briefcase, 
+  Database,
+  Newspaper,
+  BrainCircuit,
   Settings as SettingsIcon,
-  LogOut,
   User,
   ShieldCheck,
-  Layers,
-  Menu,
-  X,
-  Newspaper,
-  Archive,
+  LogOut,
   Search,
-  ShieldAlert,
-  Cpu,
-  Database
+  Bell,
+  Moon,
+  ChevronDown,
+  ArrowRight,
+  Maximize2,
+  X,
+  Menu
 } from 'lucide-react';
 
 
@@ -448,291 +456,118 @@ function QuantApp() {
   return (
     <div className="flex min-h-screen text-slate-200">
       {/* Sidebar Navigation */}
-      <aside className={`bg-slate-950/70 border-r border-white/5 flex flex-col justify-between shrink-0 backdrop-blur-md transition-all duration-300 ease-in-out sticky top-0 h-screen overflow-y-auto ${
-        sidebarOpen ? 'w-64 p-6 opacity-100' : 'w-0 p-0 opacity-0 border-r-0 overflow-hidden'
+      <aside className={`bg-[#080b14] border-r border-white/5 flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out sticky top-0 h-screen overflow-y-auto ${
+        sidebarOpen ? 'w-64 p-5 opacity-100' : 'w-0 p-0 opacity-0 border-r-0 overflow-hidden'
       }`}>
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Logo & Close Button */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 px-1">
             <div 
               className="flex items-center gap-3 min-w-0 cursor-pointer" 
               onClick={() => navigate('/dashboard')}
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center font-bold text-base text-black shadow-md shadow-indigo-500/10 shrink-0">
-                AQ
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+                <div className="w-full h-full bg-[#080b14] rounded-[10px] flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-indigo-400">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#C084FC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
               </div>
-              <span className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent truncate">
-                AIQUANT
-              </span>
+              <div className="min-w-0">
+                <span className="font-extrabold text-base tracking-wide text-white block truncate leading-tight">
+                  AiQuant
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block truncate">
+                  AI Trading System
+                </span>
+              </div>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-colors shrink-0"
+              className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-colors shrink-0"
               title="Collapse Menu"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="space-y-1.5">
-            {/* Dashboard */}
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/dashboard' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Market Dashboard
-            </button>
-
-            {/* AI Predictor */}
-            <button
-              onClick={() => navigate('/predictor')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/predictor' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <BrainCircuit className="w-4 h-4" />
-              AI Predictor
-            </button>
-
-            {/* AI Asset Screener */}
-            <button
-              onClick={() => navigate('/screener')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/screener' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              AI Asset Screener
-            </button>
- 
-            {/* Market Intelligence */}
-            <button
-              onClick={() => navigate('/market')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/market' 
-                  ? 'bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Newspaper className="w-4 h-4" />
-              Market Intelligence
-            </button>
-
-            {/* Global Market Scanner */}
-            <button
-              onClick={() => navigate('/scanner')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/scanner' 
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              Global Market Scanner
-            </button>
-
-            {/* Feature Engineering Lab */}
-            <button
-              onClick={() => navigate('/features')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/features' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              Feature Engineering
-            </button>
-
-            {/* Risk Command Center */}
-            <button
-              onClick={() => navigate('/risk')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/risk' 
-                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4" />
-              Risk Command Center
-            </button>
-
-            {/* AI Command Center */}
-            <button
-              onClick={() => navigate('/commandcenter')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/commandcenter' 
-                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Cpu className="w-4 h-4" />
-              AI Command Center
-            </button>
-
-            {/* Data Lake */}
-            <button
-              onClick={() => navigate('/datalake')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/datalake' 
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Database className="w-4 h-4" />
-              Data Lake & Hub
-            </button>
-
-            {/* X Social News */}
-            <button
-              onClick={() => navigate('/news')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/news' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              X Social News
-            </button>
-
-
-
-            {/* AI Strategy Lab */}
-            <button
-              onClick={() => navigate('/strategylab')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/strategylab' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Terminal className="w-4 h-4" />
-              AI Strategy Lab
-            </button>
-
-            {/* Backtester */}
-            <button
-              onClick={() => navigate('/backtester')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/backtester' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              Strategy Backtester
-            </button>
-
-            {/* Live Terminal */}
-            <button
-              onClick={() => navigate('/live')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/live' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              Live Terminal
-            </button>
-
-            {/* Trade History */}
-            <button
-              onClick={() => navigate('/history')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/history' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Archive className="w-4 h-4" />
-              Trade History
-            </button>
-
-            {/* Portfolio */}
-            <button
-              onClick={() => navigate('/portfolio')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/portfolio' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              Portfolio Manager
-            </button>
-
-            {/* Settings */}
-            <button
-              onClick={() => navigate('/settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/settings' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <SettingsIcon className="w-4 h-4" />
-              Platform Settings
-            </button>
-
-            {/* User Profile */}
-            <button
-              onClick={() => navigate('/profile')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                location.pathname === '/profile' 
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              User Profile
-            </button>
+          {/* Navigation Items (Exact 17 items from mockup) */}
+          <nav className="space-y-1">
+            {[
+              { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+              { name: 'Screener', path: '/screener', icon: SlidersHorizontal },
+              { name: 'Market Intelligence', path: '/market', icon: Sparkles },
+              { name: 'Global Scanner', path: '/scanner', icon: Compass },
+              { name: 'Feature Engineering', path: '/features', icon: Layers },
+              { name: 'Risk Command Center', path: '/risk', icon: ShieldAlert },
+              { name: 'AI Command Center', path: '/commandcenter', icon: Bot },
+              { name: 'Strategy Lab', path: '/strategylab', icon: FlaskConical },
+              { name: 'Backtester', path: '/backtester', icon: TrendingUp },
+              { name: 'Live Session', path: '/live', icon: Radio },
+              { name: 'History', path: '/history', icon: Clock },
+              { name: 'Portfolio', path: '/portfolio', icon: Briefcase },
+              { name: 'Data Lake', path: '/datalake', icon: Database },
+              { name: 'News & Sentiment', path: '/news', icon: Newspaper },
+              { name: 'AI Predictor', path: '/predictor', icon: BrainCircuit },
+              { name: 'Settings', path: '/settings', icon: SettingsIcon },
+              { name: 'Profile', path: '/profile', icon: User },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => navigate(item.path)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    isActive 
+                      ? 'bg-gradient-to-r from-[#201c4e] to-[#151433] text-white border border-[#4f46e5]/40 shadow-[0_0_15px_rgba(99,102,241,0.25)] font-semibold' 
+                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent font-medium'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <span className="truncate">{item.name}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
-        {/* Profile Card & Logout */}
-        <div className="space-y-4">
-          <div 
-            onClick={() => navigate('/profile')}
-            className="p-3 bg-slate-900/40 border border-white/5 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
-          >
-            <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">
-              <User className="w-4 h-4" />
+        {/* Sidebar System Status & Version */}
+        <div className="space-y-3 pt-4 border-t border-white/5">
+          <div className="p-3 bg-[#0c101d] border border-white/5 rounded-xl space-y-1.5 shadow-inner">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold uppercase">
+              <span>SYSTEM STATUS</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981] animate-pulse" />
             </div>
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-xs text-white block truncate">{session}</span>
-              <span className="text-[9px] text-slate-500 font-semibold uppercase flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-indigo-400" />
-                Verified Quant
-              </span>
+            <div className="text-xs font-bold text-emerald-400">All Systems Operational</div>
+            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-white/5">
+              <span>Heartbeat</span>
+              <span className="font-mono text-slate-400">2.4s ago</span>
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-            Exit Terminal
-          </button>
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1">
+            <span>v2.4.0</span>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleLogout}
+                className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+                title="Logout"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+              <Maximize2 className="w-3.5 h-3.5 text-slate-500 hover:text-slate-300 cursor-pointer" />
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#0a0c16] to-[#05070c]">
         {/* Top Header */}
-        <header className="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-slate-950/20 backdrop-blur-md gap-4">
+        <header className="px-8 py-4 border-b border-white/5 flex justify-between items-center bg-[#0d111d]/70 backdrop-blur-md gap-4 sticky top-0 z-30">
           <div className="flex items-center gap-4 min-w-0">
             {!sidebarOpen && (
               <button
@@ -743,40 +578,81 @@ function QuantApp() {
                 <Menu className="w-5 h-5 animate-pulse" />
               </button>
             )}
-            <h1 className="font-extrabold text-lg tracking-wide uppercase text-white truncate">
-              {location.pathname === '/dashboard' && 'Market Dashboard'}
-              {location.pathname === '/screener' && 'Quant Signal Matrix / AI Asset Screener'}
-              {location.pathname === '/market' && 'Market Intelligence & Economic Calendar'}
-              {location.pathname === '/scanner' && 'Global Market Scanner'}
-              {location.pathname === '/features' && 'Feature Engineering Laboratory'}
-              {location.pathname === '/risk' && 'Risk Command Center & Stress Testing'}
-              {location.pathname === '/commandcenter' && 'AI Command Center & Multi-Agent Orchestrator'}
-              {location.pathname === '/datalake' && 'Data Lake & Management Hub'}
-              {location.pathname === '/news' && 'X Social News Feed'}
-              {location.pathname === '/predictor' && 'AI Price Forecasting'}
-              {location.pathname === '/strategylab' && 'AI Strategy Playground'}
-              {location.pathname === '/backtester' && 'Strategy Backtesting'}
-              {location.pathname === '/live' && 'Live Simulated Session'}
-              {location.pathname === '/history' && 'Trade History Ledger'}
-              {location.pathname === '/portfolio' && 'Portfolio & Risk Diagnostics'}
-              {location.pathname === '/settings' && 'Platform Configuration'}
-              {location.pathname === '/profile' && 'Alexander Ramirez (Alex R.) - User Profile Terminal'}
-            </h1>
+            
+            {/* Search Input / Quick Launcher */}
+            <div 
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs text-slate-400 hover:text-white hover:border-white/10 transition-all cursor-pointer w-64 md:w-80 shadow-inner"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400" />
+              <span className="flex-1 text-slate-400 text-xs truncate">Search anything...</span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-white/5">⌘ K</span>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-gray-800 text-xs text-gray-400 hover:text-white transition-all"
+          <div className="flex items-center gap-3">
+            {/* Telegram Command & Control Center Link Button */}
+            <a
+              href="https://t.me/Aiquantappbot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-indigo-500/15 border border-sky-500/30 text-sky-400 hover:text-white hover:border-sky-400/60 transition-all text-xs font-semibold shadow-sm group"
+              title="Open 24/7 Telegram Command & Control Terminal (@Aiquantappbot)"
             >
-              <Search className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Quick Launcher</span>
-              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-gray-400">Ctrl+K</span>
+              <svg className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform fill-current" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
+              </svg>
+              <span className="hidden md:inline font-bold">Telegram Terminal</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981] animate-pulse" />
+            </a>
+
+            {/* Market Status UTC Pill */}
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">MARKET STATUS</span>
+              <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981] animate-pulse" />
+                OPEN
+              </span>
+              <span className="text-slate-400 font-mono text-xs">12:45:30 UTC</span>
+              <ArrowRight className="w-3 h-3 text-slate-500" />
+            </div>
+
+            {/* Notification Bell */}
+            <button 
+              onClick={() => navigate('/market')}
+              className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors border border-white/5 bg-slate-900/60"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-500 text-[10px] font-bold text-white flex items-center justify-center border-2 border-[#0a0c16]">
+                7
+              </span>
             </button>
 
-            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#00FF9D] animate-pulse" />
-              AI OS ONLINE: STREAM.BINANCE.COM
+            {/* Theme Toggle (Moon) */}
+            <button 
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors border border-white/5 bg-slate-900/60"
+              title="Toggle Theme"
+            >
+              <Moon className="w-4 h-4" />
+            </button>
+
+            {/* User Profile Pill */}
+            <div 
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2.5 pl-2 pr-3 py-1 rounded-xl bg-slate-900/80 border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-700 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                OP
+              </div>
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-bold text-white leading-tight">Operator</div>
+                <div className="text-[9px] font-semibold text-indigo-400 flex items-center gap-1">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  Pro Trader
+                </div>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden sm:block" />
             </div>
           </div>
         </header>

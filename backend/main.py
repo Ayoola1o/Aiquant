@@ -3,6 +3,7 @@ import os
 import json
 import logging
 import traceback
+import requests
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from collections import defaultdict
@@ -49,6 +50,12 @@ def startup_event():
         live_session.restore_previous_active_bots()
     except Exception as e:
         print(f"[Startup Error] Failed to restore active bots: {e}", flush=True)
+
+    try:
+        from telegram_bot import telegram_manager
+        telegram_manager.start()
+    except Exception as e:
+        print(f"[Telegram Startup Warning] Could not initialize Telegram: {e}", flush=True)
 
 # --- Pydantic Schemes for API Validation ---
 
@@ -579,6 +586,11 @@ def stop_live_session():
 
 @app.post("/api/live/bots/spawn")
 def spawn_bot(req: SpawnBotRequest):
+    gemini_k = req.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+    alpaca_k = req.alpaca_key_id or os.environ.get("ALPACA_KEY_ID", "")
+    alpaca_s = req.alpaca_secret_key or os.environ.get("ALPACA_SECRET_KEY", "")
+    hl_k = req.hyperliquid_private_key or os.environ.get("HYPERLIQUID_PRIVATE_KEY", "")
+
     success = live_session.start_bot(
         req.bot_id,
         req.name,
@@ -587,13 +599,13 @@ def spawn_bot(req: SpawnBotRequest):
         req.timeframe,
         req.starting_cash,
         req.feed_source,
-        req.alpaca_key_id,
-        req.alpaca_secret_key,
-        hyperliquid_private_key=req.hyperliquid_private_key,
+        alpaca_k,
+        alpaca_s,
+        hyperliquid_private_key=hl_k,
         risk_profile=req.risk_profile,
         agentic_mode=req.agentic_mode,
         agent_attitude=req.agent_attitude,
-        gemini_api_key=req.gemini_api_key,
+        gemini_api_key=gemini_k,
         tech_agent_key=req.tech_agent_key,
         sentiment_agent_key=req.sentiment_agent_key,
         tradingview_agent_key=req.tradingview_agent_key,
@@ -610,9 +622,28 @@ def update_live_risk_profile(req: RiskProfileModel):
     live_session.update_global_risk_profile(req.dict())
     return {"status": "success", "risk_profile": live_session.global_risk_profile}
 
+@app.post("/api/live/bots/pause/{bot_id}")
+def pause_bot_endpoint(bot_id: str):
+    success = live_session.pause_bot(bot_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Bot not found.")
+    return {"status": "success", "bots": live_session.get_all_states()}
+
+@app.post("/api/live/bots/resume/{bot_id}")
+def resume_bot_endpoint(bot_id: str):
+    success = live_session.resume_bot(bot_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Bot not found.")
+    return {"status": "success", "bots": live_session.get_all_states()}
+
 @app.post("/api/live/bots/stop/{bot_id}")
 def stop_bot(bot_id: str, close_pct: float = 1.0):
     live_session.stop_bot(bot_id, close_pct=close_pct)
+    return {"status": "success", "bots": live_session.get_all_states()}
+
+@app.delete("/api/live/bots/{bot_id}")
+def delete_bot_endpoint(bot_id: str):
+    live_session.delete_bot(bot_id)
     return {"status": "success", "bots": live_session.get_all_states()}
 
 @app.get("/api/live/bots")
@@ -652,6 +683,199 @@ def sync_live_keys(req: SyncKeysRequest):
     new_keys = {k: v for k, v in new_keys.items() if v}
     live_session.update_keys_for_all_bots(new_keys)
     return {"status": "success", "message": "Keys hot-swapped for all Agentic bots."}
+
+class AlpacaAccountRequest(BaseModel):
+    alpaca_key_id: Optional[str] = None
+    alpaca_secret_key: Optional[str] = None
+
+@app.post("/api/alpaca/verify")
+def verify_alpaca_credentials(req: AlpacaAccountRequest):
+    key_id = req.alpaca_key_id or os.environ.get("ALPACA_KEY_ID", "")
+    secret_key = req.alpaca_secret_key or os.environ.get("ALPACA_SECRET_KEY", "")
+    if not key_id or not secret_key:
+        raise HTTPException(status_code=400, detail="Missing Alpaca Key ID or Secret Key.")
+    
+    headers = {
+        "APCA-API-KEY-ID": key_id,
+        "APCA-API-SECRET-KEY": secret_key,
+    }
+    try:
+        r = requests.get("https://paper-api.alpaca.markets/v2/account", headers=headers, timeout=12)
+        if r.status_code == 200:
+            data = r.json()
+            return {
+                "status": "connected",
+                "account_number": data.get("account_number"),
+                "status_code": data.get("status"),
+                "currency": data.get("currency", "USD"),
+                "cash": float(data.get("cash", 0.0)),
+                "portfolio_value": float(data.get("portfolio_value", 0.0)),
+                "buying_power": float(data.get("buying_power", 0.0)),
+                "pattern_day_trader": data.get("pattern_day_trader", False)
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"Alpaca verification failed ({r.status_code}): {r.text}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Alpaca connection error: {str(e)}")
+
+@app.post("/api/alpaca/account")
+def get_alpaca_account_and_positions(req: AlpacaAccountRequest):
+    key_id = req.alpaca_key_id or os.environ.get("ALPACA_KEY_ID", "")
+    secret_key = req.alpaca_secret_key or os.environ.get("ALPACA_SECRET_KEY", "")
+    if not key_id or not secret_key:
+        raise HTTPException(status_code=400, detail="Missing Alpaca credentials.")
+    
+    headers = {
+        "APCA-API-KEY-ID": key_id,
+        "APCA-API-SECRET-KEY": secret_key,
+    }
+    try:
+        acc_r = requests.get("https://paper-api.alpaca.markets/v2/account", headers=headers, timeout=12)
+        pos_r = requests.get("https://paper-api.alpaca.markets/v2/positions", headers=headers, timeout=12)
+        ord_r = requests.get("https://paper-api.alpaca.markets/v2/orders?limit=30&status=all", headers=headers, timeout=12)
+        
+        if acc_r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Account query failed ({acc_r.status_code}): {acc_r.text}")
+            
+        account_data = acc_r.json()
+        positions_data = pos_r.json() if pos_r.status_code == 200 else []
+        orders_data = ord_r.json() if ord_r.status_code == 200 else []
+        
+        equity_val = float(account_data.get("portfolio_value", account_data.get("equity", 0.0)))
+        last_equity_val = float(account_data.get("last_equity", equity_val))
+        
+        return {
+            "status": "success",
+            "account": {
+                "id": account_data.get("id"),
+                "account_number": account_data.get("account_number", ""),
+                "status": account_data.get("status", "ACTIVE"),
+                "currency": account_data.get("currency", "USD"),
+                "cash": float(account_data.get("cash", 0.0)),
+                "buying_power": float(account_data.get("buying_power", 0.0)),
+                "portfolio_value": equity_val,
+                "equity": equity_val,
+                "last_equity": last_equity_val,
+                "day_trade_count": int(account_data.get("day_trade_count", 0)),
+                "pattern_day_trader": account_data.get("pattern_day_trader", False),
+                "trading_blocked": account_data.get("trading_blocked", False),
+                "shorting_enabled": account_data.get("shorting_enabled", False),
+            },
+            "positions": positions_data,
+            "orders": orders_data
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Alpaca API error: {str(e)}")
+
+@app.post("/api/alpaca/liquidate/{symbol}")
+def liquidate_alpaca_position(symbol: str, req: AlpacaAccountRequest):
+    key_id = req.alpaca_key_id or os.environ.get("ALPACA_KEY_ID", "")
+    secret_key = req.alpaca_secret_key or os.environ.get("ALPACA_SECRET_KEY", "")
+    if not key_id or not secret_key:
+        raise HTTPException(status_code=400, detail="Missing Alpaca credentials.")
+    
+    headers = {
+        "APCA-API-KEY-ID": key_id,
+        "APCA-API-SECRET-KEY": secret_key,
+    }
+    try:
+        alpaca_sym = symbol.replace("USDT", "USD").upper()
+        r = requests.delete(f"https://paper-api.alpaca.markets/v2/positions/{alpaca_sym}", headers=headers, timeout=12)
+        if r.status_code in (200, 204):
+            return {"status": "success", "message": f"Position in {alpaca_sym} liquidated."}
+        else:
+            raise HTTPException(status_code=400, detail=f"Liquidation failed: {r.text}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ── Telegram Command & Control Center API ──────────────────────────────
+
+class TelegramConfigRequest(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    bot_username: Optional[str] = None
+    notifications_enabled: Optional[bool] = True
+
+@app.get("/api/telegram/status")
+def get_telegram_status():
+    from telegram_bot import telegram_manager
+    return {
+        "status": "success",
+        "running": telegram_manager.is_running,
+        "bot_username": telegram_manager.bot_username,
+        "chat_id": telegram_manager.authorized_chat_id,
+        "has_token": bool(telegram_manager.bot_token),
+        "notifications_enabled": telegram_manager.notifications_enabled,
+        "link": f"https://t.me/{telegram_manager.bot_username}"
+    }
+
+@app.post("/api/telegram/config")
+def update_telegram_config(req: TelegramConfigRequest):
+    from telegram_bot import telegram_manager
+    telegram_manager.update_config(
+        token=req.bot_token or "",
+        chat_id=req.chat_id or "",
+        bot_username=req.bot_username or "",
+        notifications=req.notifications_enabled if req.notifications_enabled is not None else True
+    )
+    return {
+        "status": "success",
+        "running": telegram_manager.is_running,
+        "bot_username": telegram_manager.bot_username,
+        "chat_id": telegram_manager.authorized_chat_id
+    }
+
+@app.post("/api/telegram/test")
+def test_telegram_connection(req: TelegramConfigRequest):
+    from telegram_bot import telegram_manager
+    token = req.bot_token or telegram_manager.bot_token
+    chat_id = req.chat_id or telegram_manager.authorized_chat_id
+
+    if not token or not chat_id:
+        raise HTTPException(status_code=400, detail="Telegram Bot Token and Chat ID are required to send a test message.")
+
+    # Hot update manager credentials
+    telegram_manager.update_config(
+        token=token,
+        chat_id=chat_id,
+        bot_username=req.bot_username or "",
+        notifications=req.notifications_enabled if req.notifications_enabled is not None else True
+    )
+
+    markup = {
+        "inline_keyboard": [
+            [{"text": "📊 Live Status", "callback_data": "cmd_status"}, {"text": "🤖 View Bots", "callback_data": "cmd_bots"}]
+        ]
+    }
+    msg_text = (
+        "✅ <b>Telegram Command & Control Center Connected!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Your AI Quant Trading platform is securely linked.\n"
+        "Type <code>/help</code> or <code>/status</code> to start commanding your trading fleet remotely."
+    )
+
+    try:
+        url = f"{telegram_manager.api_base}/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": msg_text,
+            "parse_mode": "HTML",
+            "reply_markup": markup
+        }
+        r = telegram_manager.session.post(url, json=payload, timeout=(10, 25))
+        if r.status_code == 200:
+            return {"status": "success", "message": "Test ping sent to Telegram successfully!"}
+        else:
+            raise HTTPException(status_code=400, detail=f"Telegram API Error ({r.status_code}): {r.text}")
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=408,
+            detail="Connection to api.telegram.org timed out after 25s. Check your internet connection, firewall, or VPN/proxy settings."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
 
 @app.get("/api/history")
 def get_history():
@@ -794,101 +1018,6 @@ class AlpacaCredentials(BaseModel):
     alpaca_key_id: str
     alpaca_secret_key: str
 
-
-@app.post("/api/alpaca/account")
-def get_alpaca_account(creds: AlpacaCredentials):
-    """
-    Fetches live Alpaca Paper Trading account, positions, and recent orders.
-    Requires valid Alpaca Paper API credentials.
-    """
-    import requests as req
-
-    headers = {
-        "APCA-API-KEY-ID": creds.alpaca_key_id,
-        "APCA-API-SECRET-KEY": creds.alpaca_secret_key,
-    }
-    base = "https://paper-api.alpaca.markets/v2"
-
-    try:
-        # Account
-        account_res = req.get(f"{base}/account", headers=headers, timeout=6)
-        if account_res.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Alpaca account error: {account_res.text}")
-        account = account_res.json()
-
-        # Positions
-        positions_res = req.get(f"{base}/positions", headers=headers, timeout=6)
-        positions = positions_res.json() if positions_res.status_code == 200 else []
-
-        # Recent orders (last 20)
-        orders_res = req.get(f"{base}/orders?limit=20&status=all", headers=headers, timeout=6)
-        orders = orders_res.json() if orders_res.status_code == 200 else []
-
-        res_payload = {
-            "account": {
-                "id": account.get("id"),
-                "status": account.get("status"),
-                "currency": account.get("currency", "USD"),
-                "cash": float(account.get("cash", 0)),
-                "buying_power": float(account.get("buying_power", 0)),
-                "portfolio_value": float(account.get("portfolio_value", 0)),
-                "equity": float(account.get("equity", 0)),
-                "last_equity": float(account.get("last_equity", 0)),
-                "day_trade_count": int(account.get("day_trade_count", 0)),
-                "pattern_day_trader": account.get("pattern_day_trader", False),
-                "trading_blocked": account.get("trading_blocked", False),
-                "shorting_enabled": account.get("shorting_enabled", False),
-            },
-            "positions": [
-                {
-                    "symbol": p.get("symbol"),
-                    "qty": float(p.get("qty", 0)),
-                    "side": p.get("side"),
-                    "market_value": float(p.get("market_value", 0)),
-                    "cost_basis": float(p.get("cost_basis", 0)),
-                    "unrealized_pl": float(p.get("unrealized_pl", 0)),
-                    "unrealized_plpc": float(p.get("unrealized_plpc", 0)),
-                    "avg_entry_price": float(p.get("avg_entry_price", 0)),
-                    "current_price": float(p.get("current_price", 0)),
-                    "change_today": float(p.get("change_today", 0)),
-                }
-                for p in (positions if isinstance(positions, list) else [])
-            ],
-            "orders": [
-                {
-                    "id": o.get("id"),
-                    "symbol": o.get("symbol"),
-                    "side": o.get("side"),
-                    "type": o.get("type"),
-                    "qty": o.get("qty"),
-                    "filled_qty": o.get("filled_qty"),
-                    "filled_avg_price": o.get("filled_avg_price"),
-                    "status": o.get("status"),
-                    "created_at": o.get("created_at"),
-                    "submitted_at": o.get("submitted_at"),
-                }
-                for o in (orders if isinstance(orders, list) else [])
-            ],
-        }
-
-        # Save updates to local SQLite database
-        try:
-            import database as db
-            db.save_account_snapshot(
-                equity=res_payload["account"]["equity"],
-                cash=res_payload["account"]["cash"],
-                buying_power=res_payload["account"]["buying_power"]
-            )
-            db.update_positions(res_payload["positions"])
-            db.update_orders(res_payload["orders"])
-        except Exception as db_err:
-            print(f"Failed to save account info to local database: {db_err}")
-
-        return res_payload
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to connect to Alpaca: {str(e)}")
 
 @app.post("/api/alpaca/liquidate")
 def liquidate_alpaca_positions(creds: AlpacaCredentials):
@@ -2587,6 +2716,75 @@ def get_alpaca_performance(req: AlpacaPerformanceRequest):
         raise HTTPException(status_code=503, detail=str(e))
 
 # --- WebSocket Hub ---
+
+# ── Real-Time Risk Telemetry Endpoints ────────────────────────────────────
+from trading_engine import RiskManager
+global_risk_manager = RiskManager()
+
+@app.get("/api/risk/status")
+def get_risk_status():
+    """
+    Returns real-time risk telemetry snapshot (circuit breaker state, drawdown, heartbeat health).
+    """
+    try:
+        telemetry = global_risk_manager.get_telemetry_snapshot()
+        return {"status": "success", "data": telemetry}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/risk/profile")
+def update_risk_profile(profile: dict):
+    """
+    Updates global risk management parameters.
+    """
+    try:
+        global_risk_manager.update_profile(profile)
+        return {"status": "success", "message": "Risk profile updated.", "profile": global_risk_manager.profile}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/agent/consensus")
+async def get_agent_consensus(req: dict):
+    """
+    Triggers Google ADK multi-agent consensus workflow (Analyst signals, Debate thesis, Risk Supervisor verdict).
+    """
+    try:
+        from adk_agent import run_multi_agent_consensus
+        symbol = req.get("symbol", "BTCUSDT")
+        timeframe = req.get("timeframe", "1h")
+        user_query = req.get("user_query", "")
+        res = await run_multi_agent_consensus(symbol=symbol, timeframe=timeframe, user_query=user_query)
+        return {"status": "success", "data": res}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/market/router")
+def get_market_route(symbol: str = "BTCUSDT"):
+    """
+    Returns optimal multi-exchange order routing recommendations and net fill price comparison.
+    """
+    try:
+        import market_data as md
+        route_data = md.get_best_execution_route(symbol=symbol)
+        return {"status": "success", "data": route_data}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/test/run")
+def run_integration_tests():
+    """
+    Executes automated backend integration test suite and returns result summary.
+    """
+    try:
+        import test_suite
+        res = test_suite.run_all_tests()
+        return {"status": "success", "data": res}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
 @app.websocket("/ws/live-trading")
 async def websocket_endpoint(websocket: WebSocket):

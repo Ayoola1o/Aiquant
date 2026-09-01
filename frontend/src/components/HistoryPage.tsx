@@ -55,7 +55,7 @@ export default function HistoryPage() {
 
   const fetchExperiments = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/experiments');
+      const res = await fetch('/api/experiments');
       const data = await res.json();
       if (data.status === 'success') {
         setExperiments(data.experiments || []);
@@ -72,7 +72,7 @@ export default function HistoryPage() {
 
   const handleSaveNotes = async (expId: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/experiments/${expId}/notes`, {
+      const res = await fetch(`/api/experiments/${expId}/notes`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ai_notes: notesText })

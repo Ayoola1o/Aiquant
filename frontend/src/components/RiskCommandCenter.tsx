@@ -1,10 +1,57 @@
-import { useState } from 'react';
-import { ShieldAlert, AlertTriangle, Zap, Flame } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShieldAlert, AlertTriangle, Zap, Flame, Activity, CheckCircle2, XCircle } from 'lucide-react';
 
+interface TelemetryData {
+  paused: boolean;
+  portfolio_value: number;
+  daily_starting_equity: number;
+  current_drawdown_pct: number;
+  max_drawdown_limit_pct: number;
+  active_positions_count: number;
+  max_simultaneous_trades: number;
+  heartbeat_ok: boolean;
+  timestamp: string;
+}
 
 export default function RiskCommandCenter() {
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
   const [stressScenario, setStressScenario] = useState<'2008_crash' | '2020_flash' | 'crypto_cascade'>('2020_flash');
+  const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
+
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const res = await fetch('/api/risk/status');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'success' && json.data) {
+            setTelemetry(json.data);
+            if (json.data.paused) setKillSwitchTriggered(true);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully if backend is offline
+      }
+    };
+
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleToggleKillSwitch = async () => {
+    const nextState = !killSwitchTriggered;
+    setKillSwitchTriggered(nextState);
+    try {
+      await fetch('/api/risk/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: nextState })
+      });
+    } catch (e) {
+      // Ignore network errors in demo mode
+    }
+  };
 
   const stressResults = {
     '2008_crash': { pnlImpact: '-28.4%', maxDrawdown: '34.2%', var95: '$14,200', var99: '$22,500' },
@@ -23,14 +70,19 @@ export default function RiskCommandCenter() {
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-wide">Risk Command Center & Stress Lab</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white tracking-wide">Risk Command Center & Telemetry</h1>
+              <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <Activity className="w-3 h-3 animate-pulse" /> LIVE TELEMETRY STREAM
+              </span>
+            </div>
             <p className="text-xs text-gray-400">Institutional VaR, CVaR, correlation monitoring & emergency capital defense controls</p>
           </div>
         </div>
 
         {/* Emergency Kill Switch Button */}
         <button
-          onClick={() => setKillSwitchTriggered(!killSwitchTriggered)}
+          onClick={handleToggleKillSwitch}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-xl ${
             killSwitchTriggered
               ? 'bg-emerald-600 text-white animate-pulse'
@@ -38,28 +90,40 @@ export default function RiskCommandCenter() {
           }`}
         >
           <Flame className="w-4 h-4" />
-          <span>{killSwitchTriggered ? 'KILL SWITCH ACTIVE (Positions Flattened)' : 'TRIGGER EMERGENCY KILL SWITCH'}</span>
+          <span>{killSwitchTriggered ? 'KILL SWITCH ACTIVE (System Paused)' : 'TRIGGER EMERGENCY KILL SWITCH'}</span>
         </button>
       </div>
 
       {/* Top Risk Metrics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-panel p-4 bg-slate-950/80 border border-gray-800 rounded-xl">
-          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Value at Risk (VaR 95%)</div>
-          <div className="text-xl font-bold text-rose-400 font-mono mt-1">$4,850.00</div>
-          <div className="text-[10px] text-gray-500 mt-1">Daily 95% Confidence Limit</div>
+          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Current Drawdown</div>
+          <div className="text-xl font-bold text-rose-400 font-mono mt-1">
+            {telemetry ? `${telemetry.current_drawdown_pct}%` : '0.0%'}
+          </div>
+          <div className="text-[10px] text-gray-500 mt-1">
+            Limit: {telemetry ? `${telemetry.max_drawdown_limit_pct}%` : '3.0%'} Circuit Breaker
+          </div>
         </div>
 
         <div className="glass-panel p-4 bg-slate-950/80 border border-gray-800 rounded-xl">
-          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Conditional VaR (CVaR 99%)</div>
-          <div className="text-xl font-bold text-rose-500 font-mono mt-1">$8,240.00</div>
-          <div className="text-[10px] text-gray-500 mt-1">Expected Shortfall Tail Risk</div>
+          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Feed Heartbeat</div>
+          <div className="text-xl font-bold font-mono mt-1 flex items-center gap-1.5">
+            {telemetry?.heartbeat_ok !== false ? (
+              <span className="text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> HEALTHY</span>
+            ) : (
+              <span className="text-rose-400 flex items-center gap-1"><XCircle className="w-4 h-4" /> STALE</span>
+            )}
+          </div>
+          <div className="text-[10px] text-gray-500 mt-1">30s Heartbeat Check</div>
         </div>
 
         <div className="glass-panel p-4 bg-slate-950/80 border border-gray-800 rounded-xl">
-          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Margin Capacity Used</div>
-          <div className="text-xl font-bold text-amber-400 font-mono mt-1">32.4%</div>
-          <div className="text-[10px] text-gray-500 mt-1">$32,400 / $100,000 Allocated</div>
+          <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Active Trades Count</div>
+          <div className="text-xl font-bold text-amber-400 font-mono mt-1">
+            {telemetry ? `${telemetry.active_positions_count} / ${telemetry.max_simultaneous_trades}` : '0 / 5'}
+          </div>
+          <div className="text-[10px] text-gray-500 mt-1">Max Position Cap</div>
         </div>
 
         <div className="glass-panel p-4 bg-slate-950/80 border border-gray-800 rounded-xl">

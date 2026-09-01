@@ -15,7 +15,7 @@ export default function FeatureInspector({ ticker, period = '1mo', interval = '1
   const fetchSnapshot = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/features/inspect?ticker=${ticker}&period=${period}&interval=${interval}&index=-1`);
+      const res = await fetch(`/api/features/inspect?ticker=${ticker}&period=${period}&interval=${interval}&index=-1`);
       const data = await res.json();
       if (data.status === 'success' && data.snapshot) {
         setSnapshot(data.snapshot);
