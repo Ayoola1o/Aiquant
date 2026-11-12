@@ -5,7 +5,7 @@ import os
 import re
 import uuid
 import hmac
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -162,7 +162,7 @@ def create_session_token(user_id: str) -> str:
             VALUES (:id, :user_id, :expires_at)
         """), {
             "id": session_id, "user_id": str(user_id),
-            "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) + __import__("datetime").timedelta(seconds=SESSION_MAX_AGE),
+            "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=SESSION_MAX_AGE),
         })
     return _serializer().dumps({"sub": str(user_id), "sid": session_id})
 
