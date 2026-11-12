@@ -214,7 +214,6 @@ export default function Portfolio({
     } catch (err) {
       console.warn("Portfolio live sync error:", err);
       setAlpacaError("Network error communicating with Alpaca backend.");
-      await 
     } finally {
       setIsLoading(false);
     }

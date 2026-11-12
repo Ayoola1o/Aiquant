@@ -308,7 +308,7 @@ export default function Backtester({
           <div className={`text-xl font-black mt-1 ${kpis.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {hasResults ? ((kpis.totalReturnPct >= 0 ? '+' : '') + Number(kpis.totalReturnPct).toFixed(2) + '%') : '—'}
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">{hasResults ? '</span>
+          <span className="text-[10px] text-slate-400 font-mono">{hasResults ? ('$' + Number(kpis.pnl).toLocaleString()) : '—'}</span>
         </div>
 
         <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
@@ -465,7 +465,6 @@ export default function Backtester({
     </div>
   );
 }
- + Number(kpis.pnl).toLocaleString() : '—'}</span>
         </div>
 
         <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
