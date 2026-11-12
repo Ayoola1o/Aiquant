@@ -268,12 +268,14 @@ export default function LiveSession({
   };
 
   // Connect WebSocket to /ws/live-trading
-  const connectWebSocket = () => {
+  const connectWebSocket = async () => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : window.location.host;
-    const wsUrl = `${wsProto}//${wsHost}/ws/live-trading`;
-
     try {
+      const ticketResponse = await fetch('/api/auth/ws-ticket', { method: 'POST' });
+      if (!ticketResponse.ok) throw new Error('Unable to authorize live session.');
+      const { ticket } = await ticketResponse.json();
+      const wsUrl = `${wsProto}//${wsHost}/ws/live-trading?ticket=${encodeURIComponent(ticket)}`;
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
