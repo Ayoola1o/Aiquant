@@ -223,3 +223,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   main .glass-panel { border-radius: 14px; }
   header { flex-wrap: wrap; }
 }
+
+/* Shared institutional surfaces used across all authenticated workspaces */
+main .glass-panel,
+main [class*="bg-slate-950"][class*="border"],
+main [class*="bg-slate-900"][class*="border"] {
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(14px);
+}
+main .glass-panel {
+  background: linear-gradient(145deg, rgba(17, 24, 39, .88), rgba(8, 12, 22, .88));
+  border-color: rgba(148, 163, 184, .13);
+}
+main [class*="rounded-xl"][class*="border"] {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+main button:disabled { cursor: not-allowed; opacity: .55; }
+main [role="tablist"] { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+main [role="tablist"]::-webkit-scrollbar { display: none; }
+main pre, main code, main .font-mono { font-variant-numeric: tabular-nums; }
+main .recharts-responsive-container { min-width: 0; }
+@media (hover: hover) and (pointer: fine) {
+  main [data-interactive="true"]:hover { transform: translateY(-2px); }
+}
