@@ -64,11 +64,29 @@ export default function App() {
 }
 
 function QuantApp() {
-  const [session, setSession] = useState<string | null>(() => {
-    return localStorage.getItem('neuroquant_session') || null;
-  });
+  const [session, setSession] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('No active session');
+        return response.json();
+      })
+      .then((data) => {
+        if (active) setSession(data.user?.username || null);
+      })
+      .catch(() => {
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -420,15 +438,22 @@ function QuantApp() {
 
   const handleLoginSuccess = (username: string) => {
     setSession(username);
-    localStorage.setItem('neuroquant_session', username);
     navigate('/dashboard');
   };
 
-  const handleLogout = () => {
-    setSession(null);
-    localStorage.removeItem('neuroquant_session');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } finally {
+      setSession(null);
+      navigate('/');
+    }
   };
+
+  // Restore the server-validated cookie session before deciding which routes to render.
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#05070c] text-xs font-mono text-slate-400">Restoring secure session...</div>;
+  }
 
   // Checks if current path is a public page (Landing Page or Login)
   const isPublicPage = location.pathname === '/' || location.pathname === '/login';
