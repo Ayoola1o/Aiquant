@@ -21,6 +21,7 @@ import FeatureEngineeringLab from './components/FeatureEngineeringLab';
 import RiskCommandCenter from './components/RiskCommandCenter';
 import AICommandCenter from './components/AICommandCenter';
 import DataManagement from './components/DataManagement';
+import { validAccessToken, signOut } from './lib/supabaseSession';
 
 
 
@@ -71,23 +72,33 @@ function QuantApp() {
 
   useEffect(() => {
     let active = true;
-    // Remove the legacy mock-session marker; only the server cookie is trusted now.
     localStorage.removeItem('neuroquant_session');
-    fetch('/api/auth/me', { credentials: 'same-origin' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('No active session');
-        return response.json();
-      })
-      .then((data) => {
-        if (active) setSession(data.user?.username || null);
-      })
-      .catch(() => {
-        if (active) setSession(null);
-      })
-      .finally(() => {
-        if (active) setAuthLoading(false);
-      });
+    validAccessToken().then(async (token) => {
+      if (!token) return null;
+      const response = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error('Session expired');
+      return response.json();
+    }).then(data => { if (active) setSession(data?.user?.username || null); })
+      .catch(() => { if (active) setSession(null); })
+      .finally(() => { if (active) setAuthLoading(false); });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('/api/') && !url.startsWith('/api/auth/config') && !url.startsWith('/api/auth/me')) {
+        const token = await validAccessToken();
+        if (token) {
+          const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+          headers.set('Authorization', `Bearer ${token}`);
+          init = { ...init, headers };
+        }
+      }
+      return originalFetch(input, init);
+    };
+    return () => { window.fetch = originalFetch; };
   }, []);
 
   useEffect(() => {
@@ -445,7 +456,7 @@ function QuantApp() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      await signOut();
     } finally {
       setSession(null);
       navigate('/');
