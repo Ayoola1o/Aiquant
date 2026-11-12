@@ -21,7 +21,7 @@ import {
   Activity, 
   Database,
   BarChart3
-} from 'lucide-react';
+} from './ui/icons';
 
 interface ProfileData {
   name: string;
