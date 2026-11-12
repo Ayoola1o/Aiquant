@@ -11,6 +11,7 @@ export default function Auth({ onLoginSuccess, onBack }: AuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [bootstrapKey, setBootstrapKey] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,7 +22,7 @@ export default function Auth({ onLoginSuccess, onBack }: AuthProps) {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin ? { email, password } : { email, password, username };
+      const payload = isLogin ? { email, password } : { email, password, username, bootstrap_key: bootstrapKey };
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,6 +73,22 @@ export default function Auth({ onLoginSuccess, onBack }: AuthProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2">Administrator Setup Key</label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500"><Lock className="w-4 h-4" /></span>
+                <input
+                  type="password" autoComplete="off" value={bootstrapKey}
+                  onChange={(e) => setBootstrapKey(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-950/80 border border-slate-800 focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 rounded-xl text-sm outline-none transition-all"
+                  placeholder="Required for initial administrator account"
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1.5">Use the AIQUANT_BOOTSTRAP_ADMIN_KEY configured by the deployment owner. Later accounts receive trader access.</p>
+            </div>
+          )}
+
           {!isLogin && (
             <div>
               <label className="block text-slate-400 text-xs font-semibold mb-2">Username</label>
