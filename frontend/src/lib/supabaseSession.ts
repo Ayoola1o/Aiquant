@@ -15,7 +15,12 @@ async function config() {
 export function getSession(): SupabaseSession | null {
   try { const raw=sessionStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) as SupabaseSession : null; } catch { return null; }
 }
-function saveSession(s: SupabaseSession | null) { if(s) sessionStorage.setItem(SESSION_KEY,JSON.stringify(s)); else sessionStorage.removeItem(SESSION_KEY); }
+function saveSession(s: SupabaseSession | null) {
+  if (s) {
+    const normalized = { ...s, expires_at: s.expires_at || Math.floor(Date.now()/1000) + (Number((s as any).expires_in) || 3600) };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
+  } else sessionStorage.removeItem(SESSION_KEY);
+}
 async function authRequest(path:string,body:Record<string,unknown>) {
   const c=await config();
   const r=await fetch(c.url+'/auth/v1'+path,{method:'POST',headers:{'Content-Type':'application/json','apikey':c.key},body:JSON.stringify(body)});
