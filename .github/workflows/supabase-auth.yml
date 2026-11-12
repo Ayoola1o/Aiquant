@@ -30,3 +30,10 @@ jobs:
       - run: python -m py_compile backend/main.py backend/supabase_auth.py backend/test_supabase_auth.py
       - working-directory: backend
         run: python -m unittest test_supabase_auth -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
