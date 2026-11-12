@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load environment variables (e.g. GEMINI_API_KEY)
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,94 +35,51 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Server-side authentication: identity is derived only from a signed HttpOnly cookie.
-from auth_service import (
-    AuthError, create_user, authenticate_user, get_user_by_id,
-    create_session_token, verify_session_token, revoke_session, init_auth_db, SESSION_MAX_AGE,
+# Supabase Auth: validate the access token on every protected API request.
+from supabase_auth import SupabaseAuthError, verify_supabase_token
+
+AUTH_PUBLIC_PATHS = {"/", "/api/stocks", "/api/auth/config"}
+ADMIN_ONLY_PREFIXES = (
+    "/api/live/", "/api/alpaca/", "/api/telegram/", "/api/risk/",
+    "/api/backtest", "/api/strategies", "/api/experiments", "/api/history",
+    "/api/social/x-handles", "/api/test/run",
 )
 
-AUTH_PUBLIC_PATHS = {"/api/auth/register", "/api/auth/login", "/api/auth/logout", "/"}
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if request.method == "OPTIONS":
-            request.state.user = None
-            return await call_next(request)
-        origin = request.headers.get("origin")
-        if request.method not in ("GET", "HEAD") and origin:
-            from urllib.parse import urlparse
-            origin_value = origin.rstrip("/")
-            allowed_origins = {
-                value.strip().rstrip("/")
-                for value in os.environ.get("AIQUANT_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
-                if value.strip()
-            }
-            same_origin = urlparse(origin_value).netloc.lower() == request.url.netloc.lower()
-            if not same_origin and origin_value not in allowed_origins:
-                return JSONResponse({"detail": "Cross-origin request rejected."}, status_code=403)
-        if path in AUTH_PUBLIC_PATHS or path == "/api/stocks":
+        if request.method == "OPTIONS" or path in AUTH_PUBLIC_PATHS:
             request.state.user = None
             return await call_next(request)
         if path.startswith("/api/"):
-            token = request.cookies.get("aiquant_session")
-            user_id = verify_session_token(token) if token else None
-            user = get_user_by_id(user_id) if user_id else None
-            if not user:
+            authorization = request.headers.get("authorization", "")
+            scheme, _, token = authorization.partition(" ")
+            if scheme.lower() != "bearer" or not token:
                 return JSONResponse({"detail": "Authentication required."}, status_code=401)
+            try:
+                user = await asyncio.to_thread(verify_supabase_token, token)
+            except SupabaseAuthError as exc:
+                return JSONResponse({"detail": str(exc)}, status_code=401)
             request.state.user = user
-            admin_only_prefixes = (
-                "/api/live/", "/api/alpaca/", "/api/telegram/", "/api/risk/",
-                "/api/backtest", "/api/strategies", "/api/experiments", "/api/history",
-                "/api/social/x-handles", "/api/test/run",
-            )
-            if path.startswith(admin_only_prefixes) and user["role"] != "admin":
-                return JSONResponse({"detail": "Administrator permission required for this operation."}, status_code=403)
+            if path.startswith(ADMIN_ONLY_PREFIXES) and user["role"] != "admin":
+                return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
         return await call_next(request)
 
 app.add_middleware(AuthenticationMiddleware)
 
-@app.post("/api/auth/register")
-def register_account(payload: dict, response: Response):
-    try:
-        user = create_user(
-            email=str(payload.get("email", "")).strip().lower(),
-            username=str(payload.get("username", "")).strip(),
-            password=str(payload.get("password", "")),
-            bootstrap_key=str(payload.get("bootstrap_key", "")),
-        )
-        token = create_session_token(user["id"])
-    except AuthError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    secure = os.environ.get("AIQUANT_COOKIE_SECURE", "true" if os.environ.get("VERCEL") else "false").lower() == "true"
-    response.set_cookie("aiquant_session", token, max_age=SESSION_MAX_AGE, httponly=True, secure=secure, samesite="lax", path="/")
-    return {"user": user}
-
-@app.post("/api/auth/login")
-def login_account(payload: dict, response: Response):
-    try:
-        user = authenticate_user(
-            email=str(payload.get("email", "")).strip().lower(),
-            password=str(payload.get("password", "")),
-        )
-        token = create_session_token(user["id"])
-    except AuthError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    secure = os.environ.get("AIQUANT_COOKIE_SECURE", "true" if os.environ.get("VERCEL") else "false").lower() == "true"
-    response.set_cookie("aiquant_session", token, max_age=SESSION_MAX_AGE, httponly=True, secure=secure, samesite="lax", path="/")
-    return {"user": user}
-
-@app.post("/api/auth/logout")
-def logout_account(request: Request, response: Response):
-    revoke_session(request.cookies.get("aiquant_session"))
-    response.delete_cookie("aiquant_session", path="/", httponly=True, samesite="lax")
-    return {"status": "success"}
+@app.get("/api/auth/config")
+def auth_config():
+    return {
+        "supabase_url": os.environ.get("SUPABASE_URL", "").rstrip("/"),
+        "supabase_publishable_key": os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", ""),
+    }
 
 @app.get("/api/auth/me")
 def current_account(request: Request):
-    if not getattr(request.state, "user", None):
+    user = getattr(request.state, "user", None)
+    if not user:
         raise HTTPException(status_code=401, detail="Authentication required.")
-    return {"user": request.state.user}
-
+    return {"user": user}
 
 # Enable CORS for frontend connection
 app.add_middleware(
@@ -137,7 +94,6 @@ app.add_middleware(
 def startup_event():
     import database as db
     db.init_db()
-    init_auth_db()
     try:
         live_session.restore_previous_active_bots()
     except Exception as e:
