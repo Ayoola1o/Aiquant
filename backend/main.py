@@ -38,7 +38,7 @@ app = FastAPI(
 # Server-side authentication: identity is derived only from a signed HttpOnly cookie.
 from auth_service import (
     AuthError, create_user, authenticate_user, get_user_by_id,
-    create_session_token, verify_session_token, SESSION_MAX_AGE,
+    create_session_token, verify_session_token, revoke_session, init_auth_db, SESSION_MAX_AGE,
 )
 
 AUTH_PUBLIC_PATHS = {"/api/auth/register", "/api/auth/login", "/api/auth/logout", "/"}
@@ -94,7 +94,8 @@ def login_account(payload: dict, response: Response):
     return {"user": user}
 
 @app.post("/api/auth/logout")
-def logout_account(response: Response):
+def logout_account(request: Request, response: Response):
+    revoke_session(request.cookies.get("aiquant_session"))
     response.delete_cookie("aiquant_session", path="/", httponly=True, samesite="lax")
     return {"status": "success"}
 
@@ -118,6 +119,7 @@ app.add_middleware(
 def startup_event():
     import database as db
     db.init_db()
+    init_auth_db()
     try:
         live_session.restore_previous_active_bots()
     except Exception as e:
