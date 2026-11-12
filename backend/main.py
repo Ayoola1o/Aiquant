@@ -2252,7 +2252,6 @@ def get_user_profile(request: Request):
         "integrations": {"alpaca": False, "polygon": False, "aws": False},
         "model_dev_history": [], "contributions": [], "activity_feed": [], "skills": []
     }
-}
 
 class AlpacaChartDataRequest(BaseModel):
     alpaca_key_id: str
