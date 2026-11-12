@@ -1,0 +1,31 @@
+name: Authentication tests
+
+on:
+  push:
+    branches:
+      - codex/backend-authentication
+    paths:
+      - "backend/auth_service.py"
+      - "backend/test_auth.py"
+      - ".github/workflows/auth-tests.yml"
+  pull_request:
+    paths:
+      - "backend/auth_service.py"
+      - "backend/test_auth.py"
+      - ".github/workflows/auth-tests.yml"
+
+jobs:
+  auth-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install authentication test dependencies
+        run: python -m pip install argon2-cffi itsdangerous SQLAlchemy
+      - name: Run authentication unit tests
+        working-directory: backend
+        run: python -m unittest test_auth -v
