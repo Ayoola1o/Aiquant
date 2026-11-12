@@ -370,6 +370,7 @@ def predict_prices(req: PredictRequest):
 
 @app.post("/api/backtest")
 def run_backtest(req: BacktestRequest):
+    # Keep custom strategy execution fail-closed until an isolated worker is deployed.
     """
     Compiles and executes a custom strategy script against historical data.
 
