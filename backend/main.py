@@ -45,7 +45,15 @@ AUTH_PUBLIC_PATHS = {"/api/auth/register", "/api/auth/login", "/api/auth/logout"
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if request.method == "OPTIONS" or path in AUTH_PUBLIC_PATHS or path == "/api/stocks":
+        if request.method == "OPTIONS":
+            request.state.user = None
+            return await call_next(request)
+        origin = request.headers.get("origin")
+        if request.method not in ("GET", "HEAD") and origin:
+            from urllib.parse import urlparse
+            if urlparse(origin).netloc.lower() != request.url.netloc.lower():
+                return JSONResponse({"detail": "Cross-origin request rejected."}, status_code=403)
+        if path in AUTH_PUBLIC_PATHS or path == "/api/stocks":
             request.state.user = None
             return await call_next(request)
         if path.startswith("/api/"):
@@ -54,11 +62,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             user = get_user_by_id(user_id) if user_id else None
             if not user:
                 return JSONResponse({"detail": "Authentication required."}, status_code=401)
-            origin = request.headers.get("origin")
-            if request.method not in ("GET", "HEAD") and origin:
-                from urllib.parse import urlparse
-                if urlparse(origin).netloc.lower() != request.url.netloc.lower():
-                    return JSONResponse({"detail": "Cross-origin request rejected."}, status_code=403)
             request.state.user = user
         return await call_next(request)
 
