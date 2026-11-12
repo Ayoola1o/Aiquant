@@ -10,7 +10,7 @@ Configure these in the deployment platform's environment settings. Never commit 
 | `AIQUANT_AUTH_SECRET` | Stable random secret with at least 32 characters. Generate with `openssl rand -hex 32`. Keep the same value across every serverless instance and deployment. |
 | `AIQUANT_BOOTSTRAP_ADMIN_KEY` | One-time first-admin setup secret, at least 24 characters. Generate independently, for example with `openssl rand -hex 24`. Enter this value in the first account's registration form. |
 | `AIQUANT_COOKIE_SECURE` | Set to `true` for HTTPS production deployments. |
-| `AIQUANT_ALLOWED_ORIGINS` | Exact comma-separated frontend origins if the frontend is hosted separately. For same-origin Vercel routing, configure the deployed origin. |
+| `AIQUANT_ALLOWED_ORIGINS` | Exact comma-separated trusted browser origins. Prefer serving the frontend and API from the same origin; cross-origin cookie deployments need additional cookie-domain and SameSite configuration not included in this phase. |
 
 ## Initial administrator setup
 
