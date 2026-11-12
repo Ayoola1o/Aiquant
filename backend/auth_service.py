@@ -69,6 +69,16 @@ def init_auth_db() -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS uq_users_single_admin
             ON users(role) WHERE role = 'admin'
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                revoked_at TIMESTAMP NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_auth_sessions_user ON auth_sessions(user_id)"))
 
 
 def _public_user(row) -> dict:
@@ -134,7 +144,16 @@ def authenticate_user(email: str, password: str) -> dict:
 
 
 def create_session_token(user_id: str) -> str:
-    return _serializer().dumps({"sub": str(user_id), "iat": int(datetime.now(timezone.utc).timestamp())})
+    session_id = str(uuid.uuid4())
+    with _engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO auth_sessions (id, user_id, expires_at)
+            VALUES (:id, :user_id, :expires_at)
+        """), {
+            "id": session_id, "user_id": str(user_id),
+            "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) + __import__("datetime").timedelta(seconds=SESSION_MAX_AGE),
+        })
+    return _serializer().dumps({"sub": str(user_id), "sid": session_id})
 
 
 def verify_session_token(token: Optional[str]) -> Optional[str]:
@@ -143,9 +162,34 @@ def verify_session_token(token: Optional[str]) -> Optional[str]:
     try:
         payload = _serializer().loads(token, max_age=SESSION_MAX_AGE)
         user_id = payload.get("sub")
-        return str(user_id) if user_id else None
+        session_id = payload.get("sid")
+        if not user_id or not session_id:
+            return None
+        with _engine.connect() as conn:
+            active = conn.execute(text("""
+                SELECT 1 FROM auth_sessions
+                WHERE id = :sid AND user_id = :uid
+                  AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+            """), {"sid": str(session_id), "uid": str(user_id)}).first()
+        return str(user_id) if active else None
     except (BadSignature, SignatureExpired, AuthError, TypeError, ValueError):
         return None
+
+
+def revoke_session(token: Optional[str]) -> None:
+    if not token:
+        return
+    try:
+        payload = _serializer().loads(token, max_age=SESSION_MAX_AGE)
+        session_id = payload.get("sid")
+    except (BadSignature, SignatureExpired, AuthError, TypeError, ValueError):
+        return
+    if session_id:
+        with _engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP
+                WHERE id = :sid AND revoked_at IS NULL
+            """), {"sid": str(session_id)})
 
 
 def get_user_by_id(user_id: Optional[str]) -> Optional[dict]:
