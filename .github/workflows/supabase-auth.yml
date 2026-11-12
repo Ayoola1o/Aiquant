@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/supabase-auth-integration
+      - codex/fix-live-backtest-portfolio
     paths:
       - "backend/supabase_auth.py"
       - "backend/test_supabase_auth.py"
