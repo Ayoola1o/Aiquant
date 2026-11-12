@@ -63,8 +63,16 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             except SupabaseAuthError as exc:
                 return JSONResponse({"detail": str(exc)}, status_code=401)
             request.state.user = user
-            if path.startswith(ADMIN_ONLY_PREFIXES) and user["role"] != "admin":
-                return JSONResponse({"detail": "Administrator permission required."}, status_code=403)
+            # Existing app routes still include global (not tenant-isolated) trading
+            # state. Until each route is moved to user-scoped Supabase storage,
+            # trader accounts may access only public market-data/analysis endpoints.
+            trader_safe = (
+                path.startswith("/api/market/")
+                or path.startswith("/api/features/inspect")
+                or path.startswith("/api/predict")
+            )
+            if user["role"] != "admin" and not trader_safe:
+                return JSONResponse({"detail": "This resource is not yet enabled for trader accounts."}, status_code=403)
         return await call_next(request)
 
 app.add_middleware(AuthenticationMiddleware)
