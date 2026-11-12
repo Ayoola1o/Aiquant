@@ -112,7 +112,7 @@ export default function Portfolio({
   const [totalPnl, setTotalPnl] = useState(0.0);
 
   // Equity Curve Timeline
-  const equityHistory: Array<{ date: string; val: number }> = [];
+  const [equityHistory, setEquityHistory] = useState<Array<{ date: string; val: number }>>([]);
 
   // Positions Data
   const [positions, setPositions] = useState<any[]>([]);
@@ -126,7 +126,7 @@ export default function Portfolio({
     const effectiveSecretKey = alpacaSecretKey;
     setEquity(0); setCash(0); setBuyingPower(0); setTotalPnl(0);
     setDailyPnl(0); setDailyPnlPct(0); setAccountDetails(null);
-    setRecentOrders([]); setPositions([]);
+    setRecentOrders([]); setPositions([]); setEquityHistory([]);
 
     try {
       if (effectiveKeyId && effectiveSecretKey) {
@@ -157,6 +157,18 @@ export default function Portfolio({
           }
           if (data.orders && Array.isArray(data.orders)) {
             setRecentOrders(data.orders);
+          }
+          const historyPeriod: Record<string, string> = { '1D': '1D', '7D': '1W', '30D': '1M', '90D': '3M', 'YTD': '1A', 'ALL': '1A' };
+          const historyResponse = await fetch('/api/alpaca/portfolio/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alpaca_key_id: effectiveKeyId, alpaca_secret_key: effectiveSecretKey, period: historyPeriod[timeRange] || '1D' })
+          });
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json();
+            setEquityHistory(Array.isArray(historyData.history) ? historyData.history
+              .filter((point: any) => Number.isFinite(Number(point.equity)))
+              .map((point: any) => ({ date: new Date(Number(point.timestamp) * 1000).toLocaleDateString(), val: Number(point.equity) })) : []);
           }
           if (data.positions && Array.isArray(data.positions)) {
             const totalPosPl = data.positions.reduce((sum: number, p: any) => sum + (parseFloat(p.unrealized_pl) || 0), 0);
@@ -210,7 +222,7 @@ export default function Portfolio({
 
   useEffect(() => {
     fetchLivePortfolio();
-  }, [alpacaKeyId, alpacaSecretKey]);
+  }, [alpacaKeyId, alpacaSecretKey, timeRange]);
 
   // Liquidate specific position
   const handleLiquidate = async (symbol: string) => {

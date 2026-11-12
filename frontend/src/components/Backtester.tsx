@@ -129,7 +129,7 @@ export default function Backtester({
         if (Array.isArray(data.trades)) {
           setTradeLogs(data.trades.slice(0, 500).map((t: any, idx: number) => ({
             id: idx + 1,
-            date: t.exit_time || t.entry_time || '2025-05-18',
+            date: t.exit_time || t.entry_time || '—',
             type: t.side?.toUpperCase() || 'LONG',
             symbol: selectedPair,
             entry: t.entry_price || 0,
@@ -306,9 +306,166 @@ export default function Backtester({
         <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Return</span>
           <div className={`text-xl font-black mt-1 ${kpis.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {kpis.totalReturnPct >= 0 ? '+' : ''}{Number(kpis.totalReturnPct).toFixed(2)}%
+            {hasResults ? ((kpis.totalReturnPct >= 0 ? '+' : '') + Number(kpis.totalReturnPct).toFixed(2) + '%') : '—'}
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">+${Number(kpis.pnl).toLocaleString()}</span>
+          <span className="text-[10px] text-slate-400 font-mono">{hasResults ? '</span>
+        </div>
+
+        <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Sharpe Ratio</span>
+          <div className="text-xl font-black text-white mt-1">
+            {hasResults ? Number(kpis.sharpeRatio).toFixed(2) : '—'}
+          </div>
+          <span className="text-[10px] text-emerald-400 font-mono">Sortino: {hasResults ? Number(kpis.sortinoRatio).toFixed(2) : '—'}</span>
+        </div>
+
+        <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Max Drawdown</span>
+          <div className="text-xl font-black text-rose-400 mt-1">
+            {hasResults ? '-' + Number(kpis.maxDrawdownPct).toFixed(2) + '%' : '—'}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">Historical peak-to-trough</span>
+        </div>
+
+        <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Win Rate</span>
+          <div className="text-xl font-black text-white mt-1">
+            {hasResults ? Number(kpis.winRate).toFixed(1) + '%' : '—'}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">{hasResults ? kpis.winningTrades + 'W / ' + kpis.losingTrades + 'L' : '—'}</span>
+        </div>
+
+        <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Profit Factor</span>
+          <div className="text-xl font-black text-indigo-400 mt-1">
+            {hasResults ? Number(kpis.profitFactor).toFixed(2) : '—'}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">Gross Gain / Loss</span>
+        </div>
+
+        <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Trades</span>
+          <div className="text-xl font-black text-white mt-1">
+            {hasResults ? kpis.totalTrades : '—'}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">Avg hold: {hasResults ? kpis.avgHoldDuration : '—'}</span>
+        </div>
+
+      </div>
+
+      {/* ── 3. PERFORMANCE CHARTS & TRADE TABLE ─────────────────────── */}
+      <div className="glass-panel p-6 bg-[#090d19]/90 border border-white/5 rounded-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-white/5 pb-4 mb-4">
+          <div className="flex items-center gap-2">
+            {(['Equity Curve', 'Drawdown', 'Trades'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setChartTab(tab)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  chartTab === tab ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white bg-[#0c101d]'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <span className="text-xs text-slate-500 font-mono">
+            {selectedPair} • {timeRange.toUpperCase()} Simulation Window
+          </span>
+        </div>
+
+        {chartTab === 'Equity Curve' && (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityCurveData}>
+                <defs>
+                  <linearGradient id="colorStrat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} />
+                <YAxis orientation="right" stroke="#475569" fontSize={10} tickLine={false} domain={['auto', 'auto']} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                />
+                <Area type="monotone" dataKey="strategy" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorStrat)" name="Strategy Equity ($)" />
+                <Line type="monotone" dataKey="benchmark" stroke="#64748b" strokeDasharray="3 3" dot={false} name="Benchmark ($)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {chartTab === 'Drawdown' && (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={drawdownData}>
+                <defs>
+                  <linearGradient id="colorDd" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.5}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} />
+                <YAxis orientation="right" stroke="#475569" fontSize={10} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                />
+                <Area type="monotone" dataKey="dd" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorDd)" name="Drawdown (%)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {chartTab === 'Trades' && (
+          <div className="overflow-x-auto max-h-80">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="text-[10px] text-slate-500 uppercase border-b border-white/5">
+                  <th className="pb-2">#</th>
+                  <th className="pb-2">Date</th>
+                  <th className="pb-2">Type</th>
+                  <th className="pb-2">Symbol</th>
+                  <th className="pb-2">Entry</th>
+                  <th className="pb-2">Exit</th>
+                  <th className="pb-2">PnL ($)</th>
+                  <th className="pb-2">Return (%)</th>
+                  <th className="pb-2">Exit Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {tradeLogs.map((t) => (
+                  <tr key={t.id} className="hover:bg-white/[0.02]">
+                    <td className="py-2.5 font-mono text-slate-500">{t.id}</td>
+                    <td className="py-2.5 font-mono text-slate-400">{t.date}</td>
+                    <td className="py-2.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${t.type === 'LONG' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        {t.type}
+                      </span>
+                    </td>
+                    <td className="py-2.5 font-bold text-white">{t.symbol}</td>
+                    <td className="py-2.5 font-mono text-slate-300">${Number(t.entry).toLocaleString()}</td>
+                    <td className="py-2.5 font-mono text-slate-300">${Number(t.exit).toLocaleString()}</td>
+                    <td className={`py-2.5 font-mono font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {t.pnl >= 0 ? '+' : ''}${Number(t.pnl).toFixed(2)}
+                    </td>
+                    <td className={`py-2.5 font-mono font-bold ${t.pnlPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {t.pnlPct >= 0 ? '+' : ''}{Number(t.pnlPct).toFixed(2)}%
+                    </td>
+                    <td className="py-2.5 text-slate-400">{t.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+ + Number(kpis.pnl).toLocaleString() : '—'}</span>
         </div>
 
         <div className="glass-panel p-4 bg-[#090d19]/90 border border-white/5 rounded-2xl">
