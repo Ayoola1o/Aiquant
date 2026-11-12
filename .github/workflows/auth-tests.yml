@@ -26,6 +26,9 @@ jobs:
           python-version: "3.11"
       - name: Install authentication test dependencies
         run: python -m pip install argon2-cffi itsdangerous SQLAlchemy
+      - name: Compile backend authentication modules
+        working-directory: backend
+        run: python -m py_compile auth_service.py test_auth.py main.py
       - name: Run authentication unit tests
         working-directory: backend
         run: python -m unittest test_auth -v
