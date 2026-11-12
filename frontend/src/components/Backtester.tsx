@@ -40,70 +40,16 @@ export default function Backtester({
   const [isRunning, setIsRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Real Backtest Execution Results
+  const [hasResults, setHasResults] = useState(false);
   const [kpis, setKpis] = useState({
-    totalReturnPct: 42.37,
-    pnl: 42371.82,
-    benchmarkReturnPct: 18.25,
-    alpha: 24.12,
-    beta: 0.82,
-    sharpeRatio: 2.14,
-    sortinoRatio: 2.89,
-    maxDrawdownPct: 12.34,
-    winRate: 64.8,
-    profitFactor: 2.18,
-    totalTrades: 384,
-    winningTrades: 249,
-    losingTrades: 135,
-    avgWin: 312.45,
-    avgLoss: 165.20,
-    avgHoldDuration: '14h 22m'
+    totalReturnPct: 0, pnl: 0, benchmarkReturnPct: 0, alpha: 0, beta: 0,
+    sharpeRatio: 0, sortinoRatio: 0, maxDrawdownPct: 0, winRate: 0,
+    profitFactor: 0, totalTrades: 0, winningTrades: 0, losingTrades: 0,
+    avgWin: 0, avgLoss: 0, avgHoldDuration: '—'
   });
-
-  const [equityCurveData, setEquityCurveData] = useState<any[]>([
-    { date: "Feb '24", strategy: 100000, benchmark: 100000 },
-    { date: "Mar '24", strategy: 106000, benchmark: 103000 },
-    { date: "Apr '24", strategy: 112000, benchmark: 101000 },
-    { date: "May '24", strategy: 109000, benchmark: 105000 },
-    { date: "Jun '24", strategy: 118000, benchmark: 108000 },
-    { date: "Jul '24", strategy: 121000, benchmark: 104000 },
-    { date: "Aug '24", strategy: 127000, benchmark: 109000 },
-    { date: "Sep '24", strategy: 125000, benchmark: 107000 },
-    { date: "Oct '24", strategy: 133000, benchmark: 112000 },
-    { date: "Nov '24", strategy: 131000, benchmark: 110000 },
-    { date: "Dec '24", strategy: 138000, benchmark: 114000 },
-    { date: "Jan '25", strategy: 136000, benchmark: 113000 },
-    { date: "Feb '25", strategy: 141000, benchmark: 116000 },
-    { date: "Mar '25", strategy: 139000, benchmark: 115000 },
-    { date: "Apr '25", strategy: 140500, benchmark: 117000 },
-    { date: "May '25", strategy: 142371.82, benchmark: 118250.40 }
-  ]);
-
-  const [drawdownData, setDrawdownData] = useState<any[]>([
-    { date: "Feb '24", dd: 0 },
-    { date: "Mar '24", dd: -2.1 },
-    { date: "Apr '24", dd: -1.5 },
-    { date: "May '24", dd: -5.4 },
-    { date: "Jun '24", dd: -1.2 },
-    { date: "Jul '24", dd: -3.8 },
-    { date: "Aug '24", dd: -2.0 },
-    { date: "Sep '24", dd: -6.5 },
-    { date: "Oct '24", dd: -1.8 },
-    { date: "Nov '24", dd: -4.2 },
-    { date: "Dec '24", dd: -2.5 },
-    { date: "Jan '25", dd: -8.9 },
-    { date: "Feb '25", dd: -12.34 },
-    { date: "Mar '25", dd: -7.5 },
-    { date: "Apr '25", dd: -3.2 },
-    { date: "May '25", dd: -1.1 }
-  ]);
-
-  const [tradeLogs, setTradeLogs] = useState<any[]>([
-    { id: 1, date: '2025-05-18 14:20', type: 'LONG', symbol: 'BTC/USDT', entry: 63182.45, exit: 64890.00, pnl: 1707.55, pnlPct: 2.70, reason: 'Take Profit' },
-    { id: 2, date: '2025-05-16 09:15', type: 'SHORT', symbol: 'BTC/USDT', entry: 65400.00, exit: 64120.00, pnl: 1280.00, pnlPct: 1.95, reason: 'Signal Reversal' },
-    { id: 3, date: '2025-05-14 22:40', type: 'LONG', symbol: 'BTC/USDT', entry: 62900.00, exit: 62150.00, pnl: -750.00, pnlPct: -1.19, reason: 'Stop Loss' },
-    { id: 4, date: '2025-05-12 11:00', type: 'LONG', symbol: 'BTC/USDT', entry: 61800.00, exit: 63500.00, pnl: 1700.00, pnlPct: 2.75, reason: 'Take Profit' }
-  ]);
+  const [equityCurveData, setEquityCurveData] = useState<any[]>([]);
+  const [drawdownData, setDrawdownData] = useState<any[]>([]);
+  const [tradeLogs, setTradeLogs] = useState<any[]>([]);
 
   // Sync selectedStrategyId
   useEffect(() => {
@@ -114,16 +60,23 @@ export default function Backtester({
     }
   }, [selectedStrategyId, strategies]);
 
-  const currentStrategy = strategies.find(s => s.id === selectedStrategyIdLocal) || {
-    id: 'default',
-    name: 'Momentum Pro v2.1',
-    code: `def on_candle(df):\n    # Simple Moving Average Crossover\n    sma20 = df['close'].rolling(20).mean()\n    sma50 = df['close'].rolling(50).mean()\n    if sma20.iloc[-1] > sma50.iloc[-1]:\n        return 'BUY'\n    elif sma20.iloc[-1] < sma50.iloc[-1]:\n        return 'SELL'\n    return 'HOLD'`
-  };
+  const currentStrategy = strategies.find(s => s.id === selectedStrategyIdLocal) || null;
 
   // Run Real Backtest against backend POST /api/backtest
   const handleRunBacktest = async () => {
+    if (!currentStrategy?.code?.trim()) {
+      setErrorMessage('Select or create a strategy before running a backtest.');
+      return;
+    }
+    if (!Number.isFinite(startingCapital) || startingCapital <= 0) {
+      setErrorMessage('Starting capital must be a positive number.');
+      return;
+    }
     setIsRunning(true);
     setErrorMessage(null);
+    setHasResults(false);
+    setKpis({ totalReturnPct: 0, pnl: 0, benchmarkReturnPct: 0, alpha: 0, beta: 0, sharpeRatio: 0, sortinoRatio: 0, maxDrawdownPct: 0, winRate: 0, profitFactor: 0, totalTrades: 0, winningTrades: 0, losingTrades: 0, avgWin: 0, avgLoss: 0, avgHoldDuration: '—' });
+    setEquityCurveData([]); setDrawdownData([]); setTradeLogs([]);
 
     try {
       const res = await fetch('/api/backtest', {
@@ -138,9 +91,7 @@ export default function Backtester({
           starting_capital: Number(startingCapital),
           commission_pct: 0.001,
           slippage_pct: 0.0005,
-          spread_pct: 0.0002,
-          alpaca_key_id: alpacaKeyId,
-          alpaca_secret_key: alpacaSecretKey
+          spread_pct: 0.0002
         })
       });
 
@@ -148,30 +99,23 @@ export default function Backtester({
 
       if (res.ok && data.success) {
         const rawKpis = data.kpis || {};
+        setHasResults(true);
         setKpis({
-          totalReturnPct: rawKpis.pnl_pct ?? 42.37,
-          pnl: rawKpis.pnl ?? 42371.82,
-          benchmarkReturnPct: rawKpis.benchmark_pnl_pct ?? 18.25,
-          alpha: rawKpis.alpha ?? (rawKpis.pnl_pct - 18.25),
-          beta: rawKpis.beta ?? 0.82,
-          sharpeRatio: rawKpis.sharpe_ratio ?? 2.14,
-          sortinoRatio: rawKpis.sortino_ratio ?? 2.89,
-          maxDrawdownPct: rawKpis.max_drawdown_pct ?? 12.34,
-          winRate: rawKpis.win_rate ?? 64.8,
-          profitFactor: rawKpis.profit_factor ?? 2.18,
-          totalTrades: rawKpis.total_trades ?? 384,
-          winningTrades: rawKpis.winning_trades ?? 249,
-          losingTrades: rawKpis.losing_trades ?? 135,
-          avgWin: rawKpis.avg_win ?? 312.45,
-          avgLoss: rawKpis.avg_loss ?? 165.20,
-          avgHoldDuration: rawKpis.avg_hold_duration ?? '14h 22m'
+          totalReturnPct: Number(rawKpis.pnl_pct) || 0, pnl: Number(rawKpis.pnl) || 0,
+          benchmarkReturnPct: Number(rawKpis.benchmark_pnl_pct) || 0, alpha: Number(rawKpis.alpha) || 0,
+          beta: Number(rawKpis.beta) || 0, sharpeRatio: Number(rawKpis.sharpe_ratio) || 0,
+          sortinoRatio: Number(rawKpis.sortino_ratio) || 0, maxDrawdownPct: Number(rawKpis.max_drawdown_pct) || 0,
+          winRate: Number(rawKpis.win_rate) || 0, profitFactor: Number(rawKpis.profit_factor) || 0,
+          totalTrades: Number(rawKpis.total_trades) || 0, winningTrades: Number(rawKpis.winning_trades) || 0,
+          losingTrades: Number(rawKpis.losing_trades) || 0, avgWin: Number(rawKpis.avg_win) || 0,
+          avgLoss: Number(rawKpis.avg_loss) || 0, avgHoldDuration: rawKpis.avg_hold_duration || '—'
         });
 
         if (data.equity_curve && data.equity_curve.length > 0) {
           setEquityCurveData(data.equity_curve.map((pt: any) => ({
             date: pt.date ? String(pt.date).substring(5, 10) : pt.timestamp,
             strategy: pt.equity,
-            benchmark: pt.benchmark_equity || pt.equity * 0.9
+            benchmark: Number(pt.benchmark_equity) || 0
           })));
         }
 
@@ -182,8 +126,8 @@ export default function Backtester({
           })));
         }
 
-        if (data.trades && data.trades.length > 0) {
-          setTradeLogs(data.trades.slice(0, 50).map((t: any, idx: number) => ({
+        if (Array.isArray(data.trades)) {
+          setTradeLogs(data.trades.slice(0, 500).map((t: any, idx: number) => ({
             id: idx + 1,
             date: t.exit_time || t.entry_time || '2025-05-18',
             type: t.side?.toUpperCase() || 'LONG',
@@ -199,7 +143,9 @@ export default function Backtester({
         setErrorMessage(data.error || data.detail || 'Backtest failed to execute.');
       }
     } catch (err: any) {
-      console.warn("Backtest endpoint error, using simulated output:", err);
+      console.error('Backtest request failed:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to complete backtest. Please retry.');
+      setHasResults(false);
     } finally {
       setIsRunning(false);
     }
@@ -236,14 +182,14 @@ export default function Backtester({
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c101d] border border-white/10 text-xs">
             <span className="text-[10px] text-slate-500 font-semibold">Engine Status</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Ready
+            <span className="text-amber-400 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Protected
             </span>
           </div>
 
           <button 
             onClick={handleRunBacktest}
-            disabled={isRunning}
+            disabled={isRunning || !currentStrategy?.code?.trim()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
           >
             <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
@@ -263,6 +209,11 @@ export default function Backtester({
         <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+      {!hasResults && !errorMessage && (
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+          No backtest results yet. Custom strategy execution remains disabled until an isolated execution worker is available.
         </div>
       )}
 

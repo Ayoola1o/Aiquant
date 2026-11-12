@@ -112,42 +112,21 @@ export default function Portfolio({
   const [totalPnl, setTotalPnl] = useState(0.0);
 
   // Equity Curve Timeline
-  const equityHistory = [
-    { date: 'Aug 15', val: 98000 },
-    { date: 'Aug 16', val: 104000 },
-    { date: 'Aug 17', val: 101000 },
-    { date: 'Aug 18', val: 112000 },
-    { date: 'Aug 19', val: 119000 },
-    { date: 'Aug 20', val: 122000 },
-    { date: 'Aug 21', val: 128450.75 }
-  ];
+  const equityHistory: Array<{ date: string; val: number }> = [];
 
   // Positions Data
   const [positions, setPositions] = useState<any[]>([]);
-
-  const fetchBotsFallback = async () => {
-    try {
-      const botsRes = await fetch('/api/live/bots');
-      if (botsRes.ok) {
-        const botsData = await botsRes.json();
-        const allBots = Object.values(botsData.bots || {}) as any[];
-        if (allBots.length > 0) {
-          const sumEquity = allBots.reduce((acc, b) => acc + (b.portfolio_value || b.starting_cash || 10000), 0);
-          const sumPnl = allBots.reduce((acc, b) => acc + (b.pnl || 0), 0);
-          setEquity(sumEquity);
-          setTotalPnl(sumPnl);
-        }
-      }
-    } catch {}
-  };
 
   // Fetch live Alpaca account if configured or sync from bots
   const fetchLivePortfolio = async () => {
     setIsLoading(true);
     setAlpacaError(null);
 
-    const effectiveKeyId = alpacaKeyId || localStorage.getItem('neuroquant_alpaca_key_id') || '';
-    const effectiveSecretKey = alpacaSecretKey || localStorage.getItem('neuroquant_alpaca_secret_key') || '';
+    const effectiveKeyId = alpacaKeyId;
+    const effectiveSecretKey = alpacaSecretKey;
+    setEquity(0); setCash(0); setBuyingPower(0); setTotalPnl(0);
+    setDailyPnl(0); setDailyPnlPct(0); setAccountDetails(null);
+    setRecentOrders([]); setPositions([]);
 
     try {
       if (effectiveKeyId && effectiveSecretKey) {
@@ -215,16 +194,15 @@ export default function Portfolio({
           const errData = await res.json().catch(() => ({}));
           setAlpacaError(errData.detail || 'Alpaca account query returned error.');
           setIsAlpacaConnected(false);
-          await fetchBotsFallback();
         }
       } else {
         setIsAlpacaConnected(false);
-        await fetchBotsFallback();
+        setAlpacaError('Connect an Alpaca paper account to view verified balances and positions.');
       }
     } catch (err) {
       console.warn("Portfolio live sync error:", err);
       setAlpacaError("Network error communicating with Alpaca backend.");
-      await fetchBotsFallback();
+      await 
     } finally {
       setIsLoading(false);
     }
@@ -258,8 +236,7 @@ export default function Portfolio({
         setActionMessage(`Network error liquidating ${symbol}.`);
       }
     } else {
-      setPositions(prev => prev.filter(p => p.asset !== symbol));
-      setActionMessage(`Position ${symbol} closed.`);
+      setActionMessage('Connect an authorized Alpaca account before submitting a liquidation request.');
     }
 
     setTimeout(() => setActionMessage(null), 4000);
@@ -295,7 +272,7 @@ export default function Portfolio({
                 : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
             }`}>
               <span className={`w-2 h-2 rounded-full ${isAlpacaConnected ? 'bg-emerald-400 animate-pulse' : 'bg-indigo-400'}`} />
-              <span>{isAlpacaConnected ? 'Alpaca Paper Live' : 'Sandbox Fleet'}</span>
+              <span>{isAlpacaConnected ? 'Alpaca Paper' : 'Disconnected'}</span>
             </div>
           </div>
           <p className="text-xs md:text-sm text-slate-400 font-medium mt-1">
@@ -491,7 +468,9 @@ export default function Portfolio({
             </div>
 
             <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              {equityHistory.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-slate-500">Verified account history will appear after a successful account sync.</div>
+              ) : <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={equityHistory}>
                   <defs>
                     <linearGradient id="portEqGrad" x1="0" y1="0" x2="0" y2="1">
@@ -504,7 +483,7 @@ export default function Portfolio({
                   <Tooltip contentStyle={{ backgroundColor: '#090d19', borderColor: '#334155', borderRadius: '8px' }} />
                   <Area type="monotone" dataKey="val" stroke="#818CF8" strokeWidth={2.5} fill="url(#portEqGrad)" />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </div>
           </div>
         </div>

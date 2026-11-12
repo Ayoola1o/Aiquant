@@ -395,13 +395,14 @@ def run_backtest(req: BacktestRequest):
         except Exception:
             pass
 
+    if not req.ticker or not req.ticker.strip():
+        raise HTTPException(status_code=400, detail="A valid ticker is required.")
+    if not pd.notna(req.starting_capital) or req.starting_capital <= 0:
+        raise HTTPException(status_code=400, detail="Starting capital must be greater than zero.")
     df = qe.fetch_historical_data(
-        req.ticker,
-        period=actual_period,
-        interval=req.interval,
-        alpaca_key_id=req.alpaca_key_id,
-        alpaca_secret_key=req.alpaca_secret_key,
-        exchange=req.exchange
+        req.ticker.strip().upper(), period=actual_period, interval=req.interval,
+        alpaca_key_id=os.environ.get("ALPACA_KEY_ID", ""),
+        alpaca_secret_key=os.environ.get("ALPACA_SECRET_KEY", ""), exchange=req.exchange
     )
     if df.empty:
         raise HTTPException(status_code=400, detail=f"Failed to fetch historical data for {req.ticker}")
@@ -722,11 +723,17 @@ def resume_bot_endpoint(bot_id: str):
 
 @app.post("/api/live/bots/stop/{bot_id}")
 def stop_bot(bot_id: str, close_pct: float = 1.0):
+    if not 0 < close_pct <= 1:
+        raise HTTPException(status_code=400, detail="close_pct must be greater than 0 and at most 1.")
+    if live_session.get_bot(bot_id) is None:
+        raise HTTPException(status_code=404, detail="Bot not found.")
     live_session.stop_bot(bot_id, close_pct=close_pct)
     return {"status": "success", "bots": live_session.get_all_states()}
 
 @app.delete("/api/live/bots/{bot_id}")
 def delete_bot_endpoint(bot_id: str):
+    if live_session.get_bot(bot_id) is None:
+        raise HTTPException(status_code=404, detail="Bot not found.")
     live_session.delete_bot(bot_id)
     return {"status": "success", "bots": live_session.get_all_states()}
 
@@ -822,8 +829,12 @@ def get_alpaca_account_and_positions(req: AlpacaAccountRequest):
             raise HTTPException(status_code=400, detail=f"Account query failed ({acc_r.status_code}): {acc_r.text}")
             
         account_data = acc_r.json()
-        positions_data = pos_r.json() if pos_r.status_code == 200 else []
-        orders_data = ord_r.json() if ord_r.status_code == 200 else []
+        if pos_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Alpaca positions query failed ({pos_r.status_code}).")
+        if ord_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Alpaca orders query failed ({ord_r.status_code}).")
+        positions_data = pos_r.json()
+        orders_data = ord_r.json()
         
         equity_val = float(account_data.get("portfolio_value", account_data.get("equity", 0.0)))
         last_equity_val = float(account_data.get("last_equity", equity_val))
