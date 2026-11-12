@@ -11,7 +11,7 @@ import {
   RefreshCw, 
   CheckCircle2, 
   Hash
-} from 'lucide-react';
+} from './ui/icons';
 import { 
   BarChart, 
   Bar, 
