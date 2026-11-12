@@ -17,7 +17,7 @@ import {
   RefreshCw,
   X,
   Shield
-} from 'lucide-react';
+} from './ui/icons';
 
 interface PortfolioProps {
   alpacaKeyId?: string;
