@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Send, Copy, FileCode, Terminal, MessageCircle, X, Zap } from 'lucide-react';
+import { Sparkles, Send, Copy, FileCode, Terminal, MessageCircle, X, Zap } from './ui/icons';
 
 interface AIStrategyLabProps {
   strategies: Array<{ id: string; name: string; code: string }>;
