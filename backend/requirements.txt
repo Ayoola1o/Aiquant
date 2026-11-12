@@ -14,3 +14,7 @@ huggingface_hub==0.33.1
 safetensors==0.6.2
 alpaca-py
 python-dotenv
+argon2-cffi
+itsdangerous
+SQLAlchemy
+psycopg[binary]
