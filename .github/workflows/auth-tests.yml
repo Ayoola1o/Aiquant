@@ -6,7 +6,11 @@ on:
       - codex/backend-authentication
     paths:
       - "backend/auth_service.py"
+      - "backend/main.py"
       - "backend/test_auth.py"
+      - "frontend/src/App.tsx"
+      - "frontend/src/components/Auth.tsx"
+      - "backend/requirements.txt"
       - ".github/workflows/auth-tests.yml"
   pull_request:
     paths:
