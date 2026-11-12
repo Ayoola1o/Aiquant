@@ -72,7 +72,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             request.state.user = user
             admin_only_prefixes = (
                 "/api/live/", "/api/alpaca/", "/api/telegram/", "/api/risk/",
-                "/api/strategies", "/api/experiments", "/api/history",
+                "/api/backtest", "/api/strategies", "/api/experiments", "/api/history",
                 "/api/social/x-handles", "/api/test/run",
             )
             if path.startswith(admin_only_prefixes) and user["role"] != "admin":
