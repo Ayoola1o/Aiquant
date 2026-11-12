@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
+import hmac
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -94,7 +95,7 @@ def _public_user(row) -> dict:
     }
 
 
-def create_user(email: str, username: str, password: str) -> dict:
+def create_user(email: str, username: str, password: str, bootstrap_key: str = "") -> dict:
     _serializer()  # Fail before creating an account if session signing is not configured.
     email = (email or "").strip().lower()
     username = (username or "").strip()
@@ -109,7 +110,15 @@ def create_user(email: str, username: str, password: str) -> dict:
     try:
         with _engine.begin() as conn:
             admin_count = conn.execute(text("SELECT COUNT(*) FROM users WHERE role = 'admin'")).scalar_one()
-            role = "admin" if admin_count == 0 else "trader"
+            if admin_count == 0:
+                expected_key = os.environ.get("AIQUANT_BOOTSTRAP_ADMIN_KEY", "")
+                if len(expected_key) < 24:
+                    raise AuthError("Administrator setup is not configured. Set AIQUANT_BOOTSTRAP_ADMIN_KEY (at least 24 characters) before the first registration.", 503)
+                if not hmac.compare_digest(bootstrap_key or "", expected_key):
+                    raise AuthError("The administrator setup key is invalid.", 403)
+                role = "admin"
+            else:
+                role = "trader"
             conn.execute(text("""
                 INSERT INTO users (id, email, username, password_hash, role)
                 VALUES (:id, :email, :username, :password_hash, :role)
