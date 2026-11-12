@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight } from './ui/icons';
 
 interface AuthProps {
   onLoginSuccess: (username: string) => void;
