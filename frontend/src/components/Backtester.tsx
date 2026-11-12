@@ -23,9 +23,7 @@ interface BacktesterProps {
 
 export default function Backtester({
   strategies = [],
-  selectedStrategyId = '',
-  alpacaKeyId = '',
-  alpacaSecretKey = ''
+  selectedStrategyId = ''
 }: BacktesterProps) {
   // Strategy selection
   const [selectedStrategyIdLocal, setSelectedStrategyIdLocal] = useState<string>(
