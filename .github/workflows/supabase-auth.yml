@@ -1,0 +1,32 @@
+name: Supabase authentication checks
+
+on:
+  push:
+    branches:
+      - codex/supabase-auth-integration
+    paths:
+      - "backend/supabase_auth.py"
+      - "backend/test_supabase_auth.py"
+      - "backend/main.py"
+      - "backend/requirements.txt"
+      - ".github/workflows/supabase-auth.yml"
+  pull_request:
+    paths:
+      - "backend/supabase_auth.py"
+      - "backend/test_supabase_auth.py"
+      - "backend/main.py"
+      - "backend/requirements.txt"
+      - ".github/workflows/supabase-auth.yml"
+
+jobs:
+  auth-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install "PyJWT[crypto]>=2.10,<3" requests
+      - run: python -m py_compile backend/main.py backend/supabase_auth.py backend/test_supabase_auth.py
+      - working-directory: backend
+        run: python -m unittest test_supabase_auth -v
