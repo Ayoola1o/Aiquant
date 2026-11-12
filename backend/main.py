@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables (e.g. GEMINI_API_KEY)
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -32,6 +34,76 @@ app = FastAPI(
     description="Quantitative Trading and AI Forecasting Platform Backend",
     version="1.0.0"
 )
+
+# Server-side authentication: identity is derived only from a signed HttpOnly cookie.
+from auth_service import (
+    AuthError, create_user, authenticate_user, get_user_by_id,
+    create_session_token, verify_session_token, SESSION_MAX_AGE,
+)
+
+AUTH_PUBLIC_PATHS = {"/api/auth/register", "/api/auth/login", "/api/auth/logout", "/"}
+class AuthenticationMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if request.method == "OPTIONS" or path in AUTH_PUBLIC_PATHS or path == "/api/stocks":
+            request.state.user = None
+            return await call_next(request)
+        if path.startswith("/api/"):
+            token = request.cookies.get("aiquant_session")
+            user_id = verify_session_token(token) if token else None
+            user = get_user_by_id(user_id) if user_id else None
+            if not user:
+                return JSONResponse({"detail": "Authentication required."}, status_code=401)
+            origin = request.headers.get("origin")
+            if request.method not in ("GET", "HEAD") and origin:
+                from urllib.parse import urlparse
+                if urlparse(origin).netloc.lower() != request.url.netloc.lower():
+                    return JSONResponse({"detail": "Cross-origin request rejected."}, status_code=403)
+            request.state.user = user
+        return await call_next(request)
+
+app.add_middleware(AuthenticationMiddleware)
+
+@app.post("/api/auth/register")
+def register_account(payload: dict, response: Response):
+    try:
+        user = create_user(
+            email=str(payload.get("email", "")).strip().lower(),
+            username=str(payload.get("username", "")).strip(),
+            password=str(payload.get("password", "")),
+        )
+        token = create_session_token(user["id"])
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    secure = os.environ.get("AIQUANT_COOKIE_SECURE", "true" if os.environ.get("VERCEL") else "false").lower() == "true"
+    response.set_cookie("aiquant_session", token, max_age=SESSION_MAX_AGE, httponly=True, secure=secure, samesite="lax", path="/")
+    return {"user": user}
+
+@app.post("/api/auth/login")
+def login_account(payload: dict, response: Response):
+    try:
+        user = authenticate_user(
+            email=str(payload.get("email", "")).strip().lower(),
+            password=str(payload.get("password", "")),
+        )
+        token = create_session_token(user["id"])
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    secure = os.environ.get("AIQUANT_COOKIE_SECURE", "true" if os.environ.get("VERCEL") else "false").lower() == "true"
+    response.set_cookie("aiquant_session", token, max_age=SESSION_MAX_AGE, httponly=True, secure=secure, samesite="lax", path="/")
+    return {"user": user}
+
+@app.post("/api/auth/logout")
+def logout_account(response: Response):
+    response.delete_cookie("aiquant_session", path="/", httponly=True, samesite="lax")
+    return {"status": "success"}
+
+@app.get("/api/auth/me")
+def current_account(request: Request):
+    if not getattr(request.state, "user", None):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    return {"user": request.state.user}
+
 
 # Enable CORS for frontend connection
 app.add_middleware(
@@ -2150,59 +2222,17 @@ async def evaluate_adk_pipeline(req: ADKEvaluationRequest):
     return result
 
 @app.get("/api/profile")
-def get_user_profile():
-    """
-    Returns mock data for the User Profile Terminal of Alexander Ramirez.
-    """
+def get_user_profile(request: Request):
+    user = request.state.user
     return {
-        "name": "Alexander Ramirez",
-        "title": "Senior Quantitative Analyst & AI Lead",
-        "member_since": "Jan 2019",
-        "email": "ramirez.alex@neuroquant.ai",
-        "linked_profile": "linked-profile: alex-r-quant-lead",
-        "roles": [
-            {"name": "Lead", "project": "NeuroLSTM"},
-            {"name": "Contributor", "project": "Anomaly Models"}
-        ],
-        "account_settings": {
-            "tier": "Pro+ Terminal Tier",
-            "renewal": "Jan 15, 2025",
-            "2fa_enabled": True,
-            "api_keys_masked": "******Keys, ******Keys",
-            "last_login_ip": "192.168.2.125"
-        },
-        "integrations": {
-            "alpaca": True,
-            "polygon": True,
-            "aws": True
-        },
-        "model_dev_history": [
-            {"year": "2019", "models": 1},
-            {"year": "2020", "models": 2},
-            {"year": "2021", "models": 3},
-            {"year": "2022", "models": 4},
-            {"year": "2023", "models": 7}
-        ],
-        "contributions": [
-            {"name": "NeuroLSTM_x2.0", "role": "Lead", "status": "Active"},
-            {"name": "Anomaly Detection V1", "role": "Lead", "status": "Active"},
-            {"name": "Anomaly Detection V3", "role": "Contributor", "status": "Live"},
-            {"name": "Anomaly Detection V3", "role": "Lead", "status": "Live"}
-        ],
-        "activity_feed": [
-            {"timestamp": "2026-06-28 14:20", "event": "Published Research Draft: 'AI in High-Frequency Volatility Prediction'"},
-            {"timestamp": "2026-06-28 10:15", "event": "Hyper-parameter optimization: NeuroLSTM_x2.0 (complete)"},
-            {"timestamp": "2026-06-27 18:40", "event": "Created new model feature set: 'Alternative Alpha'"},
-            {"timestamp": "2026-06-27 09:30", "event": "Code Review: LSTM V3 model"}
-        ],
-        "skills": [
-            {"subject": "Quantitative", "value": 85, "fullMark": 100},
-            {"subject": "Optimization", "value": 90, "fullMark": 100},
-            {"subject": "Sentiment Analysis", "value": 75, "fullMark": 100},
-            {"subject": "Data Sourcing", "value": 80, "fullMark": 100},
-            {"subject": "Feature Engineering", "value": 95, "fullMark": 100}
-        ]
+        "name": user["username"], "title": "Aiquant Trader",
+        "member_since": user["created_at"], "email": user["email"],
+        "linked_profile": "", "roles": [],
+        "account_settings": {"tier": "Standard", "renewal": "", "2fa_enabled": False, "api_keys_masked": "", "last_login_ip": ""},
+        "integrations": {"alpaca": False, "polygon": False, "aws": False},
+        "model_dev_history": [], "contributions": [], "activity_feed": [], "skills": []
     }
+}
 
 class AlpacaChartDataRequest(BaseModel):
     alpaca_key_id: str
@@ -2796,6 +2826,11 @@ def run_integration_tests():
 
 @app.websocket("/ws/live-trading")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.cookies.get("aiquant_session")
+    user_id = verify_session_token(token) if token else None
+    if not user_id or not get_user_by_id(user_id):
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     await websocket.accept()
     live_session.connected_websockets.add(websocket)
     print(f"[WS] Client connected. Total: {len(live_session.connected_websockets)}", flush=True)
