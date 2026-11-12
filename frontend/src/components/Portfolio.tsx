@@ -26,10 +26,18 @@ interface PortfolioProps {
 
 // Mini Sparkline component for KPI cards
 const MiniSparkline = ({ data, color, width = 55, height = 20 }: { data: number[]; color: string; width?: number; height?: number }) => {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const validData = data.filter(Number.isFinite);
+  if (validData.length < 2) {
+    return (
+      <svg width={width} height={height} className="overflow-visible">
+        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="#475569" strokeDasharray="2 3" />
+      </svg>
+    );
+  }
+  const min = Math.min(...validData);
+  const max = Math.max(...validData);
   const range = max - min || 1;
-  const points = data
+  const points = validData
     .map((val, i) => {
       const x = (i / (data.length - 1)) * width;
       const y = height - ((val - min) / range) * (height - 4) - 2;
@@ -158,7 +166,7 @@ export default function Portfolio({
           if (data.orders && Array.isArray(data.orders)) {
             setRecentOrders(data.orders);
           }
-          const historyPeriod: Record<string, string> = { '1D': '1D', '7D': '1W', '30D': '1M', '90D': '3M', 'YTD': '1A', 'ALL': '1A' };
+          const historyPeriod: Record<string, string> = { '1D': '1D', '7D': '1W', '30D': '1M', '90D': '3M', '6M': '6M', '1Y': '1A' };
           const historyResponse = await fetch('/api/alpaca/portfolio/history', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -302,7 +310,7 @@ export default function Portfolio({
           </button>
 
           <div className="flex bg-[#0c101d] p-1 rounded-xl border border-white/5 text-xs">
-            {(['1D', '7D', '30D', '90D', 'YTD', 'ALL'] as const).map(tr => (
+            {(['1D', '7D', '30D', '90D', '6M', '1Y'] as const).map(tr => (
               <button
                 key={tr}
                 onClick={() => setTimeRange(tr)}
@@ -360,7 +368,7 @@ export default function Portfolio({
                 {dailyPnl >= 0 ? '+' : ''}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-medium">({dailyPnlPct >= 0 ? '+' : ''}{dailyPnlPct.toFixed(2)}%)</span>
               </div>
             </div>
-            <MiniSparkline color={dailyPnl >= 0 ? "#10B981" : "#F43F5E"} data={[30, 35, 42, 48, 55, 65]} width={55} height={20} />
+            <MiniSparkline color={dailyPnl >= 0 ? "#10B981" : "#F43F5E"} data={equityHistory.map(point => point.val)} width={55} height={20} />
           </div>
         </div>
 
@@ -459,7 +467,7 @@ export default function Portfolio({
                 {dailyPnlPct >= 0 ? '+' : ''}{dailyPnlPct.toFixed(2)}%
               </div>
             </div>
-            <MiniSparkline color="#A855F7" data={[20, 25, 38, 42, 50, 60]} width={55} height={20} />
+            <MiniSparkline color="#A855F7" data={equityHistory.map(point => point.val)} width={55} height={20} />
           </div>
         </div>
 
