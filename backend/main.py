@@ -63,6 +63,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             if not user:
                 return JSONResponse({"detail": "Authentication required."}, status_code=401)
             request.state.user = user
+            admin_only_prefixes = (
+                "/api/live/", "/api/alpaca/", "/api/telegram/", "/api/risk/",
+                "/api/strategies", "/api/experiments", "/api/history",
+                "/api/social/x-handles", "/api/test/run",
+            )
+            if path.startswith(admin_only_prefixes) and user["role"] != "admin":
+                return JSONResponse({"detail": "Administrator permission required for this operation."}, status_code=403)
         return await call_next(request)
 
 app.add_middleware(AuthenticationMiddleware)
@@ -74,6 +81,7 @@ def register_account(payload: dict, response: Response):
             email=str(payload.get("email", "")).strip().lower(),
             username=str(payload.get("username", "")).strip(),
             password=str(payload.get("password", "")),
+            bootstrap_key=str(payload.get("bootstrap_key", "")),
         )
         token = create_session_token(user["id"])
     except AuthError as exc:
