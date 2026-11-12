@@ -95,6 +95,7 @@ def _public_user(row) -> dict:
 
 
 def create_user(email: str, username: str, password: str) -> dict:
+    _serializer()  # Fail before creating an account if session signing is not configured.
     email = (email or "").strip().lower()
     username = (username or "").strip()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 320:
@@ -123,6 +124,7 @@ def create_user(email: str, username: str, password: str) -> dict:
 
 
 def authenticate_user(email: str, password: str) -> dict:
+    _serializer()  # Fail closed when the deployment has no stable session secret.
     email = (email or "").strip().lower()
     with _engine.connect() as conn:
         row = conn.execute(text("SELECT * FROM users WHERE email = :email"), {"email": email}).mappings().first()
