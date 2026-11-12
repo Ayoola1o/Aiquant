@@ -65,12 +65,23 @@ class AuthenticationServiceTests(unittest.TestCase):
         self.assertIsNone(auth_service.verify_session_token(token))
 
     def test_wrong_bootstrap_key_cannot_claim_first_admin(self):
-        # Use a fresh email; the already-initialized system correctly treats new accounts as traders.
-        trader = auth_service.create_user(
-            "another-trader@example.test", "Another Trader", "yet another secure password 2026",
-            "incorrect-bootstrap-key",
+        previous_engine = auth_service._engine
+        isolated_engine = auth_service.create_engine(
+            "sqlite:///" + str(Path(_test_dir.name) / "bootstrap-test.db"),
+            connect_args={"check_same_thread": False},
         )
-        self.assertEqual(trader["role"], "trader")
+        auth_service._engine = isolated_engine
+        try:
+            auth_service.init_auth_db()
+            with self.assertRaises(auth_service.AuthError) as caught:
+                auth_service.create_user(
+                    "attacker@example.test", "Attacker", "a sufficiently long password 2026",
+                    "incorrect-bootstrap-key",
+                )
+            self.assertEqual(caught.exception.status_code, 403)
+        finally:
+            isolated_engine.dispose()
+            auth_service._engine = previous_engine
 
 
 if __name__ == "__main__":
