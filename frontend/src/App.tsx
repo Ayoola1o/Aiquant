@@ -52,7 +52,8 @@ import {
   Maximize2,
   X,
   Menu
-} from 'lucide-react';
+  Lineicons, LineHome
+} from './components/ui/icons';
 
 
 export default function App() {
@@ -468,11 +469,7 @@ function QuantApp() {
             >
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
                 <div className="w-full h-full bg-[#080b14] rounded-[10px] flex items-center justify-center">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-indigo-400">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 17L12 22L22 17" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 12L12 17L22 12" stroke="#C084FC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <Lineicons icon={LineHome} size={18} color="#818cf8" strokeWidth={1.8} />
                 </div>
               </div>
               <div className="min-w-0">
@@ -567,7 +564,7 @@ function QuantApp() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#0a0c16] to-[#05070c]">
         {/* Top Header */}
-        <header className="px-8 py-4 border-b border-white/5 flex justify-between items-center bg-[#0d111d]/70 backdrop-blur-md gap-4 sticky top-0 z-30">
+        <header className="px-4 sm:px-6 xl:px-8 py-4 border-b border-white/5 flex justify-between items-center bg-[#0d111d]/70 backdrop-blur-md gap-4 sticky top-0 z-30">
           <div className="flex items-center gap-4 min-w-0">
             {!sidebarOpen && (
               <button
@@ -659,7 +656,7 @@ function QuantApp() {
 
 
         {/* Content Box */}
-        <main className="p-8 flex-1 overflow-y-auto">
+        <main className="p-4 sm:p-6 xl:p-8 flex-1 overflow-y-auto min-w-0">
           <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
