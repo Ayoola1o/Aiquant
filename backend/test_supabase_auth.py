@@ -41,7 +41,7 @@ class SupabaseAuthTests(unittest.TestCase):
 
     @patch("supabase_auth._config")
     @patch("supabase_auth._verify_access_token")
-    def test_wrong_postgres_role_is_rejected(self, config, verify):
+    def test_wrong_postgres_role_is_rejected(self, verify, config):
         config.return_value = ("https://project.supabase.co", "publishable")
         verify.return_value = {"sub": "user-123", "role": "anon"}
         with self.assertRaises(supabase_auth.SupabaseAuthError):
