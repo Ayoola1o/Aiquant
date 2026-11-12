@@ -13,6 +13,7 @@ from typing import Any
 import jwt
 import requests
 from jwt import PyJWKClient
+from jwt.exceptions import PyJWKClientError
 from jwt.exceptions import InvalidTokenError
 
 class SupabaseAuthError(Exception):
@@ -58,7 +59,7 @@ def _verify_access_token(token: str, url: str, api_key: str) -> dict[str, Any]:
         )
     except SupabaseAuthError:
         raise
-    except (InvalidTokenError, requests.RequestException, ValueError, KeyError) as exc:
+    except (InvalidTokenError, PyJWKClientError, requests.RequestException, ValueError, KeyError) as exc:
         raise SupabaseAuthError("Invalid or expired access token.") from exc
 
 def verify_supabase_token(token: str) -> dict[str, Any]:
