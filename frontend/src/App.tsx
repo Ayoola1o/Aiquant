@@ -71,6 +71,8 @@ function QuantApp() {
 
   useEffect(() => {
     let active = true;
+    // Remove the legacy mock-session marker; only the server cookie is trusted now.
+    localStorage.removeItem('neuroquant_session');
     fetch('/api/auth/me', { credentials: 'same-origin' })
       .then(async (response) => {
         if (!response.ok) throw new Error('No active session');
