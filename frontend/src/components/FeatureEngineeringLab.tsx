@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layers, Database, BarChart2, Download } from 'lucide-react';
+import { Layers, Database, BarChart2, Download } from './ui/icons';
 
 
 export default function FeatureEngineeringLab() {
