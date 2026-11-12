@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff, RefreshCw } from './ui/icons';
 
 interface SettingsProps {
   alpacaKeyId: string;
