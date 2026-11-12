@@ -2841,8 +2841,12 @@ def run_integration_tests():
 async def websocket_endpoint(websocket: WebSocket):
     token = websocket.cookies.get("aiquant_session")
     user_id = verify_session_token(token) if token else None
-    if not user_id or not get_user_by_id(user_id):
+    user = get_user_by_id(user_id) if user_id else None
+    if not user:
         await websocket.close(code=1008, reason="Authentication required")
+        return
+    if user["role"] != "admin":
+        await websocket.close(code=1008, reason="Administrator permission required")
         return
     await websocket.accept()
     live_session.connected_websockets.add(websocket)
