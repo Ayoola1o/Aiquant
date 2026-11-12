@@ -25,7 +25,7 @@ import {
   Building2,
   BookOpen,
   RefreshCw
-} from 'lucide-react';
+} from './ui/icons';
 
 interface ScreenerItem {
   ticker: string;
