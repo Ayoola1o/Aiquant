@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity, AlertOctagon, AlertTriangle, ArrowDownRight, ArrowUpRight,
-  CheckCircle2, Clock3, Flame, Gauge, Info, RefreshCw, ShieldAlert,
-  ShieldCheck, Siren, TrendingDown, Zap
+  Activity, AlertTriangle, CheckCircle2, Clock3, Flame, Gauge, Info,
+  Radio, RefreshCw, ShieldAlert, ShieldCheck, Siren, TrendingDown, Zap
 } from 'lucide-react';
 
 interface TelemetryData {
