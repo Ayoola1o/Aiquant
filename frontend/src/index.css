@@ -189,3 +189,37 @@ body {
 .sector-block:hover {
   transform: translateY(-2px);
 }
+
+
+/* Application-wide responsive refinements */
+#root { min-height: 100vh; width: 100%; }
+main { min-width: 0; }
+main > div { min-width: 0; max-width: 100%; }
+main section, main article, main [class*="grid"] { min-width: 0; }
+main input, main select, main textarea { max-width: 100%; }
+main table { width: 100%; }
+main .overflow-x-auto { scrollbar-width: thin; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, .85);
+  outline-offset: 2px;
+}
+.lni { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+
+@media (max-width: 1024px) {
+  main { padding: 1rem !important; }
+  main .grid-cols-4, main .lg\\:grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main .grid-cols-3, main .lg\\:grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  main { padding: .875rem !important; }
+  main .grid-cols-4, main .grid-cols-3, main .grid-cols-2,
+  main .md\\:grid-cols-2, main .md\\:grid-cols-3, main .lg\\:grid-cols-2,
+  main .lg\\:grid-cols-3, main .lg\\:grid-cols-4 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  main h1 { font-size: 1.25rem; line-height: 1.45; }
+  main .glass-panel { border-radius: 14px; }
+  header { flex-wrap: wrap; }
+}
