@@ -51,7 +51,14 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         origin = request.headers.get("origin")
         if request.method not in ("GET", "HEAD") and origin:
             from urllib.parse import urlparse
-            if urlparse(origin).netloc.lower() != request.url.netloc.lower():
+            origin_value = origin.rstrip("/")
+            allowed_origins = {
+                value.strip().rstrip("/")
+                for value in os.environ.get("AIQUANT_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+                if value.strip()
+            }
+            same_origin = urlparse(origin_value).netloc.lower() == request.url.netloc.lower()
+            if not same_origin and origin_value not in allowed_origins:
                 return JSONResponse({"detail": "Cross-origin request rejected."}, status_code=403)
         if path in AUTH_PUBLIC_PATHS or path == "/api/stocks":
             request.state.user = None
