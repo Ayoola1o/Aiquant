@@ -3,6 +3,8 @@ import os
 import json
 import logging
 import traceback
+import secrets
+import time
 import requests
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -80,6 +82,24 @@ def current_account(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required.")
     return {"user": user}
+
+
+# One-time short-lived tickets avoid putting Supabase JWTs in WebSocket URLs.
+_WS_TICKETS: dict[str, tuple[str, float]] = {}
+
+@app.post("/api/auth/ws-ticket")
+def create_websocket_ticket(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Administrator permission required.")
+    now = time.time()
+    for ticket, (_, expires) in list(_WS_TICKETS.items()):
+        if expires <= now:
+            _WS_TICKETS.pop(ticket, None)
+    ticket = secrets.token_urlsafe(32)
+    _WS_TICKETS[ticket] = (user["id"], now + 30)
+    return {"ticket": ticket, "expires_in": 30}
+
 
 # Enable CORS for frontend connection
 app.add_middleware(
@@ -2801,14 +2821,10 @@ def run_integration_tests():
 
 @app.websocket("/ws/live-trading")
 async def websocket_endpoint(websocket: WebSocket):
-    token = websocket.cookies.get("aiquant_session")
-    user_id = verify_session_token(token) if token else None
-    user = get_user_by_id(user_id) if user_id else None
-    if not user:
+    ticket = websocket.query_params.get("ticket", "")
+    ticket_data = _WS_TICKETS.pop(ticket, None)
+    if not ticket_data or ticket_data[1] <= time.time():
         await websocket.close(code=1008, reason="Authentication required")
-        return
-    if user["role"] != "admin":
-        await websocket.close(code=1008, reason="Administrator permission required")
         return
     await websocket.accept()
     live_session.connected_websockets.add(websocket)
