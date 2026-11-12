@@ -227,43 +227,30 @@ function QuantApp() {
 
   const [selectedStrategyId, setSelectedStrategyId] = useState('default');
 
-  // Global API credential settings — persisted to localStorage
-  const [alpacaKeyId, setAlpacaKeyId] = useState<string>(() =>
-    localStorage.getItem('neuroquant_alpaca_key_id') || ''
-  );
-  const [alpacaSecretKey, setAlpacaSecretKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_alpaca_secret_key') || ''
-  );
-  const [openAiApiKey, setOpenAiApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_openai_api_key') || ''
-  );
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_gemini_api_key') || ''
-  );
-  const [techAgentKey, setTechAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_tech_agent_key') || ''
-  );
-  const [sentimentAgentKey, setSentimentAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_sentiment_agent_key') || ''
-  );
-  const [tradingViewAgentKey, setTradingViewAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_tradingview_agent_key') || ''
-  );
-  const [hyperliquidAgentKey, setHyperliquidAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_hyperliquid_agent_key') || ''
-  );
-  const [hyperliquidPrivateKey, setHyperliquidPrivateKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_hyperliquid_private_key') || ''
-  );
-  const [firecrawlAgentKey, setFirecrawlAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_firecrawl_agent_key') || ''
-  );
-  const [openRouterApiKey, setOpenRouterApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_openrouter_api_key') || ''
-  );
-  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_nvidia_api_key') || ''
-  );
+  // API credentials are held in memory only; do not persist secrets in browser storage.
+  const [alpacaKeyId, setAlpacaKeyId] = useState<string>('');
+  const [alpacaSecretKey, setAlpacaSecretKey] = useState<string>('');
+  const [openAiApiKey, setOpenAiApiKey] = useState<string>('');
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [techAgentKey, setTechAgentKey] = useState<string>('');
+  const [sentimentAgentKey, setSentimentAgentKey] = useState<string>('');
+  const [tradingViewAgentKey, setTradingViewAgentKey] = useState<string>('');
+  const [hyperliquidAgentKey, setHyperliquidAgentKey] = useState<string>('');
+  const [hyperliquidPrivateKey, setHyperliquidPrivateKey] = useState<string>('');
+  const [firecrawlAgentKey, setFirecrawlAgentKey] = useState<string>('');
+  const [openRouterApiKey, setOpenRouterApiKey] = useState<string>('');
+  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>('');
+
+  useEffect(() => {
+    [
+      'neuroquant_alpaca_key_id', 'neuroquant_alpaca_secret_key',
+      'neuroquant_openai_api_key', 'neuroquant_gemini_api_key',
+      'neuroquant_tech_agent_key', 'neuroquant_sentiment_agent_key',
+      'neuroquant_tradingview_agent_key', 'neuroquant_hyperliquid_agent_key',
+      'neuroquant_hyperliquid_private_key', 'neuroquant_firecrawl_agent_key',
+      'neuroquant_openrouter_api_key', 'neuroquant_nvidia_api_key'
+    ].forEach((key) => localStorage.removeItem(key));
+  }, []);
 
   // Global AI Model Settings
   const [aiModel, setAiModel] = useState<string>(() =>
@@ -405,46 +392,14 @@ function QuantApp() {
     localStorage.setItem('neuroquant_strategies', JSON.stringify(strategies));
   }, [strategies]);
 
-  // Sync Alpaca credentials to localStorage
+  // Persist non-secret model preferences only.
   useEffect(() => {
-    localStorage.setItem('neuroquant_alpaca_key_id', alpacaKeyId);
-    localStorage.setItem('neuroquant_alpaca_secret_key', alpacaSecretKey);
-  }, [alpacaKeyId, alpacaSecretKey]);
-
-  // Sync AI Assistant API credentials & models to localStorage
-  useEffect(() => {
-    localStorage.setItem('neuroquant_openai_api_key', openAiApiKey);
-    localStorage.setItem('neuroquant_gemini_api_key', geminiApiKey);
-    localStorage.setItem('neuroquant_tech_agent_key', techAgentKey);
-    localStorage.setItem('neuroquant_sentiment_agent_key', sentimentAgentKey);
-    localStorage.setItem('neuroquant_tradingview_agent_key', tradingViewAgentKey);
-    localStorage.setItem('neuroquant_hyperliquid_agent_key', hyperliquidAgentKey);
-    localStorage.setItem('neuroquant_hyperliquid_private_key', hyperliquidPrivateKey);
-    localStorage.setItem('neuroquant_firecrawl_agent_key', firecrawlAgentKey);
-    localStorage.setItem('neuroquant_openrouter_api_key', openRouterApiKey);
-    localStorage.setItem('neuroquant_nvidia_api_key', nvidiaApiKey);
     localStorage.setItem('neuroquant_ai_model', aiModel);
     localStorage.setItem('neuroquant_openai_model', openaiModel);
     localStorage.setItem('neuroquant_gemini_model', geminiModel);
     localStorage.setItem('neuroquant_openrouter_model', openRouterModel);
     localStorage.setItem('neuroquant_nvidia_model', nvidiaModel);
-  }, [
-    openAiApiKey, 
-    geminiApiKey,
-    techAgentKey,
-    sentimentAgentKey,
-    tradingViewAgentKey,
-    hyperliquidAgentKey,
-    hyperliquidPrivateKey,
-    firecrawlAgentKey,
-    openRouterApiKey, 
-    nvidiaApiKey, 
-    aiModel, 
-    openaiModel, 
-    geminiModel, 
-    openRouterModel, 
-    nvidiaModel
-  ]);
+  }, [aiModel, openaiModel, geminiModel, openRouterModel, nvidiaModel]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -733,8 +688,6 @@ function QuantApp() {
               <Backtester 
                 strategies={strategies} 
                 selectedStrategyId={selectedStrategyId} 
-                alpacaKeyId={alpacaKeyId}
-                alpacaSecretKey={alpacaSecretKey}
               />
             } />
             <Route path="/live" element={
