@@ -296,7 +296,15 @@ def predict_prices(req: PredictRequest):
 def run_backtest(req: BacktestRequest):
     """
     Compiles and executes a custom strategy script against historical data.
+
+    WARNING: strategy execution currently uses Python exec and is not sandboxed.
+    Keep this endpoint disabled until an isolated worker is deployed.
     """
+    if os.environ.get("AIQUANT_ENABLE_UNSANDBOXED_BACKTEST", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail="Custom strategy backtesting is temporarily disabled while secure isolated execution is being deployed."
+        )
     warmup_days = 210
     actual_period = req.period
     warmup_candles = 0
