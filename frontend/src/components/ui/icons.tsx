@@ -27,7 +27,7 @@ export {
   LuClock3 as Clock3, LuLayers3 as Layers3, LuMessageSquare as MessageSquare,
   LuFlame as Flame, LuSiren as Siren, LuLayoutDashboard as LayoutDashboard,
   LuCompass as Compass, LuBriefcase as Briefcase, LuMaximize2 as Maximize2,
-  LuChevronDown as ChevronDown, LuMoon as Moon, LuMenu as Menu,
+  LuChevronDown as ChevronDown, LuMoon as Moon, LuMenu as Menu, LuLogOut as LogOut,
 } from 'react-icons/lu';
 
 export { Lineicons } from '@lineiconshq/react-lineicons';
