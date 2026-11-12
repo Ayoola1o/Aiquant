@@ -36,7 +36,7 @@ app = FastAPI(
 # Enable CORS for frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in os.environ.get("AIQUANT_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -145,17 +145,17 @@ class RiskProfileModel(BaseModel):
     atr_risk_percent: float = 1.0
     atr_period: int = 14
     atr_multiplier: float = 2.0
-    max_order_value_enabled: bool = False
+    max_order_value_enabled: bool = True
     max_order_value: float = 5000.0
-    price_collar_enabled: bool = False
+    price_collar_enabled: bool = True
     max_spread_percent: float = 0.5
-    correlation_limit_enabled: bool = False
+    correlation_limit_enabled: bool = True
     max_allocation_per_asset: float = 20.0
-    max_simultaneous_trades_enabled: bool = False
+    max_simultaneous_trades_enabled: bool = True
     max_simultaneous_trades: int = 5
-    max_drawdown_enabled: bool = False
+    max_drawdown_enabled: bool = True
     max_drawdown_percent: float = 3.0
-    heartbeat_check_enabled: bool = False
+    heartbeat_check_enabled: bool = True
     max_heartbeat_stale_seconds: int = 30
     exit_size_pct: float = 100.0
     auto_rebalance_enabled: bool = False
