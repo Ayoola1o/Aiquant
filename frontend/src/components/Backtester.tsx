@@ -12,7 +12,7 @@ import {
   Play, 
   Download, 
   AlertCircle
-} from 'lucide-react';
+} from './ui/icons';
 
 interface BacktesterProps {
   strategies?: Array<{ id: string; name: string; code: string }>;
