@@ -60,3 +60,5 @@ jobs:
         run: npx --prefix frontend tsc -b frontend/tsconfig.json --pretty false
       - name: Build frontend for production
         run: npm run build --prefix frontend
+
+# Integration branch validation baseline.
