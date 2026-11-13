@@ -3,7 +3,7 @@ import {
   Activity, ArrowUpRight, Bot, BrainCircuit, ChevronRight, Clock3, Cpu,
   Gauge, Layers3, MessageSquare,
   Pause, Play, Radio, RefreshCw, ShieldCheck, Sparkles, Terminal, Zap
-} from 'lucide-react';
+} from './ui/icons';
 
 type AgentStatus = 'IDLE' | 'BUSY' | 'STREAMING' | 'PAUSED';
 interface Agent {
