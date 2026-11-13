@@ -51,7 +51,7 @@ import {
   ArrowRight,
   Maximize2,
   X,
-  Menu
+  Menu,
   Lineicons, LineHome
 } from './components/ui/icons';
 
