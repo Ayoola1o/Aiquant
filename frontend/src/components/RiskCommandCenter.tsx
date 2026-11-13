@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, AlertTriangle, CheckCircle2, Clock3, Flame, Gauge, Info,
   Radio, RefreshCw, ShieldAlert, ShieldCheck, Siren, TrendingDown, Zap
-} from 'lucide-react';
+} from './ui/icons';
 
 interface TelemetryData {
   paused: boolean;
