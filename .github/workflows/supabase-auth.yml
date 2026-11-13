@@ -1,40 +1,61 @@
-name: Supabase authentication checks
+name: Aiquant CI
 
 on:
   push:
-    branches:
-      - codex/supabase-auth-integration
-      - codex/fix-live-backtest-portfolio
-    paths:
-      - "backend/supabase_auth.py"
-      - "backend/test_supabase_auth.py"
-      - "backend/main.py"
-      - "backend/requirements.txt"
-      - ".github/workflows/supabase-auth.yml"
   pull_request:
-    paths:
-      - "backend/supabase_auth.py"
-      - "backend/test_supabase_auth.py"
-      - "backend/main.py"
-      - "backend/requirements.txt"
-      - ".github/workflows/supabase-auth.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aiquant-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  auth-tests:
+  backend:
+    name: Backend compile and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install "PyJWT[crypto]>=2.10,<3" requests
-      - run: python -m py_compile backend/main.py backend/supabase_auth.py backend/test_supabase_auth.py
-      - working-directory: backend
-        run: python -m unittest test_supabase_auth -v
-      - uses: actions/setup-node@v4
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend test dependencies
+        run: python -m pip install --upgrade pip "PyJWT[crypto]>=2.10,<3" requests
+
+      - name: Compile all backend Python files
+        run: python -m compileall -q backend
+
+      - name: Run backend unit tests
+        run: python -m unittest discover -s backend -p "test_*.py" -v
+
+  frontend:
+    name: Frontend TypeScript and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci --prefix frontend
-      - run: npm run build --prefix frontend
+
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: TypeScript project checks
+        run: npx --prefix frontend tsc -b frontend/tsconfig.json --pretty false
+
+      - name: Build frontend for production
+        run: npm run build --prefix frontend
