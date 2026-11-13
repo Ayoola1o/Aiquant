@@ -25,5 +25,10 @@
       "src": "/(.*)",
       "dest": "/frontend/dist/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "backend/main.py": {
+      "excludeFiles": "{frontend/**,artifacts-download/**,Skins/**,chatgpt/**,jesseguide/**,.agents/**,.paul/**,buildguide/**,hyperliquid-skills/**,hyperliquid-stats-web/**,knowledge-work-plugins/**,senpi-skills/**,**/*.srt,**/*.pdf,**/*.png,**/test_*.py,**/*_test.py,**/__pycache__/**}"
+    }
+  }
 }
