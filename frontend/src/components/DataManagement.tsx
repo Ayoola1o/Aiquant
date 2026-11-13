@@ -1,4 +1,4 @@
-import { Database, RefreshCw } from 'lucide-react';
+import { Database, RefreshCw } from './ui/icons';
 
 
 export default function DataManagement() {
