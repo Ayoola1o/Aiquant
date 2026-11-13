@@ -22,14 +22,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - name: Install backend test dependencies
-        run: >-
+      - name: Install backend runtime dependencies
+        run: |
           python -m pip install --upgrade pip
-          "PyJWT[crypto]>=2.10,<3" requests numpy pandas scipy scikit-learn
-          yfinance websockets pydantic alpaca-py
+          python -m pip install -r backend/requirements.txt
       - name: Compile all backend Python files
         run: python -m compileall -q backend
       - name: Run backend unit tests
