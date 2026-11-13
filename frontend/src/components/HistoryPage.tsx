@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, TrendingUp, TrendingDown, Bot, FlaskConical, Save } from 'lucide-react';
+import { Archive, TrendingUp, TrendingDown, Bot, FlaskConical, Save } from './ui/icons';
 
 interface Trade {
   symbol: string;
