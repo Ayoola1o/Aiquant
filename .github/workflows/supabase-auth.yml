@@ -32,9 +32,14 @@ jobs:
           yfinance websockets pydantic alpaca-py
       - name: Compile all backend Python files
         run: python -m compileall -q backend
-      - name: Run discovered backend unit tests
+      - name: Run backend unit tests
         working-directory: backend
-        run: python -m unittest discover -s . -p "test_*.py" -v
+        run: |
+          if [ -f test_supabase_auth.py ]; then
+            python -m unittest test_supabase_auth test_suite -v
+          else
+            python -m unittest test_suite -v
+          fi
 
   frontend:
     name: Frontend TypeScript and production build
