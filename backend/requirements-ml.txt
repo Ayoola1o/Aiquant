@@ -1,0 +1,8 @@
+# Optional local Kronos transformer dependencies.
+# Install with: pip install -r backend/requirements-ml.txt
+# Vercel uses backend/requirements.txt and intentionally omits these large ML packages.
+-r requirements.txt
+torch>=2.0.0
+einops==0.8.1
+huggingface_hub==0.33.1
+safetensors==0.6.2
