@@ -22,7 +22,7 @@ import {
   X,
   Settings,
   Radio
-} from 'lucide-react';
+} from './ui/icons';
 
 interface LiveSessionProps {
   strategies?: Array<{ id: string; name: string; code: string }>;
