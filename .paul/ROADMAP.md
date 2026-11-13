@@ -24,3 +24,8 @@ last_updated: "2026-08-05"
 
 ### Active Phase
 - [ ] Phase 8: Production Containerization & Cloud Deployment Infrastructure
+
+### UI Quality Track (in progress)
+- [x] Add shared React Icons and Lineicons foundation across all frontend pages.
+- [x] Standardize responsive application shell, page surfaces, focus states, and mobile grid behavior.
+- [ ] Complete per-page interaction, loading, empty, and error-state audits with browser validation.

@@ -8,7 +8,7 @@ import {
   Activity,
   Bot,
   BarChart2
-} from 'lucide-react';
+} from './ui/icons';
 import { 
   ComposedChart,
   Bar,

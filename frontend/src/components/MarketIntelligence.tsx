@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Newspaper, Gauge, DollarSign, Activity, Calendar, RefreshCw } from 'lucide-react';
+import { Newspaper, Gauge, DollarSign, Activity, Calendar, RefreshCw } from './ui/icons';
 
 
 export default function MarketIntelligence() {

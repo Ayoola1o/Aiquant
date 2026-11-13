@@ -17,7 +17,7 @@ import {
   RefreshCw,
   X,
   Shield
-} from 'lucide-react';
+} from './ui/icons';
 
 interface PortfolioProps {
   alpacaKeyId?: string;
@@ -26,10 +26,18 @@ interface PortfolioProps {
 
 // Mini Sparkline component for KPI cards
 const MiniSparkline = ({ data, color, width = 55, height = 20 }: { data: number[]; color: string; width?: number; height?: number }) => {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const validData = data.filter(Number.isFinite);
+  if (validData.length < 2) {
+    return (
+      <svg width={width} height={height} className="overflow-visible">
+        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="#475569" strokeDasharray="2 3" />
+      </svg>
+    );
+  }
+  const min = Math.min(...validData);
+  const max = Math.max(...validData);
   const range = max - min || 1;
-  const points = data
+  const points = validData
     .map((val, i) => {
       const x = (i / (data.length - 1)) * width;
       const y = height - ((val - min) / range) * (height - 4) - 2;
@@ -112,42 +120,21 @@ export default function Portfolio({
   const [totalPnl, setTotalPnl] = useState(0.0);
 
   // Equity Curve Timeline
-  const equityHistory = [
-    { date: 'Aug 15', val: 98000 },
-    { date: 'Aug 16', val: 104000 },
-    { date: 'Aug 17', val: 101000 },
-    { date: 'Aug 18', val: 112000 },
-    { date: 'Aug 19', val: 119000 },
-    { date: 'Aug 20', val: 122000 },
-    { date: 'Aug 21', val: 128450.75 }
-  ];
+  const [equityHistory, setEquityHistory] = useState<Array<{ date: string; val: number }>>([]);
 
   // Positions Data
   const [positions, setPositions] = useState<any[]>([]);
-
-  const fetchBotsFallback = async () => {
-    try {
-      const botsRes = await fetch('/api/live/bots');
-      if (botsRes.ok) {
-        const botsData = await botsRes.json();
-        const allBots = Object.values(botsData.bots || {}) as any[];
-        if (allBots.length > 0) {
-          const sumEquity = allBots.reduce((acc, b) => acc + (b.portfolio_value || b.starting_cash || 10000), 0);
-          const sumPnl = allBots.reduce((acc, b) => acc + (b.pnl || 0), 0);
-          setEquity(sumEquity);
-          setTotalPnl(sumPnl);
-        }
-      }
-    } catch {}
-  };
 
   // Fetch live Alpaca account if configured or sync from bots
   const fetchLivePortfolio = async () => {
     setIsLoading(true);
     setAlpacaError(null);
 
-    const effectiveKeyId = alpacaKeyId || localStorage.getItem('neuroquant_alpaca_key_id') || '';
-    const effectiveSecretKey = alpacaSecretKey || localStorage.getItem('neuroquant_alpaca_secret_key') || '';
+    const effectiveKeyId = alpacaKeyId;
+    const effectiveSecretKey = alpacaSecretKey;
+    setEquity(0); setCash(0); setBuyingPower(0); setTotalPnl(0);
+    setDailyPnl(0); setDailyPnlPct(0); setAccountDetails(null);
+    setRecentOrders([]); setPositions([]); setEquityHistory([]);
 
     try {
       if (effectiveKeyId && effectiveSecretKey) {
@@ -178,6 +165,18 @@ export default function Portfolio({
           }
           if (data.orders && Array.isArray(data.orders)) {
             setRecentOrders(data.orders);
+          }
+          const historyPeriod: Record<string, string> = { '1D': '1D', '7D': '1W', '30D': '1M', '90D': '3M', '6M': '6M', '1Y': '1A' };
+          const historyResponse = await fetch('/api/alpaca/portfolio/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alpaca_key_id: effectiveKeyId, alpaca_secret_key: effectiveSecretKey, period: historyPeriod[timeRange] || '1D' })
+          });
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json();
+            setEquityHistory(Array.isArray(historyData.history) ? historyData.history
+              .filter((point: any) => Number.isFinite(Number(point.equity)))
+              .map((point: any) => ({ date: new Date(Number(point.timestamp) * 1000).toLocaleDateString(), val: Number(point.equity) })) : []);
           }
           if (data.positions && Array.isArray(data.positions)) {
             const totalPosPl = data.positions.reduce((sum: number, p: any) => sum + (parseFloat(p.unrealized_pl) || 0), 0);
@@ -215,16 +214,14 @@ export default function Portfolio({
           const errData = await res.json().catch(() => ({}));
           setAlpacaError(errData.detail || 'Alpaca account query returned error.');
           setIsAlpacaConnected(false);
-          await fetchBotsFallback();
         }
       } else {
         setIsAlpacaConnected(false);
-        await fetchBotsFallback();
+        setAlpacaError('Connect an Alpaca paper account to view verified balances and positions.');
       }
     } catch (err) {
       console.warn("Portfolio live sync error:", err);
       setAlpacaError("Network error communicating with Alpaca backend.");
-      await fetchBotsFallback();
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +229,7 @@ export default function Portfolio({
 
   useEffect(() => {
     fetchLivePortfolio();
-  }, [alpacaKeyId, alpacaSecretKey]);
+  }, [alpacaKeyId, alpacaSecretKey, timeRange]);
 
   // Liquidate specific position
   const handleLiquidate = async (symbol: string) => {
@@ -258,8 +255,7 @@ export default function Portfolio({
         setActionMessage(`Network error liquidating ${symbol}.`);
       }
     } else {
-      setPositions(prev => prev.filter(p => p.asset !== symbol));
-      setActionMessage(`Position ${symbol} closed.`);
+      setActionMessage('Connect an authorized Alpaca account before submitting a liquidation request.');
     }
 
     setTimeout(() => setActionMessage(null), 4000);
@@ -295,7 +291,7 @@ export default function Portfolio({
                 : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
             }`}>
               <span className={`w-2 h-2 rounded-full ${isAlpacaConnected ? 'bg-emerald-400 animate-pulse' : 'bg-indigo-400'}`} />
-              <span>{isAlpacaConnected ? 'Alpaca Paper Live' : 'Sandbox Fleet'}</span>
+              <span>{isAlpacaConnected ? 'Alpaca Paper' : 'Disconnected'}</span>
             </div>
           </div>
           <p className="text-xs md:text-sm text-slate-400 font-medium mt-1">
@@ -314,7 +310,7 @@ export default function Portfolio({
           </button>
 
           <div className="flex bg-[#0c101d] p-1 rounded-xl border border-white/5 text-xs">
-            {(['1D', '7D', '30D', '90D', 'YTD', 'ALL'] as const).map(tr => (
+            {(['1D', '7D', '30D', '90D', '6M', '1Y'] as const).map(tr => (
               <button
                 key={tr}
                 onClick={() => setTimeRange(tr)}
@@ -372,7 +368,7 @@ export default function Portfolio({
                 {dailyPnl >= 0 ? '+' : ''}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-medium">({dailyPnlPct >= 0 ? '+' : ''}{dailyPnlPct.toFixed(2)}%)</span>
               </div>
             </div>
-            <MiniSparkline color={dailyPnl >= 0 ? "#10B981" : "#F43F5E"} data={[30, 35, 42, 48, 55, 65]} width={55} height={20} />
+            <MiniSparkline color={dailyPnl >= 0 ? "#10B981" : "#F43F5E"} data={equityHistory.map(point => point.val)} width={55} height={20} />
           </div>
         </div>
 
@@ -471,7 +467,7 @@ export default function Portfolio({
                 {dailyPnlPct >= 0 ? '+' : ''}{dailyPnlPct.toFixed(2)}%
               </div>
             </div>
-            <MiniSparkline color="#A855F7" data={[20, 25, 38, 42, 50, 60]} width={55} height={20} />
+            <MiniSparkline color="#A855F7" data={equityHistory.map(point => point.val)} width={55} height={20} />
           </div>
         </div>
 
@@ -491,7 +487,9 @@ export default function Portfolio({
             </div>
 
             <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              {equityHistory.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-slate-500">Verified account history will appear after a successful account sync.</div>
+              ) : <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={equityHistory}>
                   <defs>
                     <linearGradient id="portEqGrad" x1="0" y1="0" x2="0" y2="1">
@@ -504,7 +502,7 @@ export default function Portfolio({
                   <Tooltip contentStyle={{ backgroundColor: '#090d19', borderColor: '#334155', borderRadius: '8px' }} />
                   <Area type="monotone" dataKey="val" stroke="#818CF8" strokeWidth={2.5} fill="url(#portEqGrad)" />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ class TelegramBotManager:
     """
     def __init__(self):
         self.bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-        self.authorized_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "8961634909").strip()
+        self.authorized_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
         self.bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Aiquantappbot").strip().lstrip("@")
         self.api_base = os.environ.get("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")
         self.is_running = False
@@ -37,9 +37,11 @@ class TelegramBotManager:
 
     def update_config(self, token: str = "", chat_id: str = "", bot_username: str = "", notifications: bool = True):
         with self._lock:
-            if token:
+            allow_runtime_updates = os.environ.get("TELEGRAM_ALLOW_RUNTIME_CREDENTIAL_UPDATES", "false").lower() == "true"
+            if allow_runtime_updates and token:
                 self.bot_token = token.strip()
-            if chat_id:
+            # The owner chat is immutable unless an operator explicitly enables runtime changes.
+            if allow_runtime_updates and chat_id:
                 self.authorized_chat_id = chat_id.strip()
             if bot_username:
                 self.bot_username = bot_username.strip().lstrip("@")
@@ -191,19 +193,14 @@ class TelegramBotManager:
         if not text:
             return
 
-        # Security check: if authorized_chat_id is configured, restrict to authorized chat
-        if self.authorized_chat_id and chat_id != self.authorized_chat_id:
-            # Self-registration helper: allow user to authorize if it's their first time
-            if text.startswith("/auth"):
-                self.authorized_chat_id = chat_id
-                self.send_message(chat_id, f"✅ <b>Terminal Authorized!</b> Chat ID <code>{chat_id}</code> is now the master control channel.\nType /help to view all commands.")
-                return
-            else:
-                self.send_message(
-                    chat_id,
-                    f"🔒 <b>Unauthorized Channel</b>\nYour Chat ID is <code>{chat_id}</code>.\nTo bind this chat as the master control center, send: <code>/auth</code>"
-                )
-                return
+        # Fail closed: never allow self-registration or commands without an owner chat.
+        chat_type = msg.get("chat", {}).get("type", "")
+        if not self.authorized_chat_id:
+            logger.error("Telegram control is disabled: TELEGRAM_CHAT_ID is not configured.")
+            return
+        if chat_type != "private" or chat_id != self.authorized_chat_id:
+            logger.warning("Rejected Telegram command from an unauthorized chat.")
+            return
 
         # Handle Commands
         parts = text.split()
@@ -262,8 +259,14 @@ class TelegramBotManager:
 
     def _handle_callback(self, query: dict):
         cq_id = query.get("id")
-        chat_id = str(query.get("message", {}).get("chat", {}).get("id", ""))
+        message = query.get("message", {})
+        chat = message.get("chat", {})
+        chat_id = str(chat.get("id", ""))
         data = query.get("data", "")
+        if not self.authorized_chat_id or chat.get("type") != "private" or chat_id != self.authorized_chat_id:
+            self.answer_callback_query(cq_id, "Unauthorized control channel.")
+            logger.warning("Rejected Telegram callback from an unauthorized chat.")
+            return
         self.answer_callback_query(cq_id)
 
         if data == "cmd_status":

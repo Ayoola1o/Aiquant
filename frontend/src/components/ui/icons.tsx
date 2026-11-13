@@ -1,0 +1,34 @@
+// Centralized React Icons adapter. Lineicons is used alongside the Lucide family.
+export {
+  LuInfo as Info, LuActivity as Activity, LuZap as Zap,
+  LuChartColumn as BarChart3, LuArrowRight as ArrowRight, LuSparkles as Sparkles,
+  LuBell as Bell, LuCpu as Cpu, LuUsers as Users, LuClock as Clock,
+  LuRadio as Radio, LuDownload as Download, LuRefreshCw as RefreshCw,
+  LuX as X, LuShield as Shield, LuPlay as Play, LuPause as Pause,
+  LuSquare as Square, LuPlus as Plus, LuOctagonAlert as AlertOctagon,
+  LuTriangleAlert as AlertTriangle, LuCheck as Check, LuCopy as Copy,
+  LuTerminal as Terminal, LuSettings as Settings, LuArchive as Archive,
+  LuTrendingUp as TrendingUp, LuTrendingDown as TrendingDown, LuBot as Bot,
+  LuFlaskConical as FlaskConical, LuSave as Save, LuArrowLeft as ArrowLeft,
+  LuChartBar as BarChart2, LuSend as Send, LuFileCode as FileCode,
+  LuMessageCircle as MessageCircle, LuCircleAlert as AlertCircle,
+  LuLayers as Layers, LuDatabase as Database, LuBrainCircuit as BrainCircuit,
+  LuRefreshCcw as RefreshCcw, LuSlidersHorizontal as SlidersHorizontal,
+  LuSearch as Search, LuNewspaper as Newspaper, LuChevronLeft as ChevronLeft, LuChevronRight as ChevronRight,
+  LuCoins as Coins, LuBuilding2 as Building2, LuBookOpen as BookOpen,
+  LuArrowUpRight as ArrowUpRight, LuArrowDownRight as ArrowDownRight,
+  LuGauge as Gauge, LuDollarSign as DollarSign, LuCalendar as Calendar,
+  LuRepeat2 as Repeat2, LuHeart as Heart, LuShare2 as Share2,
+  LuCircleCheck as CheckCircle2, LuHash as Hash, LuKey as Key,
+  LuShieldAlert as ShieldAlert, LuSettings as SettingsIcon, LuCircle as Circle,
+  LuTrash2 as Trash2, LuGlobe as Globe, LuBrain as Brain, LuEye as Eye,
+  LuEyeOff as EyeOff, LuMail as Mail, LuLock as Lock, LuUser as User,
+  LuCpu as CpuIcon, LuShieldCheck as ShieldCheck, LuCircleCheck as CheckCircle,
+  LuClock3 as Clock3, LuLayers3 as Layers3, LuMessageSquare as MessageSquare,
+  LuFlame as Flame, LuSiren as Siren, LuLayoutDashboard as LayoutDashboard,
+  LuCompass as Compass, LuBriefcase as Briefcase, LuMaximize2 as Maximize2,
+  LuChevronDown as ChevronDown, LuMoon as Moon, LuMenu as Menu, LuLogOut as LogOut,
+} from 'react-icons/lu';
+
+export { Lineicons } from '@lineiconshq/react-lineicons';
+export { Home2Outlined as LineHome } from '@lineiconshq/free-icons';

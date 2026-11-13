@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Bar, Line, Area } from 'recharts';
-import { BrainCircuit, RefreshCcw } from 'lucide-react';
+import { BrainCircuit, RefreshCcw } from './ui/icons';
 import FeatureInspector from './FeatureInspector';
 import AIDebatePanel from './AIDebatePanel';
 

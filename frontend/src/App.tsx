@@ -21,6 +21,7 @@ import FeatureEngineeringLab from './components/FeatureEngineeringLab';
 import RiskCommandCenter from './components/RiskCommandCenter';
 import AICommandCenter from './components/AICommandCenter';
 import DataManagement from './components/DataManagement';
+import { validAccessToken, signOut } from './lib/supabaseSession';
 
 
 
@@ -51,8 +52,9 @@ import {
   ArrowRight,
   Maximize2,
   X,
-  Menu
-} from 'lucide-react';
+  Menu,
+  Lineicons, LineHome
+} from './components/ui/icons';
 
 
 export default function App() {
@@ -64,11 +66,41 @@ export default function App() {
 }
 
 function QuantApp() {
-  const [session, setSession] = useState<string | null>(() => {
-    return localStorage.getItem('neuroquant_session') || null;
-  });
+  const [session, setSession] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    localStorage.removeItem('neuroquant_session');
+    validAccessToken().then(async (token) => {
+      if (!token) return null;
+      const response = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error('Session expired');
+      return response.json();
+    }).then(data => { if (active) setSession(data?.user?.username || null); })
+      .catch(() => { if (active) setSession(null); })
+      .finally(() => { if (active) setAuthLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('/api/') && !url.startsWith('/api/auth/config') && !url.startsWith('/api/auth/me')) {
+        const token = await validAccessToken();
+        if (token) {
+          const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+          headers.set('Authorization', `Bearer ${token}`);
+          init = { ...init, headers };
+        }
+      }
+      return originalFetch(input, init);
+    };
+    return () => { window.fetch = originalFetch; };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -196,43 +228,30 @@ function QuantApp() {
 
   const [selectedStrategyId, setSelectedStrategyId] = useState('default');
 
-  // Global API credential settings — persisted to localStorage
-  const [alpacaKeyId, setAlpacaKeyId] = useState<string>(() =>
-    localStorage.getItem('neuroquant_alpaca_key_id') || ''
-  );
-  const [alpacaSecretKey, setAlpacaSecretKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_alpaca_secret_key') || ''
-  );
-  const [openAiApiKey, setOpenAiApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_openai_api_key') || ''
-  );
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_gemini_api_key') || ''
-  );
-  const [techAgentKey, setTechAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_tech_agent_key') || ''
-  );
-  const [sentimentAgentKey, setSentimentAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_sentiment_agent_key') || ''
-  );
-  const [tradingViewAgentKey, setTradingViewAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_tradingview_agent_key') || ''
-  );
-  const [hyperliquidAgentKey, setHyperliquidAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_hyperliquid_agent_key') || ''
-  );
-  const [hyperliquidPrivateKey, setHyperliquidPrivateKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_hyperliquid_private_key') || ''
-  );
-  const [firecrawlAgentKey, setFirecrawlAgentKey] = useState<string>(() => 
-    localStorage.getItem('neuroquant_firecrawl_agent_key') || ''
-  );
-  const [openRouterApiKey, setOpenRouterApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_openrouter_api_key') || ''
-  );
-  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>(() =>
-    localStorage.getItem('neuroquant_nvidia_api_key') || ''
-  );
+  // API credentials are held in memory only; do not persist secrets in browser storage.
+  const [alpacaKeyId, setAlpacaKeyId] = useState<string>('');
+  const [alpacaSecretKey, setAlpacaSecretKey] = useState<string>('');
+  const [openAiApiKey, setOpenAiApiKey] = useState<string>('');
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [techAgentKey, setTechAgentKey] = useState<string>('');
+  const [sentimentAgentKey, setSentimentAgentKey] = useState<string>('');
+  const [tradingViewAgentKey, setTradingViewAgentKey] = useState<string>('');
+  const [hyperliquidAgentKey, setHyperliquidAgentKey] = useState<string>('');
+  const [hyperliquidPrivateKey, setHyperliquidPrivateKey] = useState<string>('');
+  const [firecrawlAgentKey, setFirecrawlAgentKey] = useState<string>('');
+  const [openRouterApiKey, setOpenRouterApiKey] = useState<string>('');
+  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>('');
+
+  useEffect(() => {
+    [
+      'neuroquant_alpaca_key_id', 'neuroquant_alpaca_secret_key',
+      'neuroquant_openai_api_key', 'neuroquant_gemini_api_key',
+      'neuroquant_tech_agent_key', 'neuroquant_sentiment_agent_key',
+      'neuroquant_tradingview_agent_key', 'neuroquant_hyperliquid_agent_key',
+      'neuroquant_hyperliquid_private_key', 'neuroquant_firecrawl_agent_key',
+      'neuroquant_openrouter_api_key', 'neuroquant_nvidia_api_key'
+    ].forEach((key) => localStorage.removeItem(key));
+  }, []);
 
   // Global AI Model Settings
   const [aiModel, setAiModel] = useState<string>(() =>
@@ -374,61 +393,36 @@ function QuantApp() {
     localStorage.setItem('neuroquant_strategies', JSON.stringify(strategies));
   }, [strategies]);
 
-  // Sync Alpaca credentials to localStorage
+  // Persist non-secret model preferences only.
   useEffect(() => {
-    localStorage.setItem('neuroquant_alpaca_key_id', alpacaKeyId);
-    localStorage.setItem('neuroquant_alpaca_secret_key', alpacaSecretKey);
-  }, [alpacaKeyId, alpacaSecretKey]);
-
-  // Sync AI Assistant API credentials & models to localStorage
-  useEffect(() => {
-    localStorage.setItem('neuroquant_openai_api_key', openAiApiKey);
-    localStorage.setItem('neuroquant_gemini_api_key', geminiApiKey);
-    localStorage.setItem('neuroquant_tech_agent_key', techAgentKey);
-    localStorage.setItem('neuroquant_sentiment_agent_key', sentimentAgentKey);
-    localStorage.setItem('neuroquant_tradingview_agent_key', tradingViewAgentKey);
-    localStorage.setItem('neuroquant_hyperliquid_agent_key', hyperliquidAgentKey);
-    localStorage.setItem('neuroquant_hyperliquid_private_key', hyperliquidPrivateKey);
-    localStorage.setItem('neuroquant_firecrawl_agent_key', firecrawlAgentKey);
-    localStorage.setItem('neuroquant_openrouter_api_key', openRouterApiKey);
-    localStorage.setItem('neuroquant_nvidia_api_key', nvidiaApiKey);
     localStorage.setItem('neuroquant_ai_model', aiModel);
     localStorage.setItem('neuroquant_openai_model', openaiModel);
     localStorage.setItem('neuroquant_gemini_model', geminiModel);
     localStorage.setItem('neuroquant_openrouter_model', openRouterModel);
     localStorage.setItem('neuroquant_nvidia_model', nvidiaModel);
-  }, [
-    openAiApiKey, 
-    geminiApiKey,
-    techAgentKey,
-    sentimentAgentKey,
-    tradingViewAgentKey,
-    hyperliquidAgentKey,
-    hyperliquidPrivateKey,
-    firecrawlAgentKey,
-    openRouterApiKey, 
-    nvidiaApiKey, 
-    aiModel, 
-    openaiModel, 
-    geminiModel, 
-    openRouterModel, 
-    nvidiaModel
-  ]);
+  }, [aiModel, openaiModel, geminiModel, openRouterModel, nvidiaModel]);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLoginSuccess = (username: string) => {
     setSession(username);
-    localStorage.setItem('neuroquant_session', username);
     navigate('/dashboard');
   };
 
-  const handleLogout = () => {
-    setSession(null);
-    localStorage.removeItem('neuroquant_session');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } finally {
+      setSession(null);
+      navigate('/');
+    }
   };
+
+  // Restore the server-validated cookie session before deciding which routes to render.
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#05070c] text-xs font-mono text-slate-400">Restoring secure session...</div>;
+  }
 
   // Checks if current path is a public page (Landing Page or Login)
   const isPublicPage = location.pathname === '/' || location.pathname === '/login';
@@ -468,11 +462,7 @@ function QuantApp() {
             >
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
                 <div className="w-full h-full bg-[#080b14] rounded-[10px] flex items-center justify-center">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-indigo-400">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 17L12 22L22 17" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 12L12 17L22 12" stroke="#C084FC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <Lineicons icon={LineHome} size={18} color="#818cf8" strokeWidth={1.8} />
                 </div>
               </div>
               <div className="min-w-0">
@@ -567,7 +557,7 @@ function QuantApp() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#0a0c16] to-[#05070c]">
         {/* Top Header */}
-        <header className="px-8 py-4 border-b border-white/5 flex justify-between items-center bg-[#0d111d]/70 backdrop-blur-md gap-4 sticky top-0 z-30">
+        <header className="px-4 sm:px-6 xl:px-8 py-4 border-b border-white/5 flex justify-between items-center bg-[#0d111d]/70 backdrop-blur-md gap-4 sticky top-0 z-30">
           <div className="flex items-center gap-4 min-w-0">
             {!sidebarOpen && (
               <button
@@ -659,7 +649,7 @@ function QuantApp() {
 
 
         {/* Content Box */}
-        <main className="p-8 flex-1 overflow-y-auto">
+        <main className="p-4 sm:p-6 xl:p-8 flex-1 overflow-y-auto min-w-0">
           <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -695,8 +685,6 @@ function QuantApp() {
               <Backtester 
                 strategies={strategies} 
                 selectedStrategyId={selectedStrategyId} 
-                alpacaKeyId={alpacaKeyId}
-                alpacaSecretKey={alpacaSecretKey}
               />
             } />
             <Route path="/live" element={

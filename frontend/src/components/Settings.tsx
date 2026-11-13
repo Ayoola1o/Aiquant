@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Key, ShieldAlert, Cpu, Settings as SettingsIcon, Bell, CheckCircle2, Circle, Plus, Trash2, Globe, Brain, Database, Eye, EyeOff, RefreshCw } from './ui/icons';
 
 interface SettingsProps {
   alpacaKeyId: string;
@@ -492,13 +492,13 @@ export default function Settings({
           <div>
             <label className="block text-slate-400 text-xs font-semibold mb-2">Alpaca Secret Key</label>
             <input
-              type="text"
+              type={showKeys ? "text" : "password"}
               value={alpacaSecretKey}
               onChange={(e) => setAlpacaSecretKey(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 rounded-xl text-xs font-mono outline-none"
               placeholder="••••••••••••••••••••••••••••••••"
             />
-            <p className="text-[10px] text-slate-600 mt-1">Stored in browser localStorage — used for live account balance & order execution.</p>
+            <p className="text-[10px] text-slate-600 mt-1">Held in memory for this browser session only; re-enter after refreshing. Do not store broker secrets in browser storage.</p>
           </div>
 
           <div>
@@ -513,7 +513,7 @@ export default function Settings({
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <span className="text-xs text-slate-500 font-semibold">API Keys are stored locally in your browser.</span>
+            <span className="text-xs text-slate-500 font-semibold">API keys are kept in memory for this session and are not saved in browser storage.</span>
             <button
               type="button"
               onClick={() => setShowKeys(!showKeys)}

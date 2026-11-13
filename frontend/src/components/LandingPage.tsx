@@ -1,4 +1,4 @@
-import { Shield, Cpu, Activity, TrendingUp, CpuIcon, Sparkles } from 'lucide-react';
+import { Shield, Cpu, Activity, TrendingUp, CpuIcon, Sparkles } from './ui/icons';
 
 interface LandingPageProps {
   onLaunch: () => void;

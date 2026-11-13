@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { Search, ArrowUpRight, ArrowDownRight, RefreshCw } from './ui/icons';
 
 interface ScannerResult {
   symbol: string;

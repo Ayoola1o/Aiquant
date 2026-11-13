@@ -12,7 +12,7 @@ import {
   Users, 
   Clock, 
   Radio 
-} from 'lucide-react';
+} from './ui/icons';
 
 interface AssetRow {
   symbol: string;
