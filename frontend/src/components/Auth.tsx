@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight } from './ui/icons';
+import { Loader2 } from 'lucide-react';
 import { signIn, signUp } from '../lib/supabaseSession';
 
 interface AuthProps {
