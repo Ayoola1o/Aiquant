@@ -3,6 +3,8 @@ import os
 import json
 import logging
 import traceback
+import secrets
+import time
 import requests
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -12,7 +14,9 @@ from dotenv import load_dotenv
 # Load environment variables (e.g. GEMINI_API_KEY)
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -33,10 +37,82 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Supabase Auth: validate the access token on every protected API request.
+from supabase_auth import SupabaseAuthError, verify_supabase_token
+
+AUTH_PUBLIC_PATHS = {"/", "/api/stocks", "/api/auth/config"}
+ADMIN_ONLY_PREFIXES = (
+    "/api/live/", "/api/alpaca/", "/api/telegram/", "/api/risk/",
+    "/api/backtest", "/api/strategies", "/api/experiments", "/api/history",
+    "/api/social/x-handles", "/api/test/run",
+)
+
+class AuthenticationMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if request.method == "OPTIONS" or path in AUTH_PUBLIC_PATHS:
+            request.state.user = None
+            return await call_next(request)
+        if path.startswith("/api/"):
+            authorization = request.headers.get("authorization", "")
+            scheme, _, token = authorization.partition(" ")
+            if scheme.lower() != "bearer" or not token:
+                return JSONResponse({"detail": "Authentication required."}, status_code=401)
+            try:
+                user = await asyncio.to_thread(verify_supabase_token, token)
+            except SupabaseAuthError as exc:
+                return JSONResponse({"detail": str(exc)}, status_code=401)
+            request.state.user = user
+            # Existing app routes still include global (not tenant-isolated) trading
+            # state. Until each route is moved to user-scoped Supabase storage,
+            # trader accounts may access only public market-data/analysis endpoints.
+            trader_safe = (
+                path.startswith("/api/market/")
+                or path.startswith("/api/features/inspect")
+                or path.startswith("/api/predict")
+            )
+            if user["role"] != "admin" and not trader_safe:
+                return JSONResponse({"detail": "This resource is not yet enabled for trader accounts."}, status_code=403)
+        return await call_next(request)
+
+app.add_middleware(AuthenticationMiddleware)
+
+@app.get("/api/auth/config")
+def auth_config():
+    return {
+        "supabase_url": os.environ.get("SUPABASE_URL", "").rstrip("/"),
+        "supabase_publishable_key": os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", ""),
+    }
+
+@app.get("/api/auth/me")
+def current_account(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    return {"user": user}
+
+
+# One-time short-lived tickets avoid putting Supabase JWTs in WebSocket URLs.
+_WS_TICKETS: dict[str, tuple[str, float]] = {}
+
+@app.post("/api/auth/ws-ticket")
+def create_websocket_ticket(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Administrator permission required.")
+    now = time.time()
+    for ticket, (_, expires) in list(_WS_TICKETS.items()):
+        if expires <= now:
+            _WS_TICKETS.pop(ticket, None)
+    ticket = secrets.token_urlsafe(32)
+    _WS_TICKETS[ticket] = (user["id"], now + 30)
+    return {"ticket": ticket, "expires_in": 30}
+
+
 # Enable CORS for frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in os.environ.get("AIQUANT_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -145,17 +221,17 @@ class RiskProfileModel(BaseModel):
     atr_risk_percent: float = 1.0
     atr_period: int = 14
     atr_multiplier: float = 2.0
-    max_order_value_enabled: bool = False
+    max_order_value_enabled: bool = True
     max_order_value: float = 5000.0
-    price_collar_enabled: bool = False
+    price_collar_enabled: bool = True
     max_spread_percent: float = 0.5
-    correlation_limit_enabled: bool = False
+    correlation_limit_enabled: bool = True
     max_allocation_per_asset: float = 20.0
-    max_simultaneous_trades_enabled: bool = False
+    max_simultaneous_trades_enabled: bool = True
     max_simultaneous_trades: int = 5
-    max_drawdown_enabled: bool = False
+    max_drawdown_enabled: bool = True
     max_drawdown_percent: float = 3.0
-    heartbeat_check_enabled: bool = False
+    heartbeat_check_enabled: bool = True
     max_heartbeat_stale_seconds: int = 30
     exit_size_pct: float = 100.0
     auto_rebalance_enabled: bool = False
@@ -294,9 +370,18 @@ def predict_prices(req: PredictRequest):
 
 @app.post("/api/backtest")
 def run_backtest(req: BacktestRequest):
+    # Keep custom strategy execution fail-closed until an isolated worker is deployed.
     """
     Compiles and executes a custom strategy script against historical data.
+
+    WARNING: strategy execution currently uses Python exec and is not sandboxed.
+    Keep this endpoint disabled until an isolated worker is deployed.
     """
+    if os.environ.get("AIQUANT_ENABLE_UNSANDBOXED_BACKTEST", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail="Custom strategy backtesting is temporarily disabled while secure isolated execution is being deployed."
+        )
     warmup_days = 210
     actual_period = req.period
     warmup_candles = 0
@@ -311,13 +396,14 @@ def run_backtest(req: BacktestRequest):
         except Exception:
             pass
 
+    if not req.ticker or not req.ticker.strip():
+        raise HTTPException(status_code=400, detail="A valid ticker is required.")
+    if not pd.notna(req.starting_capital) or req.starting_capital <= 0:
+        raise HTTPException(status_code=400, detail="Starting capital must be greater than zero.")
     df = qe.fetch_historical_data(
-        req.ticker,
-        period=actual_period,
-        interval=req.interval,
-        alpaca_key_id=req.alpaca_key_id,
-        alpaca_secret_key=req.alpaca_secret_key,
-        exchange=req.exchange
+        req.ticker.strip().upper(), period=actual_period, interval=req.interval,
+        alpaca_key_id=os.environ.get("ALPACA_KEY_ID", ""),
+        alpaca_secret_key=os.environ.get("ALPACA_SECRET_KEY", ""), exchange=req.exchange
     )
     if df.empty:
         raise HTTPException(status_code=400, detail=f"Failed to fetch historical data for {req.ticker}")
@@ -638,11 +724,17 @@ def resume_bot_endpoint(bot_id: str):
 
 @app.post("/api/live/bots/stop/{bot_id}")
 def stop_bot(bot_id: str, close_pct: float = 1.0):
+    if not 0 < close_pct <= 1:
+        raise HTTPException(status_code=400, detail="close_pct must be greater than 0 and at most 1.")
+    if live_session.get_bot(bot_id) is None:
+        raise HTTPException(status_code=404, detail="Bot not found.")
     live_session.stop_bot(bot_id, close_pct=close_pct)
     return {"status": "success", "bots": live_session.get_all_states()}
 
 @app.delete("/api/live/bots/{bot_id}")
 def delete_bot_endpoint(bot_id: str):
+    if live_session.get_bot(bot_id) is None:
+        raise HTTPException(status_code=404, detail="Bot not found.")
     live_session.delete_bot(bot_id)
     return {"status": "success", "bots": live_session.get_all_states()}
 
@@ -738,8 +830,12 @@ def get_alpaca_account_and_positions(req: AlpacaAccountRequest):
             raise HTTPException(status_code=400, detail=f"Account query failed ({acc_r.status_code}): {acc_r.text}")
             
         account_data = acc_r.json()
-        positions_data = pos_r.json() if pos_r.status_code == 200 else []
-        orders_data = ord_r.json() if ord_r.status_code == 200 else []
+        if pos_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Alpaca positions query failed ({pos_r.status_code}).")
+        if ord_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Alpaca orders query failed ({ord_r.status_code}).")
+        positions_data = pos_r.json()
+        orders_data = ord_r.json()
         
         equity_val = float(account_data.get("portfolio_value", account_data.get("equity", 0.0)))
         last_equity_val = float(account_data.get("last_equity", equity_val))
@@ -2142,58 +2238,15 @@ async def evaluate_adk_pipeline(req: ADKEvaluationRequest):
     return result
 
 @app.get("/api/profile")
-def get_user_profile():
-    """
-    Returns mock data for the User Profile Terminal of Alexander Ramirez.
-    """
+def get_user_profile(request: Request):
+    user = request.state.user
     return {
-        "name": "Alexander Ramirez",
-        "title": "Senior Quantitative Analyst & AI Lead",
-        "member_since": "Jan 2019",
-        "email": "ramirez.alex@neuroquant.ai",
-        "linked_profile": "linked-profile: alex-r-quant-lead",
-        "roles": [
-            {"name": "Lead", "project": "NeuroLSTM"},
-            {"name": "Contributor", "project": "Anomaly Models"}
-        ],
-        "account_settings": {
-            "tier": "Pro+ Terminal Tier",
-            "renewal": "Jan 15, 2025",
-            "2fa_enabled": True,
-            "api_keys_masked": "******Keys, ******Keys",
-            "last_login_ip": "192.168.2.125"
-        },
-        "integrations": {
-            "alpaca": True,
-            "polygon": True,
-            "aws": True
-        },
-        "model_dev_history": [
-            {"year": "2019", "models": 1},
-            {"year": "2020", "models": 2},
-            {"year": "2021", "models": 3},
-            {"year": "2022", "models": 4},
-            {"year": "2023", "models": 7}
-        ],
-        "contributions": [
-            {"name": "NeuroLSTM_x2.0", "role": "Lead", "status": "Active"},
-            {"name": "Anomaly Detection V1", "role": "Lead", "status": "Active"},
-            {"name": "Anomaly Detection V3", "role": "Contributor", "status": "Live"},
-            {"name": "Anomaly Detection V3", "role": "Lead", "status": "Live"}
-        ],
-        "activity_feed": [
-            {"timestamp": "2026-06-28 14:20", "event": "Published Research Draft: 'AI in High-Frequency Volatility Prediction'"},
-            {"timestamp": "2026-06-28 10:15", "event": "Hyper-parameter optimization: NeuroLSTM_x2.0 (complete)"},
-            {"timestamp": "2026-06-27 18:40", "event": "Created new model feature set: 'Alternative Alpha'"},
-            {"timestamp": "2026-06-27 09:30", "event": "Code Review: LSTM V3 model"}
-        ],
-        "skills": [
-            {"subject": "Quantitative", "value": 85, "fullMark": 100},
-            {"subject": "Optimization", "value": 90, "fullMark": 100},
-            {"subject": "Sentiment Analysis", "value": 75, "fullMark": 100},
-            {"subject": "Data Sourcing", "value": 80, "fullMark": 100},
-            {"subject": "Feature Engineering", "value": 95, "fullMark": 100}
-        ]
+        "name": user["username"], "title": "Aiquant Trader",
+        "member_since": user["created_at"], "email": user["email"],
+        "linked_profile": "", "roles": [],
+        "account_settings": {"tier": "Standard", "renewal": "", "2fa_enabled": False, "api_keys_masked": "", "last_login_ip": ""},
+        "integrations": {"alpaca": False, "polygon": False, "aws": False},
+        "model_dev_history": [], "contributions": [], "activity_feed": [], "skills": []
     }
 
 class AlpacaChartDataRequest(BaseModel):
@@ -2788,6 +2841,11 @@ def run_integration_tests():
 
 @app.websocket("/ws/live-trading")
 async def websocket_endpoint(websocket: WebSocket):
+    ticket = websocket.query_params.get("ticket", "")
+    ticket_data = _WS_TICKETS.pop(ticket, None)
+    if not ticket_data or ticket_data[1] <= time.time():
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     await websocket.accept()
     live_session.connected_websockets.add(websocket)
     print(f"[WS] Client connected. Total: {len(live_session.connected_websockets)}", flush=True)

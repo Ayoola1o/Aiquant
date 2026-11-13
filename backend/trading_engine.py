@@ -64,22 +64,22 @@ class RiskManager:
             "atr_period": 14,
             "atr_multiplier": 2.0,
             
-            "max_order_value_enabled": False,
+            "max_order_value_enabled": True,
             "max_order_value": 5000.0,
             
-            "price_collar_enabled": False,
+            "price_collar_enabled": True,
             "max_spread_percent": 0.5,
             
-            "correlation_limit_enabled": False,
+            "correlation_limit_enabled": True,
             "max_allocation_per_asset": 20.0,
             
-            "max_simultaneous_trades_enabled": False,
+            "max_simultaneous_trades_enabled": True,
             "max_simultaneous_trades": 5,
             
-            "max_drawdown_enabled": False,
+            "max_drawdown_enabled": True,
             "max_drawdown_percent": 3.0,
             
-            "heartbeat_check_enabled": False,
+            "heartbeat_check_enabled": True,
             "max_heartbeat_stale_seconds": 30,
 
             "auto_rebalance_enabled": False,

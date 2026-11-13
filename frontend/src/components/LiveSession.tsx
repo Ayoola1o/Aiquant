@@ -238,19 +238,10 @@ export default function LiveSession({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const isMountedRef = useRef(true);
   const reconnectTimeoutRef = useRef<any | null>(null);
   const reconnectDelayRef = useRef(1000);
   const terminalBottomRef = useRef<HTMLDivElement | null>(null);
-
-  // Fallback realistic live candles if backend bot is idle
-  const fallbackCandles = [
-    { time: '09:00', open: 63100, high: 63400, low: 62900, close: 63250, volume: 1420 },
-    { time: '10:00', open: 63250, high: 63650, low: 63150, close: 63580, volume: 2100 },
-    { time: '11:00', open: 63580, high: 63800, low: 63300, close: 63420, volume: 1850 },
-    { time: '12:00', open: 63420, high: 63920, low: 63400, close: 63890, volume: 3200 },
-    { time: '13:00', open: 63890, high: 64150, low: 63750, close: 64020, volume: 2900 },
-    { time: '14:00', open: 64020, high: 64300, low: 63900, close: 63845.60, volume: 2450 }
-  ];
 
   // Load active bots from backend REST endpoint
   const fetchAllBots = async () => {
@@ -268,12 +259,14 @@ export default function LiveSession({
   };
 
   // Connect WebSocket to /ws/live-trading
-  const connectWebSocket = () => {
+  const connectWebSocket = async () => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : window.location.host;
-    const wsUrl = `${wsProto}//${wsHost}/ws/live-trading`;
-
     try {
+      const ticketResponse = await fetch('/api/auth/ws-ticket', { method: 'POST' });
+      if (!ticketResponse.ok) throw new Error('Unable to authorize live session.');
+      const { ticket } = await ticketResponse.json();
+      const wsUrl = `${wsProto}//${wsHost}/ws/live-trading?ticket=${encodeURIComponent(ticket)}`;
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
@@ -299,9 +292,11 @@ export default function LiveSession({
       };
 
       ws.onclose = () => {
+        if (!isMountedRef.current) return;
         setIsLiveConnected(false);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
           reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 15000);
           connectWebSocket();
         }, reconnectDelayRef.current);
@@ -317,14 +312,15 @@ export default function LiveSession({
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     connectWebSocket();
     fetchAllBots();
     const interval = setInterval(fetchAllBots, 3500);
-
     return () => {
+      isMountedRef.current = false;
       clearInterval(interval);
-      if (socketRef.current) socketRef.current.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (socketRef.current) { socketRef.current.onclose = null; socketRef.current.close(); }
     };
   }, []);
 
@@ -343,8 +339,7 @@ export default function LiveSession({
   // Create active bot representation
   const activeBot = bots[selectedBotId] || (botEntries.length > 0 ? botEntries[0][1] : null);
 
-  // If no bots from backend yet, use a fallback preview bot structure
-  const displayBots = botEntries.length > 0 ? botEntries.map(([id, b]) => {
+  const displayBots = botEntries.map(([id, b]) => {
     const pnl = b.pnl || (b.portfolio_value ? b.portfolio_value - (b.starting_cash || 10000) : 0);
     const pnlPct = b.starting_cash ? (pnl / b.starting_cash) * 100 : 0;
     const rawStatus = (b.status || '').toLowerCase();
@@ -367,64 +362,14 @@ export default function LiveSession({
       leverage: `${b.leverage_limit || 10}x`,
       pnl24h: pnl,
       pnl24hPct: pnlPct,
-      positionSize: (b.positions && typeof b.positions === 'object' && b.symbol in b.positions) ? `${b.positions[b.symbol]} ${b.symbol}` : (b.positions && b.positions.length > 0 ? `${b.positions[0].qty} ${b.symbol}` : '0.50 BTC'),
-      positionValue: b.portfolio_value ? `$${b.portfolio_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$31,591.20',
-      entryPrice: b.avg_cost || (b.positions && b.positions.length > 0 ? b.positions[0].entry_price : 63182.45),
-      markPrice: b.current_price || (b.active_candle ? b.active_candle.close : 63845.60),
-      unrealizedPnl: b.unrealized_pnl ?? pnl,
-      unrealizedPnlPct: pnlPct,
-      stopLoss: b.stop_loss || (b.current_price ? b.current_price * 0.96 : 61500),
-      takeProfit: b.take_profit || (b.current_price ? b.current_price * 1.05 : 66500),
-      riskReward: '1:2.31',
-      confidence: b.agentic_mode ? 85 : 74,
-      raw: b
+      positionSize: (b.positions && typeof b.positions === 'object' && b.symbol in b.positions) ? `${b.positions[b.symbol]} ${b.symbol}` : (Array.isArray(b.positions) && b.positions.length > 0 ? `${b.positions[0].qty} ${b.symbol}` : '—'),
+      positionValue: Number.isFinite(Number(b.portfolio_value)) ? `${Number(b.portfolio_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
+      entryPrice: Number(b.avg_cost) || 0, markPrice: Number(b.current_price || b.active_candle?.close) || 0,
+      unrealizedPnl: Number(b.unrealized_pnl ?? pnl) || 0, unrealizedPnlPct: pnlPct,
+      stopLoss: Number(b.stop_loss) || 0, takeProfit: Number(b.take_profit) || 0,
+      riskReward: '—', confidence: null, raw: b
     };
-  }) : [
-    {
-      id: 'default',
-      name: 'Momentum Pro (Default)',
-      pair: 'BTC/USDT Perp',
-      symbol: 'BTCUSDT',
-      status: 'ACTIVE' as const,
-      side: 'Long' as const,
-      leverage: '10x',
-      pnl24h: 845.32,
-      pnl24hPct: 3.24,
-      positionSize: '0.50 BTC',
-      positionValue: '$31,591.20',
-      entryPrice: 63182.45,
-      markPrice: 63845.60,
-      unrealizedPnl: 366.22,
-      unrealizedPnlPct: 1.17,
-      stopLoss: 61500.00,
-      takeProfit: 66500.00,
-      riskReward: '1:2.31',
-      confidence: 78,
-      raw: {}
-    },
-    {
-      id: 'bot_eth_revert',
-      name: 'Mean Revert ETH',
-      pair: 'ETH/USDT Perp',
-      symbol: 'ETHUSDT',
-      status: 'ACTIVE' as const,
-      side: 'Long' as const,
-      leverage: '8x',
-      pnl24h: 512.18,
-      pnl24hPct: 1.82,
-      positionSize: '2.00 ETH',
-      positionValue: '$6,494.36',
-      entryPrice: 3247.18,
-      markPrice: 3286.50,
-      unrealizedPnl: 283.36,
-      unrealizedPnlPct: 4.73,
-      stopLoss: 3120.00,
-      takeProfit: 3650.00,
-      riskReward: '1:1.94',
-      confidence: 72,
-      raw: {}
-    }
-  ];
+  });
 
   // Dynamic tab counts
   const activeBotsCount = displayBots.filter(b => b.status === 'ACTIVE').length;
@@ -441,67 +386,27 @@ export default function LiveSession({
   });
 
   // Calculate Fleet Aggregates
-  const totalFleetValue = displayBots.reduce((sum, b) => sum + (parseFloat(b.positionValue.replace(/[$,]/g, '')) || 10000), 0);
-  const totalFleetPnl = displayBots.reduce((sum, b) => sum + b.pnl24h, 0);
-  const totalFleetPnlPct = (totalFleetPnl / (displayBots.length * 10000)) * 100;
+  const totalFleetValue = displayBots.reduce((sum, b) => sum + (Number(b.raw?.portfolio_value) || 0), 0);
+  const totalFleetPnl = displayBots.reduce((sum, b) => sum + (Number(b.pnl24h) || 0), 0);
+  const totalFleetPnlPct = totalFleetValue > 0 ? (totalFleetPnl / totalFleetValue) * 100 : 0;
 
   // Active Bot Candlesticks
-  const activeCandles = (activeBot?.history && activeBot.history.length > 0) 
-    ? activeBot.history.map((c: any, idx: number) => ({
+  const activeCandles = Array.isArray(activeBot?.history)
+    ? activeBot.history.filter((c: any) => [c.open, c.high, c.low, c.close].every((v: any) => Number.isFinite(Number(v)))).map((c: any, idx: number) => ({
         time: c.timestamp ? new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `T-${idx}`,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume || 1000
-      }))
-    : fallbackCandles;
-
-  // Active Bot Positions
-  const activePositions = activeBot?.positions && activeBot.positions.length > 0
-    ? activeBot.positions.map((p: any) => ({
-        asset: `${p.symbol || activeBot.symbol || 'BTCUSDT'} Perp`,
-        side: p.side?.toUpperCase() || 'LONG',
-        size: `${p.qty || 0.5} ${p.symbol || 'BTC'}`,
-        entryPrice: p.entry_price || p.price || 63182.45,
-        markPrice: activeBot.current_price || 63845.60,
-        unrealizedPnl: p.unrealized_pl || 366.22,
-        unrealizedPnlPct: p.unrealized_plpc || 1.17,
-        alloc: 42.5
-      }))
-    : [
-        {
-          asset: `${activeBot?.symbol || 'BTC/USDT'} Perp`,
-          side: 'LONG',
-          size: '0.50 BTC',
-          entryPrice: 63182.45,
-          markPrice: 63845.60,
-          unrealizedPnl: 366.22,
-          unrealizedPnlPct: 1.17,
-          alloc: 42.5
-        },
-        {
-          asset: 'ETH/USDT Perp',
-          side: 'LONG',
-          size: '2.00 ETH',
-          entryPrice: 3247.18,
-          markPrice: 3286.50,
-          unrealizedPnl: 283.36,
-          unrealizedPnlPct: 4.73,
-          alloc: 28.3
-        }
-      ];
-
-  // Active Bot Terminal Logs
-  const activeLogs = (activeBot?.logs && activeBot.logs.length > 0)
-    ? activeBot.logs
-    : [
-        `[${new Date().toLocaleTimeString()}] [System] Live Session engine initialized. Connected to Binance WebSocket.`,
-        `[${new Date().toLocaleTimeString()}] [Risk] Global Drawdown Guard: ACTIVE (< 3.0% Max DD).`,
-        `[${new Date().toLocaleTimeString()}] [Engine] Heartbeat check passed. Latency: 38ms.`,
-        `[${new Date().toLocaleTimeString()}] [Signal: BUY] Momentum breakout detected on BTC/USDT at 63,182.45. Order filled: 0.50 BTC.`,
-        `[${new Date().toLocaleTimeString()}] [Telemetry] Trailing Stop-Loss adjusted to 61,500.00. TP target: 66,500.00.`
-      ];
+        open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close), volume: Number(c.volume) || 0
+      })) : [];
+  const positionRows = Array.isArray(activeBot?.positions)
+    ? activeBot.positions
+    : Object.entries(activeBot?.positions || {}).filter(([, qty]) => Number(qty) !== 0).map(([symbol, qty]) => ({ symbol, qty, side: Number(qty) < 0 ? 'SHORT' : 'LONG' }));
+  const activePositions = positionRows.map((p: any) => ({
+    asset: `${p.symbol || activeBot?.symbol || 'Unknown'} Perp`,
+    side: (p.side || (Number(p.qty) < 0 ? 'SHORT' : 'LONG')).toUpperCase(),
+    size: `${p.qty ?? 0} ${p.symbol || activeBot?.symbol || ''}`,
+    entryPrice: Number(p.entry_price || p.price) || 0, markPrice: Number(activeBot?.current_price) || 0,
+    unrealizedPnl: Number(p.unrealized_pl) || 0, unrealizedPnlPct: Number(p.unrealized_plpc) || 0, alloc: 0
+  }));
+  const activeLogs = Array.isArray(activeBot?.logs) ? activeBot.logs : [];
 
   // Handle Spawning a New Bot
   const handleSpawnBot = async (e: React.FormEvent) => {
@@ -538,15 +443,15 @@ export default function LiveSession({
       ? targetStrategy.code 
       : defaultStratCode;
 
-    const effAlpacaKey = globalAlpacaKeyId || localStorage.getItem('neuroquant_alpaca_key_id') || '';
-    const effAlpacaSec = globalAlpacaSecretKey || localStorage.getItem('neuroquant_alpaca_secret_key') || '';
-    const effHlPriv = hyperliquidPrivateKey || localStorage.getItem('neuroquant_hyperliquid_private_key') || '';
-    const effGemini = geminiApiKey || localStorage.getItem('neuroquant_gemini_api_key') || '';
-    const effTech = techAgentKey || localStorage.getItem('neuroquant_tech_agent_key') || '';
-    const effSent = sentimentAgentKey || localStorage.getItem('neuroquant_sentiment_agent_key') || '';
-    const effTv = tradingViewAgentKey || localStorage.getItem('neuroquant_tradingview_agent_key') || '';
-    const effHl = hyperliquidAgentKey || localStorage.getItem('neuroquant_hyperliquid_agent_key') || '';
-    const effFc = firecrawlAgentKey || localStorage.getItem('neuroquant_firecrawl_agent_key') || '';
+    const effAlpacaKey = globalAlpacaKeyId || '';
+    const effAlpacaSec = globalAlpacaSecretKey || '';
+    const effHlPriv = hyperliquidPrivateKey || '';
+    const effGemini = geminiApiKey || '';
+    const effTech = techAgentKey || '';
+    const effSent = sentimentAgentKey || '';
+    const effTv = tradingViewAgentKey || '';
+    const effHl = hyperliquidAgentKey || '';
+    const effFc = firecrawlAgentKey || '';
 
     const newBotId = `bot_${Date.now()}`;
 
